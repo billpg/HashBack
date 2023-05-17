@@ -1,19 +1,72 @@
 # BearerTokenExchange
 Server-to-Server Bearer Token Exchange Protocol
 
-## What problem am I trying to fix?
+## The elevator pitch.
 
-Web Server **A** wants to make a request to Web Server **B**. Because we have TLS, A can be sure that it is talking with server B. However, B can't be at all certain the request it is processing came from A.
+Alice and Bob are normal web servers with an API.
+- (Alice opens an HTTPs request to Bob.)
+- "Hey Bob. I want to use yor API but I need a Bearer token."
+  - (Bob opens a separate HTTPS request to Alice.)
+  - "Hey Alice, have this Bearer token."
+  - "Thanks Bob."
+- "Thanks Alice."
 
-Most APIs deal with this using a process of shared secrets. The management console of an SaaS service will have a way to generate a shared secret that needs to be configured into the service making the request. Because that secret will be expected to be kept long term, it needs to be kept secure, requiring secret stores.
+When anyone opens an HTTPS request, thanks to TLS they can be sure who they are connecting to, but sometime the recipient also needs to know who the client is.
 
-Since we do have TLS, if both sides of the conversation are already web servers, both sides already have a system of exchanging keys that's been established for decades. TLS itself.
+By using *two* HTTPS requests in opposite directions, two web servers may perform a brief handshake and exchange a *Bearer* token. All without needing pre-shared secrets, additiona PKI systems or having to deal with TLS client certficates.
 
-This protocol allows servers to pass short-term "Bearer" authentication tokens between servers without having to store long-term secrets.
+## How does it work?
 
-## How would it work?
+Alice Jones is a rutabaga farmer and her business is growing and selling rutabagas. She has a website, **rutabaga.example**, where she take orders from the public and allows deliveries to be tracked.
 
-You're a rutabaga farmer and you want to sell rutabagas. There's a service out there that handles shopping carts, payments and customer support. All you have to do is package up thse rutabagas and deliver them when that service tells you to.
+Bob Smith runs **veggies.example**, a website that sells boxes of a mixture of vegetables to the public. He doesn't own any farms but instead contracts with farming businesses to supply those vegetables which he sorts into boxes and ships to his customers.
+
+Because both Alice and Bob own web servers on the public internet, each with TLS certificates already set up, they are ideal for this exchange to work. 
+
+### 401
+
+The traditional first step with an HTTP request that requires authentication is to make the request *without* authentication and be told what's missing. The HTTP response code for a request that requirs authenticaton is **401** with a **WWW-Authentication** header.
+```
+GET https://veggies.example/api/status.json
+
+401 Needs authentication...
+WWW-Authenticate: PickAName BearerRequest=https://veggies.example/api/bearer_request
+```
+
+In the real world, an API would probably document where this end-point is and the calling code would skip directly to making that request without waiting to be told to. Nonetheless, this response informs the caller they need a Bearer token and the URL to make a POST request to get it.
+
+Also note that this URL doesn't have to be at the same domain as the original request. A service could outsource it's Bearer token generation if it wishes.
+
+### BearerRequest
+
+Either when instructed to by a 401 response or by API documentation, when the client needs to request a Bearer token, they start by making opening a new request.
+```
+POST https://veggies.example/api/bearer_request
+Content-Type: application/json
+{ 
+    "Version": "DRAFTY-DRAFT-2",
+    "Requestor"; "rutabagas.example",
+    "RequestId: "B85636A1-41C1-409B-B112-B5F56E9575D7",
+    "TempKey": "(todo)"
+}
+```
+
+- `"Version"` is a string that identifies that we're doing a bearer token exchange and that this version of this document is being followed.
+  - If the service does not support this version, it may respond with a 400 response and a list of versions it does support. See below.
+- `"Requestor"` is the full domain name of the service that making the request.
+- `"RequestId"` is a GUID that will be repeated in the subsequent request to supply the requested Bearer token.
+- `"TempKey"` is a JSON string encoding at least 512 bits of cryptographic qulity randomness.
+  - The string could be hex or base64 encoded. Either way it will be passed into PBKDF2 as a series of bytes.
+
+### Generate and Encrypt the Bearer token
+At this point, the server *veggies.example* doesn't know if the request for a Bearer token came from the genuine *rutabagas.example* or not. 
+
+### BearerIssue
+While keeping the BearerRequest connection open and unresponded-to, the recipient of the BearerRequest will open a new separate HTTPS request to the domain specified in the `Requestor` property.
+```
+POST https://rutabagas.example/.well-known/PickAName/BearerIssue
+Content-
+
 
 How do you know when an order is placed? This service allows you, as a supplier, to register a "callback". When a customer makes a purchase, it will call your API with a very simple POST request.
 ```
@@ -64,7 +117,6 @@ The store-front service needs a Bearer token for your website. Maybe it's decidi
 POST https://rutabaga-farmer.example/api/this/is/veggies-store/give/me/a/bearer/token/please/
 {
    "Version": "DRAFTY-DRAFT-1",
-   "RequestId: "B85636A1-41C1-409B-B112-B5F56E9575D7",
    "InitiatorTempKey": "(fill this in)",
 }
 ```
