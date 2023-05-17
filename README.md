@@ -47,7 +47,7 @@ Content-Type: application/json
     "Version": "DRAFTY-DRAFT-2",
     "Requestor"; "rutabagas.example",
     "RequestId: "B85636A1-41C1-409B-B112-B5F56E9575D7",
-    "TempKey": "(todo)"
+    "MacKeyHex": "(todo)"
 }
 ```
 
@@ -55,19 +55,21 @@ Content-Type: application/json
   - If the service does not support this version, it may respond with a 400 response and a list of versions it does support. See below.
 - `"Requestor"` is the full domain name of the service that making the request.
 - `"RequestId"` is a GUID that will be repeated in the subsequent request to supply the requested Bearer token.
-- `"MacKey"` is a string to be used as the HMAC key later on.
-  - It must only contain printable ASCII characters. (33 to 126.) 
-  - It must contain at least 256 bits of cryptographic qualiy randomness.
-
+- `"MacKeyHex"` is 256 bits of cryptographic quality randomness, hex encoded, to be used as the HMAC key later on.
 
 ### BearerIssue
 At this point, the server *veggies.example* doesn't know if the request for a Bearer token came from the genuine *rutabagas.example* or not. Only that a someoe that *claims* to be this server is making the request.  
 
 The service generates a Bearer token for the claimed domain. As only a service in possession on a legitimate TLS key for that domain will be capable of using it, it is no a problem if the requestor is not actually of the claimed domain. (There may be virtue in specifying an optional "was this you?" request to allow this possibility to be checked before generating the token.)
 
+As well as the Bearer token itself, the new request also needs to include an HMAC of the token using the `"MacKey"` value from the earlier request. This will allow the recipient of the token to be sure it came from the expected source because no-one else would know that key. The following parameters are used to perform the HMAC.
+- Algorthithm: HMAC-SHA256
+- Key: (Value of MacKeyHex, after decoding hex into bytes.)
+- Value: (Value of Bearer token as UTF-8 bytes.)
+
 While keeping the BearerRequest connection open and unresponded-to, the recipient of the BearerRequest will open a new separate HTTPS request to the domain specified in the `Requestor` property.
 ```
-POST https://rutabagas.example/.well-known/PickAName/
+POST https://rutabagas.example/.well-known/PickAName
 Content-Type: application/json
 {
     "Version": "DRAFTY-DRAFT-2",
@@ -81,9 +83,18 @@ Content-Type: application/json
 - `"Version"` and `"RequestId"` are repeated from the earlier request to link this with the earlier transaction.
 - `"BearerToken"` is the bearer token itself.
 - `"ExpiresAt"` is the time when this Bearer token will expire.
-- `"HashHex"` is the result of running HMACSHA256 on the Bearer token with the *MacKey* from the   
+- `"HashHex"` is the result of running HMACSHA256 on the Bearer token with the *MacKeyHex* value from the earlier request
 
-The issuer can be sure only the legitimate requestor received the Bearer token thanks to TLS. The requestor can be sure the tken is genuine because it was verified by the MAC using the key it supplied earlier.
+The issuer can be sure only the legitimate requestor received the Bearer token thanks to TLS. The r
+equestor can be sure the tken is genuine because it was verified by the MAC using the key it supplied earlier.
+
+Because the authentication is done at the level of a domain, the URL for the POST request is always done with the path `/.well-known/PickAName`. The URL `/.well-known/` is reserved for operations at the "site" level and should be reserved and sepaated from day-to-day use such as user names. The response to a POST request may be a 307 or 308 redirect. If this is the case the the caller should repeat the POST request at the new location.
+
+Once the recipient has the Bearer token, it may confirm it is genuine by repeating the HMAC and confirming the hash matches the once supplied. If it does, it can be sure the Bearer token is genuine and can proceed to use it in subsequent requests.
+
+Both requests handled, each side can close their respective requests with a 204 code.
+
+-------------------------------------------------------------------
 
 How do you know when an order is placed? This service allows you, as a supplier, to register a "callback". When a customer makes a purchase, it will call your API with a very simple POST request.
 ```
