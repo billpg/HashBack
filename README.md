@@ -11,9 +11,24 @@ Alice and Bob are normal web servers with an API.
   - "Thanks Bob."
 - "Thanks Alice."
 
-When anyone opens an HTTPS request, thanks to TLS they can be sure who they are connecting to, but sometime the recipient also needs to know who the client is.
+When anyone opens an HTTPS request, thanks to TLS they can be sure who they are connecting to, but they can't be sure who was making the request.
 
-By using *two* HTTPS requests in opposite directions, two web servers may perform a brief handshake and exchange a *Bearer* token. All without needing pre-shared secrets, additiona PKI systems or having to deal with TLS client certficates.
+By using *two* HTTPS requests in opposite directions, two web servers may perform a brief handshake and exchange a *Bearer* token. All without needing pre-shared secrets, additional PKI systems or having to deal with TLS client certficates.
+
+### What's a Bearer token?
+
+A Bearer token is string of characters. It might be a signed JWT or it might be a string of random characters. If you know what that string of characters are, you can include it any web request where you want to show who you are. The token itself is generted (or "issued") by the service that will accept that token later on 
+
+```
+POST /api/some/secure/api/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ4IjoiYmlsbHBnLmNvbS9qMSJ9.nggyu
+{ "Stuff": "Nonsense" }
+```
+
+That's basically it. It's like a password but very long. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Cookies (those things websites keep asking if you consent to) use the same mechanism as Bearer tokens. In fact a lot of APIs will check both the `Authorization:` and `Cookie:` headers and treat them the same.
+
+Bearer tokens typically have short life-times and you'd normally be given an expiry time along with the token itself.
+
 
 ## How does it work?
 
@@ -30,7 +45,7 @@ The traditional first step with an HTTP request that requires authentication is 
 GET https://veggies.example/api/status.json
 
 401 Needs authentication...
-WWW-Authenticate: PickAName BearerRequest=https://veggies.example/api/bearer_request
+WWW-Authenticate: PickAName Realm=MyRealm BearerRequest=https://veggies.example/api/bearer_request
 ```
 
 In the real world, an API would probably document where this end-point is and the calling code would skip directly to making that request without waiting to be told to. Nonetheless, this response informs the caller they need a Bearer token and the URL to make a POST request to get it.
@@ -45,6 +60,7 @@ POST https://veggies.example/api/bearer_request
 Content-Type: application/json
 { 
     "Version": "DRAFTY-DRAFT-2",
+    "Realm": "MyRealm",
     "Requestor"; "rutabagas.example",
     "RequestId: "B85636A1-41C1-409B-B112-B5F56E9575D7",
     "MacKeyHex": "(todo)"
@@ -53,6 +69,8 @@ Content-Type: application/json
 
 - `"Version"` is a string that identifies that we're doing a bearer token exchange and that this version of this document is being followed.
   - If the service does not support this version, it may respond with a 400 response and a list of versions it does support. See below.
+- `"Realm"` is a copy of the Realm string supplied in the `WWW-Authenticate` header.
+  - If not used, this property should be missing for have a `null` value.
 - `"Requestor"` is the full domain name of the service that making the request.
 - `"RequestId"` is a GUID that will be repeated in the subsequent request to supply the requested Bearer token.
 - `"MacKeyHex"` is 256 bits of cryptographic quality randomness, hex encoded, to be used as the HMAC key later on.
@@ -73,6 +91,7 @@ POST https://rutabagas.example/.well-known/PickAName
 Content-Type: application/json
 {
     "Version": "DRAFTY-DRAFT-2",
+    "Realm": "MyRealm",
     "RequestId: "B85636A1-41C1-409B-B112-B5F56E9575D7",
     "BearerToken": "(TODO)",
     "ExpiresAt": "2023-10-24T14:15:16Z",
@@ -80,7 +99,7 @@ Content-Type: application/json
 }
 ```
 
-- `"Version"` and `"RequestId"` are repeated from the earlier request to link this with the earlier transaction.
+- `"Version"`, `"Realm"` and `"RequestId"` are repeated from the earlier request to link this with the earlier transaction.
 - `"BearerToken"` is the bearer token itself.
 - `"ExpiresAt"` is the time when this Bearer token will expire.
 - `"HashHex"` is the result of running HMACSHA256 on the Bearer token with the *MacKeyHex* value from the earlier request
@@ -121,19 +140,6 @@ Fortunately, the SaaS people have thought of this and they won't let you set a U
 
 The next option is to use **Server to Server Bearer Token Exchange**. If you select this option there's another text box for you to type in the URL that will implement your side of the exchange. When their service needs to call your API to deliver some rutabagas, it will first perform this exchange and it will have a Bearer token, which it can then use to authenticate itself when it makes that POST call to place a delivery order.
 
-### What's a Bearer token?
-
-A Bearer token is string of characters. It might be a signed JWT or it might be a string of random characters. If you know what that string of characters are, you can include it any web request where you want to show who you are.
-
-```
-POST /api/some/secure/api/
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJtZXNzYWdlIjoiaHR0cHM6Ly9iaWxscGcuY29tL2p3dG1zZy8ifQ.iSGtXjdOYkS4kedikg8eEVZczPnIdjaHMdMGqu0ai0M
-{ "Stuff": "Nonsense" }
-```
-
-That's basically it. It's like a password but very long. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Cookies (those things websites keep asking if you consent to) use the same mechanism as Bearer tokens. In fact a lot of APIs will check both the `Authorization:` and `Cookie:` headers and treat them the same.
-
-Bearer tokens typically have short life-times and you'd normally be given an expiry time along with the token itself.
 
 ## The Exchange
 
