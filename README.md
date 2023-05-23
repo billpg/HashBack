@@ -33,6 +33,10 @@ This document describes a mechanism to request a Bearer token. The process takes
 
 ## The exchange in a nutshell.
 
+The core exchange takes the form of two HTTPS requests, the **TokenRequest** and the **TokenIssue**.
+
+### TokenRequest
+
 Alice needs a Bearer token from Bob. She makes a request to the URL Bob pushlished.
 
 ```
@@ -66,10 +70,12 @@ Content-Type: application/json
   - A key that will be used to "sign" the Bearer key with an HMAC, confirming the Bearer key came from the expected source.
   - The value is 256 bits of cryptographic quality randomness.
 
-Bob opens a new separate HTTP request to Alice. The URL used will always be `https://` + (Value of `SendToDomain`) + `/.well-known/PickAName`.
+### TokenIssue
+
+At this stage, Bob doesn't know for certain that the TokenRequest actually came from Alice. Nonetheless, Bob issues a Bearer token for Alice and sends it via a new separate HTTP request to Alice. The URL used will always be `https://` + (Value of `SendToDomain`) + `/.well-known/PickAName/TokenIssue`. Thanks to TLS, Bob can be sure that only Alice is receiving it.
 
 ```
-POST https://alice.example/.well-known/PickAName
+POST https://alice.example/.well-known/PickAName/TokenIssue
 Content-Type: application/json
 {
     "PickAName": "DRAFTY-DRAFT-2",
@@ -81,32 +87,89 @@ Content-Type: application/json
 }
 ```
 
-- `POST https://alice.example/.well-known/PickAName`
+- `POST https://alice.example/.well-known/PickAName/TokenIssue`
   - The URL, except for the domain name, is fixed.
 - `"PickAName", "Realm", "RequestId"`
-  - These are copied from the initial request.
+  - These are copied from the initial TokenRequest body.
   - The request ID might be used to unite this request with the initial request.
 - `"BearerToken": "...",`
   - This is the requested Bearer token. It may be used for subsequent requests with the API.
 - `"ExpiresAt": "2023-10-24T14:15:16Z",`
   - The UTC expiry time of this Bearer token in ISO format.
 - `"HashHex": "(TODO)",`
-  - The HMAC-256 hash of the Bearer token, using the value of `MacKeyHax` in the initial requets as the key. 
-  
-Once both sides are content their side of the transaction is complete and sucessful, they close down the request with a `204` response.
+  - The HMAC-256 hash of the Bearer token, using the value of `MacKeyHax` from the TokenRequest body as the key. 
 
-### 401 Response
+### HTTPS Responses
 
-The above interactions are he core of this protocol, but the traditional first step with an HTTP request is to make it *without* authentication and be told what's missing. The HTTP response code for a request that requires authenticaton is `401` with a `WWW-Authentication` header.
+Once both sides are content their side of the transaction is complete and sucessful, they close down the request with a `204` response to indi, te success.
+
+If the server can't use or has any kind of vaidation error with a request, it should respond with a `400` error. The body should include enough detail for a developer to fix the underlying issue.
+
+Server errors should result in an applicable `5xx` error, indicating that the caller should try again later.
+
+## 401 Response - Kicking it off
+
+The above interactions are the core of this protocol, but the traditional first step with an HTTP request is to make it *without* authentication and be told what's missing. The HTTP response code for a request that requires authenticaton is `401` with a `WWW-Authentication` header.
 
 ```
 GET https://bob.example/api/status.json
 
 401 Needs authentication...
-WWW-Authenticate: PickAName Realm=MyRealm Request=/api/RequestBearerToken
+WWW-Authenticate: PickAName realm=MyRealm url=/api/RequestBearerToken
 ```
 
-In the real world, an API would probably document where this end-point is and the calling code would skip directly to making that request without waiting to be told to. Nonetheless, this response informs the caller they need a Bearer token, the URL to make a POST request to get it and the "Realm" to use when making that request.
+- The optional `realm` parameter value, if used, should be copied into the TokenRequest message. It allows for variation of the issued token if desired.
+- The required `url` parameter specifies the URL to send the TokenRequest POST.
+
+Per the HTTP standard, this `WWW-Authenticate` header may appear alongside other `WWW-Authenticate` headers, or together in a single header separated by commas.
+
+An API, instead of using this mechanism, might document where this end-point is and the calling code would skip directly to making that request without waiting to be told to. Nonetheless, this response informs the caller they need a Bearer token, the URL to make a POST request to get it and the "Realm" to use when making that request.
+
+## Redirect responses to TokenIssue requests
+
+Because the authentication is done at the level of a domain, the URL for the POST request is always done with the path `/.well-known/PickAName`. The URL `/.well-known/` is reserved for operations at the "site" level and should be reserved and sepaated from day-to-day use such as user names. The response to a POST request may be a 307 or 308 redirect. If this is the case the the caller should repeat the POST request at the new location.
+
+## Version Negotiation
+
+The intial request JSON includes a property named `"PickAName"` with a value specifying the version of this protocol the client is using. As this is the first (and so far, only) version, all requests should include this string. For servers that implement only this version of the protocol, if the property is missing or has a different value, it should return a `400` response.
+
+(That later version of this document may include guidance for how to indicate inside a 400 response that this older version *is* still supported.)
+
+## The HMAC hash
+
+The recipient of the TokenIssue request will be able to confirm the source of the Bearer token by repeating the HMAC hash and checking it matches the one supplied alongside the Bearer token. The following parameters are used to perform the HMAC.
+- Algorthithm: HMAC-SHA256
+- Key: (Value of MacKeyHex, after decoding hex into bytes.)
+- Value: (Value of Bearer token as UTF-8 bytes.)
+
+If the hash doesn't match the one supplied in the TokenIssue request, the Bearer token should be discarded. 
+
+## "Was that you"?
+
+In the discussion of the TokenIssue request above, the issuer generates a new Bearer token with the assumption that the TokenRequest is genuine. If the effort to generate a Bearer token is low, there is no problem to generate a token only to see it never used.
+
+If the effort to generate a token is high, the issuer may wish to make a request to confirm the original TokenRequest was genuine before making the effort to generate the Bearer token.
+
+This request is made to the `/.well-known/PickAName/RequestVerify` URL with the following structure.
+```
+POST https://alice.example/.well-known/PickAName/RequestVerify
+Content-Type: application/json
+{
+    "PickAName": "DRAFTY-DRAFT-2",
+    "Realm": "MyRealm",
+    "RequestId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
+    "HashHex": "(TODO)"
+}
+```
+
+- As before the `"PickAName"`, `"Realm"` and `"RequestId"` are copied from the original TokenRequest body.
+- `"HashHex"` is the result, in hex, of running the same HMAC algorithm as above but with an empty byte-array as the Value instead of the Bearer token.
+
+The recipient can confirm if the request is genuine by confirming the supplied details along with checking if whoever is making this verification request has the same MAC key by chekcing the HMAC result. 
+
+The response to the POST request will be a `200` status code and the JSON request body will have a property named `"IsRequestValid"` with a value of `true` or `false`.
+
+(Note that `200` is used for both confirmation and rejection responses. `400` or similar responses should only be used if the request is bad, such as missing properties.)
 
 ------------------------------------------------------------
 
@@ -139,10 +202,7 @@ At this point, the server *veggies.example* doesn't know if the request for a Be
 
 The service generates a Bearer token for the claimed domain. As only a service in possession on a legitimate TLS key for that domain will be capable of using it, it is no a problem if the requestor is not actually of the claimed domain. (There may be virtue in specifying an optional "was this you?" request to allow this possibility to be checked before generating the token.)
 
-As well as the Bearer token itself, the new request also needs to include an HMAC of the token using the `"MacKey"` value from the earlier request. This will allow the recipient of the token to be sure it came from the expected source because no-one else would know that key. The following parameters are used to perform the HMAC.
-- Algorthithm: HMAC-SHA256
-- Key: (Value of MacKeyHex, after decoding hex into bytes.)
-- Value: (Value of Bearer token as UTF-8 bytes.)
+As well as the Bearer token itself, the new request also needs to include an HMAC of the token using the `"MacKey"` value from the earlier request. This will allow the recipient of the token to be sure it came from the expected source because no-one else would know that key.
 
 While keeping the BearerRequest connection open and unresponded-to, the recipient of the BearerRequest will open a new separate HTTPS request to the domain specified in the `Requestor` property.
 ```
@@ -166,7 +226,6 @@ Content-Type: application/json
 The issuer can be sure only the legitimate requestor received the Bearer token thanks to TLS. The r
 equestor can be sure the tken is genuine because it was verified by the MAC using the key it supplied earlier.
 
-Because the authentication is done at the level of a domain, the URL for the POST request is always done with the path `/.well-known/PickAName`. The URL `/.well-known/` is reserved for operations at the "site" level and should be reserved and sepaated from day-to-day use such as user names. The response to a POST request may be a 307 or 308 redirect. If this is the case the the caller should repeat the POST request at the new location.
 
 Once the recipient has the Bearer token, it may confirm it is genuine by repeating the HMAC and confirming the hash matches the once supplied. If it does, it can be sure the Bearer token is genuine and can proceed to use it in subsequent requests.
 
