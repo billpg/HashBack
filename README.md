@@ -5,19 +5,19 @@ Server-to-Server Bearer Token Exchange Protocol
 
 Alice and Bob are normal web servers with an API.
 - (Alice opens an HTTPs request to Bob.)
-- "Hey Bob. I want to use yor API but I need a Bearer token."
+- "Hey Bob. I want to use your API but I need a Bearer token."
   - (Bob opens a separate HTTPS request to Alice.)
   - "Hey Alice, have this Bearer token."
   - "Thanks Bob."
 - "Thanks Alice."
 
-When anyone opens an HTTPS request, thanks to TLS they can be sure who they are connecting to, but they can't be sure who was making the request.
+When anyone opens an HTTPS request, thanks to TLS they can be sure who they are connecting to, but neither can be sure who was making the request.
 
 By using *two* HTTPS requests in opposite directions, two web servers may perform a brief handshake and exchange a *Bearer* token. All without needing pre-shared secrets, additional PKI systems or having to deal with TLS client certficates.
 
 ### What's a Bearer token?
 
-A Bearer token is string of characters. It might be a signed JWT or it might be a string of random characters. If you know what that string of characters are, you can include it any web request where you want to show who you are. The token itself is generted (or "issued") by the service that will accept that token later on 
+A Bearer token is string of characters. It might be a signed JWT or it might be a short string of random characters. If you know what that string is, you can include it any web request where you want to show who you are. The token itself is generted (or "issued") by the service that will accept that token later on as proof that you are who you say you are, because no-one else would have the token. 
 
 ```
 POST /api/some/secure/api/
@@ -25,10 +25,62 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ4IjoiYmlsbHBnLmNvb
 { "Stuff": "Nonsense" }
 ```
 
-That's basically it. It's like a password but very long. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Cookies (those things websites keep asking if you consent to) use the same mechanism as Bearer tokens. In fact a lot of APIs will check both the `Authorization:` and `Cookie:` headers and treat them the same.
+That's basically it. It's like a password but very long and issued by the remote service. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Cookies (those things websites keep asking if you consent to) are a common variation of the Bearer tokens.
 
-Bearer tokens typically have short life-times and you'd normally be given an expiry time along with the token itself.
+Bearer tokens typically (but not always) have short life-times and you'd normally be given an expiry time along with the token itself.
 
+This document describes a mechanism to request a Bearer token. The process takes a little time so you'd keep a copy of the token until it has expired. You could request one ahead of time so you've got one ready when you need it.
+
+## The exchange in a nutshell.
+
+Alice needs a Bearer token from Bob. She makes a request to the URL Bob pushlished.
+
+```
+POST https://bob.example/api/RequestBearerToken
+Content-Type: application/json
+{
+    "PickAName": "DRAFTY-DRAFT-2",
+    "Realm": "MyRealm",
+    "RequestId: "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
+    "SendToDomain": "alice.example",
+    "MacKeyHex": "253893686BB94369A271A04010B674B17EBD984D7A5F85788EB856E50350788E"
+}
+```
+
+- `POST https://bob.example/api/RequestBearerToken`
+  - Bob published and documented this URL. He could have instead used a `401` response. (See section **401 Response** later.)
+- `"PickAName": "DRAFTY-DRAFT-2",`
+  - This indicates the client is attempting to use the PickAName process and is using the version described in this document.
+  - The client might prefer to use a later versio. If the service does not support that version, it may indicate the versions is knws in a `400` response. (See section **Version Negotiaton** later.)
+- `"Realm": "MyRealm",`
+  - The service may specify a particuar realm which is specified here.
+  - The request may use `null` to mean the same as not having a realm.
+- `"RequestId: "C4C61859-0DF3-4A8D-B1E0-DDF25912279B"`  
+  - A GUID that will be repeated back in the new HTTPS request sent back to the caller.
+  - This is optional. `null` is the same as not supplying a value.
+- `"SendToDomain": "alice.example",` 
+  - A success response doesn't come back via the same HTTPS response, but via a new HTTPS request sent to the website at the domain specified here.
+  - The value is a full domain name. If the domain is IDN type, the value is encoded using normal JSON/UTF-8 rules.
+- `"MacKeyHex": "253893686BB94369A271A04010B674B17EBD984D7A5F85788EB856E50350788E"`
+  - A key that will be used to "sign" the Bearer key with an HMAC, confirming the Bearer key came from the expected source.
+  - The value is 256 bits of cryptographic quality randomness. 
+
+Bob opens a new separate HTTP request to Alice. The URL used will always be `https://` + (Value of `SendToDomain`) + `/.well-known/PickAName`.
+
+```
+POST https://alice.example/.well-known/PickAName
+Content-Type: application/json
+{
+    "PickAName": "DRAFTY-DRAFT-2",
+    "Realm": "MyRealm",
+    "RequestId: "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
+    "BearerToken": "F390DA7BE46F45F5AA27DB0020558FBAFB9194A165CD4158BBC9F6C1DBEE3DD1",
+    "ExpiresAt": "2023-10-24T14:15:16Z",
+    "HashHex": "(TODO)",
+}
+```
+
+- ``
 
 ## How does it work?
 
