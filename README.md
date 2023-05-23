@@ -41,21 +41,22 @@ Content-Type: application/json
 {
     "PickAName": "DRAFTY-DRAFT-2",
     "Realm": "MyRealm",
-    "RequestId: "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
+    "RequestId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
     "SendToDomain": "alice.example",
     "MacKeyHex": "253893686BB94369A271A04010B674B17EBD984D7A5F85788EB856E50350788E"
 }
 ```
 
 - `POST https://bob.example/api/RequestBearerToken`
-  - Bob published and documented this URL. He could have instead used a `401` response. (See section **401 Response** later.)
+  - Bob published and documented this URL. He could have instead used a `401` response to indicate where this request should take place. 
+  - (See section **401 Response** later.)
 - `"PickAName": "DRAFTY-DRAFT-2",`
   - This indicates the client is attempting to use the PickAName process and is using the version described in this document.
   - The client might prefer to use a later versio. If the service does not support that version, it may indicate the versions is knws in a `400` response. (See section **Version Negotiaton** later.)
 - `"Realm": "MyRealm",`
   - The service may specify a particuar realm which is specified here.
   - The request may use `null` to mean the same as not having a realm.
-- `"RequestId: "C4C61859-0DF3-4A8D-B1E0-DDF25912279B"`  
+- `"RequestId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B"`  
   - A GUID that will be repeated back in the new HTTPS request sent back to the caller.
   - This is optional. `null` is the same as not supplying a value.
 - `"SendToDomain": "alice.example",` 
@@ -63,7 +64,7 @@ Content-Type: application/json
   - The value is a full domain name. If the domain is IDN type, the value is encoded using normal JSON/UTF-8 rules.
 - `"MacKeyHex": "253893686BB94369A271A04010B674B17EBD984D7A5F85788EB856E50350788E"`
   - A key that will be used to "sign" the Bearer key with an HMAC, confirming the Bearer key came from the expected source.
-  - The value is 256 bits of cryptographic quality randomness. 
+  - The value is 256 bits of cryptographic quality randomness.
 
 Bob opens a new separate HTTP request to Alice. The URL used will always be `https://` + (Value of `SendToDomain`) + `/.well-known/PickAName`.
 
@@ -73,36 +74,42 @@ Content-Type: application/json
 {
     "PickAName": "DRAFTY-DRAFT-2",
     "Realm": "MyRealm",
-    "RequestId: "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
-    "BearerToken": "F390DA7BE46F45F5AA27DB0020558FBAFB9194A165CD4158BBC9F6C1DBEE3DD1",
+    "RequestId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
+    "BearerToken": "hnGbHGat49m1zRcpotQV9xPh7j8JgS1Qo0OCy4Wp2hIS43RJfhEyDvZnyoH5YZA",
     "ExpiresAt": "2023-10-24T14:15:16Z",
     "HashHex": "(TODO)",
 }
 ```
 
-- ``
+- `POST https://alice.example/.well-known/PickAName`
+  - The URL, except for the domain name, is fixed.
+- `"PickAName", "Realm", "RequestId"`
+  - These are copied from the initial request.
+  - The request ID might be used to unite this request with the initial request.
+- `"BearerToken": "...",`
+  - This is the requested Bearer token. It may be used for subsequent requests with the API.
+- `"ExpiresAt": "2023-10-24T14:15:16Z",`
+  - The UTC expiry time of this Bearer token in ISO format.
+- `"HashHex": "(TODO)",`
+  - The HMAC-256 hash of the Bearer token, using the value of `MacKeyHax` in the initial requets as the key. 
+  
+Once both sides are content their side of the transaction is complete and sucessful, they close down the request with a `204` response.
 
-## How does it work?
+### 401 Response
 
-Alice Jones is a rutabaga farmer and her business is growing and selling rutabagas. She has a website, **rutabaga.example**, where she take orders from the public and allows deliveries to be tracked.
+The above interactions are he core of this protocol, but the traditional first step with an HTTP request is to make it *without* authentication and be told what's missing. The HTTP response code for a request that requires authenticaton is `401` with a `WWW-Authentication` header.
 
-Bob Smith runs **veggies.example**, a website that sells boxes of a mixture of vegetables to the public. He doesn't own any farms but instead contracts with farming businesses to supply those vegetables which he sorts into boxes and ships to his customers.
-
-Because both Alice and Bob own web servers on the public internet, each with TLS certificates already set up, they are ideal for this exchange to work. 
-
-### 401
-
-The traditional first step with an HTTP request that requires authentication is to make the request *without* authentication and be told what's missing. The HTTP response code for a request that requirs authenticaton is **401** with a **WWW-Authentication** header.
 ```
-GET https://veggies.example/api/status.json
+GET https://bob.example/api/status.json
 
 401 Needs authentication...
-WWW-Authenticate: PickAName Realm=MyRealm BearerRequest=https://veggies.example/api/bearer_request
+WWW-Authenticate: PickAName Realm=MyRealm Request=/api/RequestBearerToken
 ```
 
-In the real world, an API would probably document where this end-point is and the calling code would skip directly to making that request without waiting to be told to. Nonetheless, this response informs the caller they need a Bearer token and the URL to make a POST request to get it.
+In the real world, an API would probably document where this end-point is and the calling code would skip directly to making that request without waiting to be told to. Nonetheless, this response informs the caller they need a Bearer token, the URL to make a POST request to get it and the "Realm" to use when making that request.
 
-Also note that this URL doesn't have to be at the same domain as the original request. A service could outsource it's Bearer token generation if it wishes.
+------------------------------------------------------------
+
 
 ### BearerRequest
 
