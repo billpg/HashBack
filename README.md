@@ -157,11 +157,18 @@ The recipient of the TokenIssue request will be able to confirm the source of th
 
 If the hash doesn't match the one supplied in the TokenIssue request, the Bearer token should be discarded. 
 
-## "Was that you"?
+## RequestVerify
 
-In the discussion of the TokenIssue request above, the issuer generates a new Bearer token with the assumption that the TokenRequest is genuine. If the effort to generate a Bearer token is low, there is no problem to generate a token only to see it never used.
+This request allows the service recieving a TokenRequest to first verify:
+- That the web service behind the domain named in the request implements this protocol.
+- That the service has possesion of the HMAC key supplied in the original request.
+- That the other properties of the request (ReqquestID, Realm, Version) are correct.
+- To avoid the burden of issuing a token for a fake TokenRequest.
 
-If the effort to generate a token is high, the issuer may wish to make a request to confirm the original TokenRequest was genuine before making the effort to generate the Bearer token.
+There are two HMAC-SHA256 operations that both sides of the conversation need to perform as part of verifying that the other side of the conversation is in possession of the HMAC key without reavling the key itself. In both the request and response JSON bodies, the hash result will be encoded in hex and supplied under the JSON key "HashHex" in both request and response.
+
+The request's fixed value is "PickAName-DRAFTY-DRAFT-2-RequestVerifyRequest".
+The response's fixed value is "PickAName-DRAFTY-DRAFT-2-RequestVerifyResponse".
 
 This request is made to the `/.well-known/PickAName/RequestVerify` URL with the following structure.
 ```
@@ -175,14 +182,21 @@ Content-Type: application/json
 }
 ```
 
-- As before the `"PickAName"`, `"Realm"` and `"RequestId"` are copied from the original TokenRequest body.
-- `"HashHex"` is the result, in hex, of running the same HMAC algorithm as above but with an empty byte-array as the Value instead of the Bearer token.
+The request repeats the `"PickAName"`, `"Realm"` and `"RequestId"` properties from the original TokenRequest body allowing the verifying server to look up which HMAC key it supplied in that request.
 
-The recipient can confirm if the request is genuine by confirming the supplied details along with checking if whoever is making this verification request has the same MAC key by chekcing the HMAC result. 
+The response to the POST request will be:
+```
+200 OK
+Content-Type: application/json
+{
+    "IsRequestVerfied": true,
+    "HashHex": "(TODO)"
+}
+```
 
-The response to the POST request will be a `200` status code and the JSON request body will have a property named `"IsRequestValid"` with a value of `true` or `false`.
+As this is a normal HTTP response, there is no need to repeat the request ID and other properties. The `"IsRequestVerified"` JSON property will be `true` or `false` indicating if the request was valid and that the HMAC hash was valid or not. If the value if `false` then the response need not include the `"HashHex"` property. 
 
-(Note that `200` is used for both confirmation and rejection responses. `400` or similar responses should only be used if the request is bad, such as missing properties.)
+Note that `200` is used for both confirmation and rejection responses. `400` or similar responses should only be used if the request is bad, such as missing properties.
 
 ## A brief security analysis
 
