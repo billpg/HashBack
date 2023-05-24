@@ -28,12 +28,16 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ4IjoiYmlsbHBnLmNvb
 That's basically it. It's like a password but very long and issued by the remote service. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Cookies are a common variation of the Bearer tokens.
 
 Bearer tokens typically (but not always) have short life-times and you'd normally be given an expiry time along with the token itself.
-
+ 
 This document describes a mechanism to request a Bearer token. The process takes a little time so you'd keep a copy of the token until it has expired. You could request one ahead of time so you've got one ready when you need it.
 
 ## The exchange in a nutshell.
 
-The core exchange takes the form of two HTTPS requests, the **TokenRequest** and the **TokenIssue**.
+The core exchange takes the form of three HTTPS requests:
+
+- **TokenRequest** where the interaction is initiated.
+- **RequestVerify** to confirm the the request is genuine.
+- **TokenIssue** to supply the issued Bearer token to the initiator.
 
 ### TokenRequest
 
@@ -56,7 +60,7 @@ Content-Type: application/json
   - (See section **401 Response** later.)
 - `"PickAName": "DRAFTY-DRAFT-2",`
   - This indicates the client is attempting to use the PickAName process and is using the version described in this document.
-  - The client might prefer to use a later versio. If the service does not support that version, it may indicate the versions is knws in a `400` response. (See section **Version Negotiaton** later.)
+  - The client might prefer to use a later version. If the service does not support that version, it may indicate the versions is knws in a `400` response. (See section **Version Negotiaton** later.)
 - `"Realm": "MyRealm",`
   - The service may specify a particuar realm which is specified here.
   - The request may use `null` to mean the same as not having a realm.
@@ -70,9 +74,55 @@ Content-Type: application/json
   - A key that will be used to "sign" the Bearer key with an HMAC, confirming the Bearer key came from the expected source.
   - The value is 256 bits of cryptographic quality randomness.
 
+The servce should return a `204` response once all the other transactions documented below have completed successfully. An error response indicates an error either in the request itslf (4xx) or during the processing of the request (5xx). The response body should contain enough detail for a developer to diagnose and fix the error. 
+
+### RequestVerify
+
+This request allows the service recieving a TokenRequest to first verify:
+- That the web service behind the domain named in the request implements this protocol.
+- That the service has possesion of the HMAC key supplied in the original request.
+- That the other properties of the request (ReqquestID, Realm, Version) are correct.
+- To avoid the burden of issuing a token for a fake TokenRequest.
+
+This step may be omitted if the two servers have a prior relationship and this exchange has been successfully completed in the past. Additionally, this step allows for a potentially expensive process of issuing a Bearer token to be avoided in the case of fake request. 
+
+A RequestVerify step is a normal HTTPS interaction with a request and response in the same transaction. This request is made to the URL `https://` + (Value of `SendToDomain`) + `/.well-known/PickAName/RequestVerify`.
+
+```
+POST https://alice.example/.well-known/PickAName/RequestVerify
+Content-Type: application/json
+{
+    "PickAName": "DRAFTY-DRAFT-2",
+    "Realm": "MyRealm",
+    "RequestId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
+    "HashHex": "(TODO)"
+}
+```
+
+The request repeats the `"PickAName"`, `"Realm"` and `"RequestId"` properties from the original TokenRequest body allowing the verifying server to look up which HMAC key it supplied in that request.
+
+The response to the POST request will be:
+```
+200 OK
+Content-Type: application/json
+{
+    "IsRequestVerfied": true,
+    "HashHex": "(TODO)"
+}
+```
+
+As this is a normal HTTP response, there is no need to repeat the request ID and other properties in the response. The `"IsRequestVerified"` JSON property will be `true` or `false` indicating if the request was valid and that the HMAC hash was valid or not. If the value if `false` then the response need not include the `"HashHex"` property. 
+
+Both the request and response JSON bodies have `"HashHex"` properties. These are the results of two HMAC-SHA256 operations that both sides of the conversation will need to perform as part of verifying that the other side of the conversation is in possession of the HMAC key without revealing the key itself. The HMAC key from the original TokenRequest body are used as the key in both cases.
+
+The request's fixed value is "PickAName-DRAFTY-DRAFT-2-RequestVerifyRequest".
+The response's fixed value is "PickAName-DRAFTY-DRAFT-2-RequestVerifyResponse".
+
+Note that `200` is used for both confirmation and rejection responses. `400` or similar responses should only be used if the request is bad, such as missing properties.
+
 ### TokenIssue
 
-At this stage, Bob doesn't know for certain that the TokenRequest actually came from Alice. Nonetheless, Bob issues a Bearer token for Alice and sends it via a new separate HTTP request to Alice. The URL used will always be `https://` + (Value of `SendToDomain`) + `/.well-known/PickAName/TokenIssue`. Thanks to TLS, Bob can be sure that only Alice is receiving it.
+At this stage, unless a RequestVerify was performed and completed, Bob doesn't know for certain that the TokenRequest actually came from Alice. Nonetheless, Bob issues a Bearer token for Alice and sends it via a new separate HTTP request to Alice. The URL used will always be `https://` + (Value of `SendToDomain`) + `/.well-known/PickAName/TokenIssue`. Thanks to TLS, Bob can be sure that only Alice is receiving it.
 
 ```
 POST https://alice.example/.well-known/PickAName/TokenIssue
@@ -97,15 +147,9 @@ Content-Type: application/json
 - `"ExpiresAt": "2023-10-24T14:15:16Z",`
   - The UTC expiry time of this Bearer token in ISO format.
 - `"HashHex": "(TODO)",`
-  - The HMAC-256 hash of the Bearer token, using the value of `MacKeyHax` from the TokenRequest body as the key. 
+  - The HMAC-256 hash of the UTF-8 bytes of the Bearer token, using the value of `MacKeyHax` from the TokenRequest body as the key. 
 
-### HTTPS Responses
-
-Once both sides are content their side of the transaction is complete and sucessful, they close down the request with a `204` response to indi, te success.
-
-If the server can't use or has any kind of vaidation error with a request, it should respond with a `400` error. The body should include enough detail for a developer to fix the underlying issue.
-
-Server errors should result in an applicable `5xx` error, indicating that the caller should try again later.
+The response to this HTTPS transaction is `204` to indicate the token was received with thanks. An error response indicates there was a problem and the response body should include enough detail to allow a developer to diagnose and fix the issue. A redirect response should result in the POST request being repeated a the new URL.
 
 ## 401 Response - Kicking it off
 
@@ -125,10 +169,6 @@ Per the HTTP standard, this `WWW-Authenticate` header may appear alongside other
 
 An API, instead of using this mechanism, might document where this end-point is and the calling code would skip directly to making that request without waiting to be told to. Nonetheless, this response informs the caller they need a Bearer token, the URL to make a POST request to get it and the "Realm" to use when making that request.
 
-## Redirect responses to TokenIssue requests
-
-Because the authentication is done at the level of a domain, the URL for the POST request is always done with the path `/.well-known/PickAName`. The URL `/.well-known/` is reserved for operations at the "site" level and should be reserved and sepaated from day-to-day use such as user names. The response to a POST request may be a 307 or 308 redirect. If this is the case the the caller should repeat the POST request at the new location.
-
 ## Version Negotiation
 
 The intial request JSON includes a property named `"PickAName"` with a value specifying the version of this protocol the client is using. As this is the first (and so far, only) version, all requests should include this string. 
@@ -137,7 +177,7 @@ If a request arrives with a different unknown string value to this property, the
 
 ```
 POST https://bob.example/api/BearerRequest
-{ "PickAName": "NEW-FUTURE-VERSION-84", ... }
+{ "PickAName": "NEW-FUTURE-VERSION-THAT-YOU-DONT-KNOW-ABOUT", ... }
 
 400 Bad Request
 { 
@@ -147,56 +187,6 @@ POST https://bob.example/api/BearerRequest
 ```
 
 The requestor may now repeat that request but interacting according to the rules of this document.
-
-## The HMAC hash
-
-The recipient of the TokenIssue request will be able to confirm the source of the Bearer token by repeating the HMAC hash and checking it matches the one supplied alongside the Bearer token. The following parameters are used to perform the HMAC.
-- Algorthithm: HMAC-SHA256
-- Key: (Value of MacKeyHex, after decoding hex into bytes.)
-- Value: (Value of Bearer token as UTF-8 bytes.)
-
-If the hash doesn't match the one supplied in the TokenIssue request, the Bearer token should be discarded. 
-
-## RequestVerify
-
-This request allows the service recieving a TokenRequest to first verify:
-- That the web service behind the domain named in the request implements this protocol.
-- That the service has possesion of the HMAC key supplied in the original request.
-- That the other properties of the request (ReqquestID, Realm, Version) are correct.
-- To avoid the burden of issuing a token for a fake TokenRequest.
-
-There are two HMAC-SHA256 operations that both sides of the conversation need to perform as part of verifying that the other side of the conversation is in possession of the HMAC key without reavling the key itself. In both the request and response JSON bodies, the hash result will be encoded in hex and supplied under the JSON key "HashHex" in both request and response.
-
-The request's fixed value is "PickAName-DRAFTY-DRAFT-2-RequestVerifyRequest".
-The response's fixed value is "PickAName-DRAFTY-DRAFT-2-RequestVerifyResponse".
-
-This request is made to the `/.well-known/PickAName/RequestVerify` URL with the following structure.
-```
-POST https://alice.example/.well-known/PickAName/RequestVerify
-Content-Type: application/json
-{
-    "PickAName": "DRAFTY-DRAFT-2",
-    "Realm": "MyRealm",
-    "RequestId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
-    "HashHex": "(TODO)"
-}
-```
-
-The request repeats the `"PickAName"`, `"Realm"` and `"RequestId"` properties from the original TokenRequest body allowing the verifying server to look up which HMAC key it supplied in that request.
-
-The response to the POST request will be:
-```
-200 OK
-Content-Type: application/json
-{
-    "IsRequestVerfied": true,
-    "HashHex": "(TODO)"
-}
-```
-
-As this is a normal HTTP response, there is no need to repeat the request ID and other properties. The `"IsRequestVerified"` JSON property will be `true` or `false` indicating if the request was valid and that the HMAC hash was valid or not. If the value if `false` then the response need not include the `"HashHex"` property. 
-
-Note that `200` is used for both confirmation and rejection responses. `400` or similar responses should only be used if the request is bad, such as missing properties.
 
 ## A brief security analysis
 
@@ -238,3 +228,19 @@ The choice of fixing the request to the `/.well-known/` folder was deliberate. I
 If we may consider a worst case scenario, the default behaviour of Carol is to publish the contents of all incoming requests, the attacker would have a copy of the valid Bearer token by reviewing those published logs, but it would be a Bearer token with a claim for a domain that doesn't have a history of using this protocol. The attacker could equally purchase their own domain and get a valid Bearer token that way.
 
 For this reason, websites issuing tokens via a TokenIssue request who additionally do not require a prior relationship, should first check the original TokenRequest message is genuine by performing a RequestVerify request.
+
+### "What if an attacker signes up for someone's website under the user name '.well-known' and can host server-side scripts there?"
+If someone can cause code to run in response to request at `/.well-known/' URLs, that individual owns the service.
+
+Services allowing users to select their own names at the top level should set this top-level folder aside.
+
+### "What if the intiator's domain has expired and the attacker has purchased it.
+This protocol verifies claims based on operating a website at a particular domain. If you own the domain, then you have the means to be authenticated at that domain. If that kind of authentication claim is not suitable, this protocol is not appropriate.
+
+## Questions to investigate.
+
+- Given that there's a RequestVerify step, do we need to restrict URLs to the `/.well-known/` folder and instead allow any URL to be specified as the one to send RequestVerify and Tokenissue requests to? Instead of a domain, the claim would be based on the whole URL instead.
+- Am I doing HMAC correctly?
+- Does there need to be pre-flight step before a POST request?
+- An earlier version AES encrypted the Bearer token in the TokenIssue request using an AES key and IV from the initiator, alongside the HMAC key. I removed it as my security analysis didn't show it was needed. Was I right to take it out?
+- What should I call it? What string should I find-and-replace 'PickAName' with?
