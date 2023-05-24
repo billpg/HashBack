@@ -25,7 +25,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ4IjoiYmlsbHBnLmNvb
 { "Stuff": "Nonsense" }
 ```
 
-That's basically it. It's like a password but very long and issued by the remote service. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Cookies (those things websites keep asking if you consent to) are a common variation of the Bearer tokens.
+That's basically it. It's like a password but very long and issued by the remote service. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Cookies are a common variation of the Bearer tokens.
 
 Bearer tokens typically (but not always) have short life-times and you'd normally be given an expiry time along with the token itself.
 
@@ -37,7 +37,7 @@ The core exchange takes the form of two HTTPS requests, the **TokenRequest** and
 
 ### TokenRequest
 
-Alice needs a Bearer token from Bob. She makes a request to the URL Bob pushlished.
+Alice needs a Bearer token from Bob. She makes a request to the URL Bob published.
 
 ```
 POST https://bob.example/api/RequestBearerToken
@@ -131,9 +131,22 @@ Because the authentication is done at the level of a domain, the URL for the POS
 
 ## Version Negotiation
 
-The intial request JSON includes a property named `"PickAName"` with a value specifying the version of this protocol the client is using. As this is the first (and so far, only) version, all requests should include this string. For servers that implement only this version of the protocol, if the property is missing or has a different value, it should return a `400` response.
+The intial request JSON includes a property named `"PickAName"` with a value specifying the version of this protocol the client is using. As this is the first (and so far, only) version, all requests should include this string. 
 
-(That later version of this document may include guidance for how to indicate inside a 400 response that this older version *is* still supported.)
+If a request arrives with a different unknown string value to this property, the servive should respond with a `400` (bad request) response, but with a JSON body including a property named `"AcceptVersion"`, listing all the supported versions in a JSON array of strings.
+
+```
+POST https://bob.example/api/BearerRequest
+{ "PickAName": "NEW-FUTURE-VERSION-84", ... }
+
+400 Bad Request
+{ 
+    "Message": "Unknown version.",
+    "AcceptVersion": [ "DRAFTY-DRAFT-2" ] 
+}
+```
+
+The requestor may now repeat that request but interacting according to the rules of this document.
 
 ## The HMAC hash
 
@@ -170,3 +183,44 @@ The recipient can confirm if the request is genuine by confirming the supplied d
 The response to the POST request will be a `200` status code and the JSON request body will have a property named `"IsRequestValid"` with a value of `true` or `false`.
 
 (Note that `200` is used for both confirmation and rejection responses. `400` or similar responses should only be used if the request is bad, such as missing properties.)
+
+## A brief security analysis
+
+### "What if an attacker attempts to eavesdrop or spoof either request?"
+TLS will stop this. The security of this protocol depends on TLS working. If TLS is broken then so is this exchange.
+
+### "What if an attacker sends a fake TokenRequest to Bob, pretending to be Alice?"
+Bob will issue a new token and send it to Alice in the form of a TokenIssue request. Alice will reject the request because she wasn't expecting one.
+
+### "What if the attacker sends a fake TokenRequest to Bob, but at the same time Alice is making a request and knowing what RequestID she will use?"
+The genuine TokenIssue request from Bob to Alice will have a genuine token, but this will fail the HMAC check because the attacker doesn't know what HMAC key she supplied to Bob in the genuine TokenRequest body.
+
+Even if Alice doesn't check the HMAC hash, this is not a problem. The attacker can't intercept it thanks to TLS. The token was genuinely issued so there's no problem if they go ahead and use it. That it was induced by an attacker is no reason to discard it.
+
+### "What if an attacker sends a fake TokenIssue to Alice, pretending to be Bob."
+If Alice isn't expecting a TokenIssue request, she will reject an unasked one.
+
+If Alice is expecting a TokenIssue, she will be able to test it came from Bob by checking the HMAC hash. Only Alice and Bob know what the HMAC key is because Alice generated it from cryptographic quality randomness and sent to Bob. Thanks to TLS, no-one else knows the key.
+
+If Alice, for whatever reason, decides to skip testing the HMAC hash, she will have a fake Bearer token. This will fail the first time she tries to use because Bob will reject the request as an unknown Bearer token. (The attacker doesn't know how to generate a genuine Bearer token that Bob will accept.)
+
+### "What if Alice uses predictable randomness when generating the HMAC key?"
+The an attacker will be able to send in a fake TokenIssue request to Alice with an HMAC hash that passes validation. Because the attacker still doesn't know how to issue a Bearer token, Bob will reject that Bearer token the first time Alice tries to use it.
+
+Alice shoud use unpredictable cryptographic quality randomness when generating the HMAC key.
+
+### "What if an attacker requests a genuine Bearer token for themselves and then pass that attacker onto Alice in a fake TokenIssue request?"
+The attacker still doesn't know how to fake an HMAC hash without knowing the HAC key Alice generated, so this will fail Alice's HMAC test.
+
+If Alice skips the HMAC test, she will have a genuine Bearer token that she thinks is hers, but one that actually identifies the attacker's domain, not Alice's. As Bob will recognise the token as the attacker's, he will not accept any action that requires a Alice's token.
+
+Alice should perform the HMAC test on any TokenIssue requests she receives.
+
+### "What if an attacker makes a TokenRequest to Bob but pretending to be from Carol, a website that does not implement this protocol?"
+Then Bob will issue a token for carol.example, but the TokenIssue request passing it along to that unwitting website will fail with a 404 error.
+
+The choice of fixing the request to the `/.well-known/` folder was deliberate. If an attacker could induce Bob to perform a POST request to any URL the attacker chose, the service might misinterpret the request as something other than a TokenIssue request.
+
+If we may consider a worst case scenario, the default behaviour of Carol is to publish the contents of all incoming requests, the attacker would have a copy of the valid Bearer token by reviewing those published logs, but it would be a Bearer token with a claim for a domain that doesn't have a history of using this protocol. The attacker could equally purchase their own domain and get a valid Bearer token that way.
+
+For this reason, websites issuing tokens via a TokenIssue request who additionally do not require a prior relationship, should first check the original TokenRequest message is genuine by performing a RequestVerify request.
