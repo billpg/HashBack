@@ -21,12 +21,14 @@
         /// </summary>
         public const string VersionValue = "DRAFTY-DRAFT-2";
 
+        public const string SaltAddedText = "2C266D36-53FB-459D-8B4D-AD67737DA026";
+
         /// <summary>
         /// Pre-computed byte array of the PBKDF2 salt bytes.
         /// (Used in PBKDF2 during constructor.)
         /// </summary>
         private static readonly IList<byte> saltBytes
-            = UTF8(ExchangeName + "_" + VersionValue).ToList().AsReadOnly();
+            = UTF8(ExchangeName + "/" + VersionValue + "/" + SaltAddedText).ToList().AsReadOnly();
 
         /// <summary>
         /// The initiator key string.
