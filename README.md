@@ -3,6 +3,8 @@ Server-to-Server Bearer Token Exchange Protocol
 
 ## The elevator pitch.
 
+When two machines need to communicate via an API, the client end needs to include some sort of authentication, which requires a long-term pre-shared-key or similar mechanism thatneeds to be stored and protected from aunauthorized access for the long-term. Wouldn't it be nice if these two machines could communicate without needding a special secret store?
+
 Alice and Bob are normal web servers with an API.
 - (Alice opens an HTTPs request to Bob.)
 - "Hey Bob. I want to use your API but I need a Bearer token."
@@ -11,17 +13,15 @@ Alice and Bob are normal web servers with an API.
   - "Thanks Bob."
 - "Thanks Alice."
 
-When anyone opens an HTTPS request, thanks to TLS they can be sure who they are connecting to, but neither can be sure who was making the request.
-
-By using *two* HTTPS requests in opposite directions, two web servers may perform a brief handshake and exchange a *Bearer* token. All without needing pre-shared secrets, additional PKI systems or having to deal with TLS client certficates.
+When anyone opens an HTTPS request, thanks to TLS they can be sure who they are connecting to, but neither can be sure who was making the request. By using *two* HTTPS requests in opposite directions, two web servers may perform a brief handshake and exchange a *Bearer* token. All without needing any pre-shared secrets. You should already have TLS configured and it protects that exhnage for free.
 
 ### What's a Bearer token?
 
-A Bearer token is string of characters. It might be a signed JWT or it might be a short string of random characters. If you know what that string is, you can include it any web request where you want to show who you are. The token itself is generted (or "issued") by the service that will accept that token later on as proof that you are who you say you are, because no-one else would have the token. 
+A Bearer token is string of characters. It might be a signed JWT or it might be a short string of random characters. If you know what that string is, you can include it any web request where you want to show who you are. The token itself is generated (or "issued") by the service that will accept that token later on as proof that you are who you say you are, because no-one else would have the token. 
 
 ```
 POST /api/some/secure/api/
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ4IjoiYmlsbHBnLmNvbS9qMSJ9.nggyu
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJTZWNNc2ciOiJiaWxscGcuY29tL2oxIn0.nggyu
 { "Stuff": "Nonsense" }
 ```
 
@@ -35,11 +35,11 @@ There are two particpants in this exchange:
 - The **Initiator** who is requesting a Bearer token from...
 - The **Issuer** who issues that Bearer token back to the Initiator.
 
-The exchange takes the form of two or three HTTPS tranactions.
+The exchange takes the form of these HTTPS tranactions.
 
 - **Initiate** where the *Initiator* starts of the exchange by calling the *Issuer*.
-- **Pre-flight** where the *Issuer* makes a quick GET request to confirm the *Initiator* implements this exchange and allow for redirection.
-- **Verify** where the *Issuer* may (optionally) verify that the claimed *Initiator* actually started the process.
+- **Configure** where the *Issuer* gets a static JSON file from the *Initiator* with basic configuration.
+- **Verify** where the *Issuer* may (optionally) verify that the claimed *Initiator* actually made the original Initiate request.
 - **Issue** where the *Issuer* supplies the issued Bearer token to the *Initiator*.
 
 ### Initiate
@@ -53,13 +53,14 @@ Content-Type: application/json
     "PickAName": "DRAFTY-DRAFT-2",
     "Realm": "MyRealm",
     "RequestId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
-    "ClaimedDomain": "alice.example",
+    "Step": "Initiate",
+    "ClaimedDomain": "initiator.example",
     "HmacKey": "253893686BB94369A271A04010B674B17EBD984D7A5F85788EB856E50350788E"
 }
 ```
 
 - `POST POST https://issuer.example/api/initiate`
-  - The choice of URl is up to the issuer to docment and publish.
+  - The choice of URL is up to the issuer to docment and publish.
   - This could be published in the form of a `401` response. (See section **401 Response** later.)
 - `"PickAName": "DRAFTY-DRAFT-2",`
   - This indicates the client is attempting to use the PickAName process and is using the version described in this document.
@@ -68,7 +69,9 @@ Content-Type: application/json
   - The issuer may issue different tokens depending on the requested realm. If applicable, the initiator should specoify that realm here.
 - `"RequestId": "..."`  
   - A GUID that the issuer will supply when connecting back tpo the initiator, who might use this ID to identity which of many requests it is in reference to.
-- `"ClaimedDomain": "alice.example",` 
+- `"Step": "Initiate"`
+  - Shows that this is the Initiate step. If this is not present the request must be rejected with an error response.  
+- `"ClaimedDomain": "initiator.example",` 
   - A success response doesn't come back via the same HTTPS response, but via a new HTTPS request sent to the website at the domain specified here.
   - The value is a full domain name. If the domain is IDN type, the value is encoded using normal JSON/UTF-8 rules.
 - `"HmacKey": "..."`
@@ -80,13 +83,13 @@ The issuer service will return a `204` response after the Bearer token has been 
 
 An error response indicates an error either in the request itslf (4xx) or during the processing of the request (5xx). The response body should contain enough detail for a developer to diagnose and fix the error. 
 
-### Pre-Flight
+### Configure
 
 Before making POST requests to an unverified service, the Issuer must first make a GET request to the service at the domain specified inside the Initiate request.
 The response may be cached according to the response headers per the HTTP standards.
 
-The URL of this GET request is always `https://` + (Value of `ClaimedDomain` property) + `/.well-known/PickAName.json`. The choice is delivberate to be at a URL under the control of the
-site administrator. (`/.well-known/` is set aside by RFC8615 for services at the site level. A third-party user should not be able to select this as a user name.)
+The URL of this GET request is always `https://` + (Value of `ClaimedDomain` property) + `/.well-known/PickAName.json`. The choice to be at a URL under the control of the
+site administrator is deliberate. (`/.well-known/` is set aside by RFC8615 for services at the site level. A third-party user should not be able to select this as a user name.)
 
 ```
 GET https://initiator.example/.well-known/PickAName.json
@@ -100,32 +103,30 @@ Content-Type: application/json
         "Dedication": "3imEWtSTqtd8QsFgJUVKG+QfVS0JmGIkAnnyJdtLkqufqdxI",
         "PostHandlerUrl": "/api/ReceiveBearerToken"
     },
-    "FUTURE-VERSION-YET-TO-BE":
+    "FUTURE-VERSION-YET-TO-BE-WRITTEN":
     {
         "BestVegetable": "Rutabaga"
     }
 }
 ```
 
-As many different version so ftheis exchange might use this file and the intention is that it can be deployed as a static file with no server processing, the
-JSON object might contain derails for various versions. Each property is named after a version string but as this the first version, only this one object is
+As many different versions of this exchange might use this file and the intention is that it can be deployed as a static file, the
+JSON object might contain details for many different versions of this exchange. Each property is named after a version string but as this the first version, only this one object is
 required to be listed and the others are to be ignored. (The above example shows a future version yet to be written.)
 
 The object inside the `DRAFTY-DRAFT-2` object must contan two properties:
 - `Dedication` - This must have the fixed sring value `"3imEWtSTqtd8QsFgJUVKG+QfVS0JmGIkAnnyJdtLkqufqdxI"`.
   - As this specific string would not appear by accident, if a file with this value at this location is found at this URL, the issuer can be reasonably certain it is communicting with a service that implements this exchange.
-- `PostHandlerUrl` - The URL where subsequent POST reusests should be sent to.
+- `PostHandlerUrl` - The URL where hhe remaining POST requests of this exchange should be sent to.
   - If starting with `/`, the rules of relative URLs apply.
 
-Services conforming to this standard will respond to this GET request with a `200` (OK) response and a JSON response body. The JSON must also include
-a `Dedication` property in the expected place with a string value as shown above. If any of these do not apply, the Issuer must abandon the process and close off the opened
-Initiate request with an error.
+If the reequest yields any response other than `200` or an expceted cache response, or the `Dedication` string si either mssing or has any value other the one documented above, the Issuer must abandon the process and close off the open Initiate request with an error.
 
 ### Verify
 
-The pre-flight request confirms that the claimed domain has a web service that implements the exchnage documented here. The optional Verify step allows the Issuer to verify that the Initiator actually make the original Initiate request before expending the effort to generate a new Bearer token. At this point of the exchange, the issier only has the word of an unverified initiator that the Initiate request was genuine. (If this step is skipped, the Issuer might create a Berer token only for the supposed Initiator to discard it because it was never asked for in the first place. If the cost of generating a Bearer token is low, you may prefer to skip this step.)
+The Configure request confirms that the claimed domain has a web service that implements the exchnage documented here. The optional Verify step allows the Issuer to verify that the Initiator actually made the original Initiate request before expending the effort to generate a new Bearer token. At this point of the exchange, the issuer has the word of an unverified initiator that the Initiate request was genuine. (If this step is skipped, the Issuer might create a Berer token only for the supposed Initiator to discard it because it was never asked for in the first place. If the cost of generating a Bearer token is low, you may prefer to skip this step.)
 
-The Verify step is a normal HTTPS interaction with a request and response in the same transaction. Both the request and response will include evidence of possession of the HMAC key supplied in Initiator request. The request should not include any additional authentication headers such as `Cookie` or `Authorization`.
+The Verify step is a normal HTTPS interaction with a request and response in the same transaction. Both the request and response will include evidence of possession of the HMAC key supplied in Initiator request.
 
 ```
 POST https://initiator.example/api/ReceiveBearerToken
@@ -134,6 +135,7 @@ Content-Type: application/json
     "PickAName": "DRAFTY-DRAFT-2",
     "Realm": "MyRealm",
     "RequestId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
+    "Step": "Verify",
     "IssuerEvidence": "(TODO)"
 }
 
@@ -166,9 +168,10 @@ Content-Type: application/json
     "PickAName": "DRAFTY-DRAFT-2",
     "Realm": "MyRealm",
     "RequestId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
+    "Step": "Issue",
     "BearerToken": "hnGbHGat49m1zRcpotQV9xPh7j8JgS1Qo0OCy4Wp2hIS43RJfhEyDvZnyoH5YZA",
     "ExpiresAt": "2023-10-24T14:15:16Z",
-    "HashHex": "(TODO)",
+    "TokenHash": "(TODO)",
 }
 ```
 
@@ -177,14 +180,18 @@ Content-Type: application/json
 - `"PickAName", "Realm", "RequestId"`
   - These are copied from the initial TokenRequest body.
   - The request ID might be used to unite this request with the initial request.
+- `"Step": "Issue"`
+  - This marks this current transaction as the *Issue* step, allowing it to be differentiated from the *Veirfy* step.
 - `"BearerToken": "...",`
   - This is the requested Bearer token. It may be used for subsequent requests with the API.
 - `"ExpiresAt": "2023-10-24T14:15:16Z",`
   - The UTC expiry time of this Bearer token in ISO format.
 - `"TokenHash": "(TODO)",`
-  - The HMAC-256 hash of the UTF-8 bytes of the Bearer token, using the value of `HmacKey` from the Initiator request body as the key. 
+  - The hex-encoded HMAC-256 hash of the UTF-8 bytes of the Bearer token, using the value of `HmacKey` from the Initiator request body as the key. 
 
 The response to this HTTPS transaction is `204` to indicate the token was received with thanks. An error response indicates there was a problem and the response body should include enough detail to allow a developer to diagnose and fix the issue. A redirect response should result in the POST request being repeated a the new URL.
+
+Once the initiator has made that `204` response to this HTTPS transaction, the original Initiator transaction that has been held open should be closed by the issuer with its own `204` response.
 
 ## 401 Response - Kicking it off
 
@@ -197,8 +204,8 @@ GET https://bob.example/api/status.json
 WWW-Authenticate: PickAName realm=MyRealm url=/api/RequestBearerToken
 ```
 
-- The optional `realm` parameter value, if used, should be copied into the TokenRequest message. It allows for variation of the issued token if desired.
-- The required `url` parameter specifies the URL to send the TokenRequest POST.
+- The optional `realm` parameter value, if used, should be copied into the Initiate message. It allows for variation of the issued token if desired.
+- The required `url` parameter specifies the URL to send the Initiate POST.
 
 Per the HTTP standard, this `WWW-Authenticate` header may appear alongside other `WWW-Authenticate` headers, or together in a single header separated by commas.
 
