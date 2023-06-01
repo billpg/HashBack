@@ -55,7 +55,7 @@ Content-Type: application/json
     "RequestId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
     "Step": "Initiate",
     "ClaimedDomain": "initiator.example",
-    "HmacKey": "253893686BB94369A271A04010B674B17EBD984D7A5F85788EB856E50350788E"
+    "HmacKey": "AKIZnpS4b+o-8wr0rYB42xa-30C+/yOLW0B-+kAWXDQ43ro"
 }
 ```
 
@@ -100,7 +100,7 @@ Content-Type: application/json
 {
     "DRAFTY-DRAFT-2":
     {
-        "Dedication": "3imEWtSTqtd8QsFgJUVKG+QfVS0JmGIkAnnyJdtLkqufqdxI",
+        "Dedication": "dqvVbmW/2g8Ou5hF49CalL7YW9oTFpdqGcHrbh6YK4ok577m",
         "PostHandlerUrl": "/api/ReceiveBearerToken"
     },
     "FUTURE-VERSION-YET-TO-BE-WRITTEN":
@@ -115,7 +115,7 @@ JSON object might contain details for many different versions of this exchange. 
 required to be listed and the others are to be ignored. (The above example shows a future version yet to be written.)
 
 The object inside the `DRAFTY-DRAFT-2` object must contan two properties:
-- `Dedication` - This must have the fixed sring value `"3imEWtSTqtd8QsFgJUVKG+QfVS0JmGIkAnnyJdtLkqufqdxI"`.
+- `Dedication` - This must have the fixed sring value shown above.
   - As this specific string would not appear by accident, if a file with this value at this location is found at this URL, the issuer can be reasonably certain it is communicting with a service that implements this exchange.
 - `PostHandlerUrl` - The URL where hhe remaining POST requests of this exchange should be sent to.
   - If starting with `/`, the rules of relative URLs apply.
@@ -136,14 +136,14 @@ Content-Type: application/json
     "Realm": "MyRealm",
     "RequestId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
     "Step": "Verify",
-    "IssuerEvidence": "(TODO)"
+    "IssuerEvidence": "003580C8FF221DF35B5CC9361CCA1FFF64A8F2E85005826332D0F6BB984C8743"
 }
 
 200 OK
 Content-Type: application/json
 {
     "IsVerfied": true,
-    "InitiatorEvidence": "(TODO)"
+    "InitiatorEvidence": "F4C85CF428581BDABF0F97EF22501DF5282387777BABCD7DD1745C5FFD2C9273"
 }
 ```
 
@@ -169,9 +169,9 @@ Content-Type: application/json
     "Realm": "MyRealm",
     "RequestId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
     "Step": "Issue",
-    "BearerToken": "hnGbHGat49m1zRcpotQV9xPh7j8JgS1Qo0OCy4Wp2hIS43RJfhEyDvZnyoH5YZA",
+    "BearerToken": "This_is_an_impossible_to_guess_Bearer_token_for_initiator.example",
     "ExpiresAt": "2023-10-24T14:15:16Z",
-    "TokenHash": "(TODO)",
+    "TokenHash": "37A5E82E7A0B0B6E7815AE39AA426E7940594E77648FFDC058B37D87967AE08F",
 }
 ```
 
@@ -184,9 +184,9 @@ Content-Type: application/json
   - This marks this current transaction as the *Issue* step, allowing it to be differentiated from the *Veirfy* step.
 - `"BearerToken": "...",`
   - This is the requested Bearer token. It may be used for subsequent requests with the API.
-- `"ExpiresAt": "2023-10-24T14:15:16Z",`
+- `"ExpiresAt": "...",`
   - The UTC expiry time of this Bearer token in ISO format.
-- `"TokenHash": "(TODO)",`
+- `"TokenHash": "...",`
   - The hex-encoded HMAC-256 hash of the UTF-8 bytes of the Bearer token, using the value of `HmacKey` from the Initiator request body as the key. 
 
 The response to this HTTPS transaction is `204` to indicate the token was received with thanks. An error response indicates there was a problem and the response body should include enough detail to allow a developer to diagnose and fix the issue. A redirect response should result in the POST request being repeated a the new URL.
