@@ -243,6 +243,46 @@ As there is no restricion of the range of characters (other than that they are U
 
 The inclusion of the fixed salt is to ensure the derived key could only be found by reading this document. The use of PBKDF2 itself is to make it difficult to construct a selected key. It is belived that single round of hashing would be sufficient, given the input should already represent 256 bits of cryptographic quality randomness, but 10 rounds ups the burden a little.
 
+## Anticipated Asked Questions
+
+### What's wrong with keeping a pre-shared secret long term?
+They require management and secure storage. If we've already made the investment in configuring TLS on both sides, why not utilize that and get rid of the pre-shared secrets?
+
+### Isn't the HMAC key a pre-shared secret?
+It has vial diffeences.   
+First, it isn't pre-shared. The HMAC key can be generated as needed on the fly. All you need is a cryptograhpic quality random number generator.
+Secondly, you only need it for the duration of the exchange, which could be over in a second.
+
+### I don't have a web server. I'm behind a firewall.
+Then this exchange is not for you. It works by utilizing that both sides can accept TLS connections and if one side can;t do that then this isn;t going to work.
+
+### I'm not a web server, but I have one on the other side of the Internet.
+Do you have a secure shared resource like a database that both you and the web server can access in a secure manner? Try storing the HMAC key in the database against the request ID, then allow your web server to acceot requests frm the issuer.
+
+### Why not put the *Configure* step into the *Initiate* phase?
+I did think about that and I could be persuaded that this is a good idea. Allow the Initiator to specify a full URL for the Issuer to make POST requests to and get rid of the Configure step entirely.
+
+The other thing the *Configure* step does is allow the *Issuer* to be reasonably sure the *initiator* actually implements this exchnage, We don't want to be sending random POST requests to web servers that might do something unexpected with a POST request. So without the *Configure* step, the *Verify* step would need to rpovide that role. If I make the decision to do this, I'd want to document that the *Verify* step is required for the first time two serveers perform this interaction. I'd also require that the headers don't include any Cookies or other things that might cause prviledged access.
+
+I know from operting a web server on the public Internet that werid looking POST requests come in all the time. A new class of weird looking POST requests from a stranger shouldn't be a problem.'
+
+A big impact of making this change would be that the claim would be based on controlling a whole URL rather the domain. If you make an *Initiate* request to `example.com/Users/Joe/` and someone else does the same for 'example.com/Users/Bob/', you are almost certainly different individuals and possibily not the individual who controls the domain `example.com`. If you ever wanted to change the URL you perform the exchange at then you'd need some mechanism to record both the old and new URL as having the same rights represented.
+
+### Why not encrypt the BearerToken in the Issue step?
+It's already encrypted. By TLS.
+
+I am open to this idea as it was a step in an earlier version. The HMAC key was a much longer key and the PBKDF2 produced anough kits for an AES key and IV as well and the HMAC key. I took it out because I couldn't find a reasonable risk factor where the extra encryption layer could have helped.
+
+At the end of the day, the Issuer has the Beareer token and passes it to the Initiator. A third oarty can't eaves-drop because TLS protects the channel.
+
+### What claim does teh Beare token represent?
+The Initiator supplies a full domain name and the Issuer supplies a bearer token to a web service at that domain. Having the Bearer token represents having taken steps to verify ownership of that domain.
+
+What sort of access that means is up to the Issuer when the Intiator supplies that token back.
+
+### How long should a beaer token last until expiry?
+Up to you but I'd go for an hour. If the exchange takes too long, remember you can do it in advance and have the Beaerer token ready if needed.
+
 ## A brief security analysis
 
 ### "What if an attacker attempts to eavesdrop or spoof either request?"
