@@ -7,25 +7,22 @@ namespace billpg.CrossRequestTokenExchange
 {
     public static class CryptoHelpers
     {
-        public const string ExchangeName = "CrossRequestTokenExchange";
-        public const string ExchangeVersion = "CRTE-DRAFT-3";
-
         /// <summary>
         /// 198 bytes, selected in advance to be the salt of the PBKDF2 operation that
         /// generates the HMAC key from the Initiator's and Issuer's keys.
         /// </summary>
         public static readonly IList<byte> FixedPbkdf2Salt = new List<byte> {
-            8,130,100,179,192,25,216,220,51,210,109,163,83,161,252,52,144,50,
-            219,249,174,41,209,236,83,19,139,83,120,51,108,12,172,119,122,58,
-            125,61,132,16,166,237,137,138,116,23,179,61,170,123,251,71,235,132,
-            101,196,80,55,110,131,118,137,228,167,219,98,113,235,114,39,2,125,
-            246,51,153,117,22,98,77,70,252,247,51,229,183,17,250,167,181,22,
-            124,5,173,94,0,62,172,215,154,106,161,142,39,223,153,50,200,109,
-            105,52,171,64,115,16,121,223,248,207,109,237,129,22,204,82,24,197,
-            58,219,161,22,125,37,232,121,75,206,121,226,173,6,27,159,26,21,
-            234,111,136,75,54,196,108,18,152,250,50,78,119,156,190,224,27,30,
-            21,127,69,77,130,44,10,233,248,62,13,132,176,172,155,148,99,81,
-            112,168,247,32,132,234,211,43,133,167,202,181,34,66,3,63,55,34
+            14,95,36,20,39,141,238,191,227,141,6,169,178,222,49,181,178,228,
+            159,107,80,156,94,39,57,206,35,67,79,131,29,250,189,44,170,168,
+            72,25,57,74,196,231,248,231,255,249,223,241,48,143,153,241,168,237,
+            43,84,123,230,241,45,85,8,210,190,183,114,45,152,25,106,158,13,
+            18,97,118,36,70,193,247,155,46,117,4,215,222,199,45,90,102,126,
+            23,55,172,53,186,242,220,82,94,225,80,4,74,30,113,94,42,224,
+            28,70,58,157,211,92,31,18,56,234,82,35,253,40,68,19,164,124,
+            150,5,252,36,236,4,31,139,141,12,130,166,255,84,55,167,166,87,
+            132,252,174,231,10,203,193,129,57,80,53,195,66,251,40,217,115,246,
+            71,180,238,146,73,62,26,154,246,198,207,37,170,23,126,104,43,143,
+            249,125,223,211,193,144,3,56,178,218,25,238,122,63,140,171,28,223
         }.AsReadOnly();
 
         /// <summary>
@@ -62,6 +59,13 @@ namespace billpg.CrossRequestTokenExchange
             return keyText;
         }
 
+        /// <summary>
+        /// Sign a bearer token string using an intiator and issuer keys.
+        /// </summary>
+        /// <param name="initiatorKey">Intiator's key.</param>
+        /// <param name="issuerKey">Issuer's key,</param>
+        /// <param name="bearerToken">ASII Bearer tokento sign.</param>
+        /// <returns>Signatuure of bearer token using both supplied keys.</returns>
         public static string SignBearerToken(string initiatorKey, string issuerKey, string bearerToken)
             => SignBearerToken(CalculateHashKey(initiatorKey, issuerKey), bearerToken);
 
@@ -78,60 +82,50 @@ namespace billpg.CrossRequestTokenExchange
             return BytesToHex(hash);
         }
 
-
+        /// <summary>
+        /// Generate a string for the Initiator to supply as proof it has the Initiator's
+        /// key as part of the verification step, using the key strings.
+        /// </summary>
+        /// <param name="initiatorKey">Intiator's key.</param>
+        /// <param name="issuerKey">Issuer's key,</param>
+        /// <returns>Proof of possesion of the the supplied keys.</returns>
         public static string InitiatorsVerifyToken(string initiatorKey, string issuerKey)
             => InitiatorsVerifyToken(CalculateHashKey(initiatorKey, issuerKey));
 
+        /// <summary>
+        /// Generate a string for the Initiator to supply as proof it has the Initiator's
+        /// key as part of the verification step, using a HMAC derived from the two keys.
+        /// </summary>
+        /// <param name="hmacKey">HMAC key bytes returned by CalculateHashKey.</param>
+        /// <returns>Proof of possesion of the the supplied keys.</returns>
         public static string InitiatorsVerifyToken(IList<byte> hmacKey)
             => SignBearerToken(hmacKey, Encoding.ASCII.GetString(new byte[] { 1 }));
 
+        /// <summary>
+        /// Generate a string for the Issuer to supply as proof it has the Initiator's
+        /// key as part of the verification step.
+        /// </summary>
+        /// <param name="initiatorKey">Intiator's key.</param>
+        /// <param name="issuerKey">Issuer's key,</param>
+        /// <returns>Proof of possesion of the the supplied keys.</returns>
         public static string IssuersVerifyToken(string initiatorKey, string issuerKey)
             => IssuersVerifyToken(CalculateHashKey(initiatorKey, issuerKey));
 
+        /// <summary>
+        /// Generate a string for the Initiator to supply as proof it has the Initiator's
+        /// key as part of the verification step, using a HMAC derived from the two keys.
+        /// </summary>
+        /// <param name="hmacKey">HMAC key bytes returned by CalculateHashKey.</param>
+        /// <returns>Proof of possesion of the the supplied keys.</returns>
         public static string IssuersVerifyToken(IList<byte> hmacKey)
             => SignBearerToken(hmacKey, Encoding.ASCII.GetString(new byte[] { 2 }));
 
+        /// <summary>
+        /// Convert an array of bytes to a string of hex.
+        /// </summary>
+        /// <param name="bytes">Byte array to convert.</param>
+        /// <returns>Hex digits.</returns>
         private static string BytesToHex(IList<byte> bytes)
             => string.Concat(bytes.Select(b => b.ToString("X2")));
-
-        public static void ValidateDomainName(string domain)
-        {
-            /* Shortcuts nulls. */
-            if (string.IsNullOrEmpty(domain))
-                throw new ApplicationException("ValidateDomainName: Name must have characters.");
-
-            /* Shortcut too-long strings. */
-            if (domain.Length > 1000)
-                throw new ApplicationException("ValidateDomainName: Name must be less than 1000 characters.");
-
-            /* Split by dots. Single no-dot domains are invalid. */
-            var domainByDot = domain.Split('.').ToList();
-            if (domainByDot.Count < 2)
-                throw new ApplicationException("ValidateDomainName: Name must have at least two dot-separated nodes.");
-
-            /* Are all items valid? */
-            if (domainByDot.All(IsDotSeparatedItemValid))
-                throw new ApplicationException("ValidateDomainName: Name is not valid.");
-            static bool IsDotSeparatedItemValid(string item)
-            {
-                /* Empty strings are not. */
-                if (string.IsNullOrEmpty(item))
-                    return false;
-
-                /* Can't start or end with hyphen. */
-                if (item[0] == '-' || item[item.Length - 1] == '-')
-                    return false;
-
-                /* Each character must be alphanumeric ASCII or hyphens. */
-                return item.All(IsValidCharacter);
-            }
-            static bool IsValidCharacter(char ch)
-                => (ch >= '0' && ch <= '9')
-                || (ch >= 'A' && ch <= 'Z')
-                || (ch >= 'a' && ch <= 'z')
-                || ch == '-';
-            
-            /* Passed test. */
-        }
     }
 }
