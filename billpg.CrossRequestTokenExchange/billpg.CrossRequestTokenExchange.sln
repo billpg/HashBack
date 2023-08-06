@@ -5,10 +5,6 @@ VisualStudioVersion = 17.1.32228.430
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "billpg.CrossRequestTokenExchange", "billpg.CrossRequestTokenExchange.csproj", "{4FEF68D2-5641-43F4-8CAF-2D1FD671D9D0}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "billpg.BearerTokenExample", "..\billpg.BearerTokenExample\billpg.BearerTokenExample.csproj", "{0A1CBD72-1C7A-4F6C-9DB4-A45C4F672B57}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CrteTests", "..\CrteTests\CrteTests.csproj", "{C5589879-405C-4480-9D9D-C0B673632514}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CalculateFixedSalt", "..\CalculateFixedSalt\CalculateFixedSalt.csproj", "{91B7F13F-F8EC-4C18-8B81-F1C8704E0668}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{BAA97397-79F6-45A1-847F-F0C3F07E09BA}"
@@ -16,7 +12,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		..\README.md = ..\README.md
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UpdateReadme", "..\UpdateReadme\UpdateReadme.csproj", "{9865C97E-4D28-42C8-AB2D-62D6D3580BE7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UpdateReadme", "..\UpdateReadme\UpdateReadme.csproj", "{9865C97E-4D28-42C8-AB2D-62D6D3580BE7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -28,14 +24,6 @@ Global
 		{4FEF68D2-5641-43F4-8CAF-2D1FD671D9D0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4FEF68D2-5641-43F4-8CAF-2D1FD671D9D0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4FEF68D2-5641-43F4-8CAF-2D1FD671D9D0}.Release|Any CPU.Build.0 = Release|Any CPU
-		{0A1CBD72-1C7A-4F6C-9DB4-A45C4F672B57}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{0A1CBD72-1C7A-4F6C-9DB4-A45C4F672B57}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{0A1CBD72-1C7A-4F6C-9DB4-A45C4F672B57}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{0A1CBD72-1C7A-4F6C-9DB4-A45C4F672B57}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C5589879-405C-4480-9D9D-C0B673632514}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C5589879-405C-4480-9D9D-C0B673632514}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C5589879-405C-4480-9D9D-C0B673632514}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C5589879-405C-4480-9D9D-C0B673632514}.Release|Any CPU.Build.0 = Release|Any CPU
 		{91B7F13F-F8EC-4C18-8B81-F1C8704E0668}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{91B7F13F-F8EC-4C18-8B81-F1C8704E0668}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{91B7F13F-F8EC-4C18-8B81-F1C8704E0668}.Release|Any CPU.ActiveCfg = Release|Any CPU
