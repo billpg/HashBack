@@ -55,7 +55,7 @@ Content-Type: application/json
 {
     "CrossRequestTokenExchange": "DRAFTY-DRAFT-3",
     "RequestId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
-    "InitiatorsKey": "AKIZnpS4b+o-8wr0rYB42xa-30C+/yOLW0B-+kAWXDQ43ro"
+    "InitiatorsKey": "THiDXXrxo2E-xLplG9+4ymi-QdxwMoMxUZi-D4B3vULbHyr"
 }
 ```
 
@@ -85,10 +85,10 @@ Content-Type: application/json
 {
     "CrossRequestTokenExchange": "DRAFTY-DRAFT-3",
     "RequestId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
-    "BearerToken": "This_is_an_impossible_to_guess_Bearer_token_for_initiator.example",
+    "BearerToken": "This_is_an_impossible_to_guess_token",
     "ExpiresAt": "2023-10-24T14:15:16Z",
-    "IssuersKey": "uuuuuuuu",
-    "BearerTokenSignature": "37A5E82E7A0B0B6E7815AE39AA426E7940594E77648FFDC058B37D87967AE08F",
+    "IssuersKey": "5Ml8wacaRT/-qGvw5KEKeHy-eGYtJAML4P9-nrWo7sLjpz0",
+    "BearerTokenSignature": "EDD994B768013B5296F7572FCD86B379F6A3399B1971B47B3C885DB46CCF9521",
 }
 ```
 
@@ -135,9 +135,9 @@ The requestor may now repeat that request but interacting according to the rules
 The Intiate request body will include a property named `InitiatorsKey` that must contain at least 256 bits of cryptographic quality randomness, expressed in any convenient encoding such as Hex or base64.
 The Issue request body must also include a property named `IssuersKey` that may contain any number of characters including an empty string. Both strings must consist only of printable ASCI characters from 33 to 126.
 
-Both keys are combined and passed into a PBKDF2 function withe the parameters listed below. The output 256 bit block is the HMACsigning key. Both participants, possessing both the key they generated themselves and the key from the orther participant will perform the same operation to derive the HMAC signing key. The Issuer will sign their Bearer token with the HMAC key and the Initiator will verify the Bearer token is genuine by verifying the signature with the HMAC key.
+Both keys are combined and passed into a PBKDF2 function withe the parameters listed below. The output 256 bit block is the HMAC signing key. Both participants, possessing both the key they generated themselves and the key from the orther participant will perform the same operation to derive the HMAC signing key. The Issuer will sign their Bearer token with the HMAC key and the Initiator will verify the Bearer token is genuine by verifying the signature with the HMAC key.
 
-The PBKDF2 function will hav eth the following parameters:
+The PBKDF2 function will have the following parameters:
 - *Password* - The ASCII bytes of the following concatenated string:
   - The character length of the Intiator's key in ASCII decimal.
   - A single space character (32).
@@ -147,13 +147,24 @@ The PBKDF2 function will hav eth the following parameters:
   - A single space character (32).
   - The Issuer's key in full.
   - A single '!' character (33).
-- *Salt* - The following fixed 198 bytes:
-  - 1,2,3,4,5,6
+- *Salt* - The ASCII bytes of the following 120 character capital-letter-only string.
+ - "EWNSJHKKHOJGAJBMKAYGKJKLMNCAAISFNKCFXJAT" +
+ - "YFZFYVQHLZNKHCXWEEDAIOXWXYCVOHUGSAASAICT" +
+ - "GMVYVATDOYXXQHNDRXXQHPXHFOSQPNPQKUWWCJUO"
 - *Hash* - SHA256.
 - *Rounds* - 99.
 - *Output* - 256 bits.
 
 The inclusion of the fixed salt is to ensure the derived key could only be found by reading this document. The use of PBKDF2 itself is to make it difficult to construct a selected key. It is belived that single round of hashing would be sufficient, given the input should already represent 256 bits of cryptographic quality randomness, but 99 rounds ups the burden a little.
+
+The following test strings can be used to verify an implementation:
+- Initiator's Key: "THiDXXrxo2E-xLplG9+4ymi-QdxwMoMxUZi-D4B3vULbHyr"
+- Issuer's Key: "5Ml8wacaRT/-qGvw5KEKeHy-eGYtJAML4P9-nrWo7sLjpz0"
+- HMAC Key (in hex): 6EDC1CD1CD9413CD5608C7AC513BCE9D8D04BB6EA2EE7D5EA846065378C1FEAF
+- Bearer Token: "Test-Bearer-Token"
+- HMAC Signature (in hex): 34B870327E8D2B7B5604408CC217ED94335739544A5E1DC05CB86352A366A384
+
+
 
 ## Anticipated Asked Questions
 
@@ -161,7 +172,7 @@ The inclusion of the fixed salt is to ensure the derived key could only be found
 They require management and secure storage. If we've already made the investment in configuring TLS on both sides, why not utilize that and get rid of the pre-shared secrets?
 
 ### Isn't the HMAC key a pre-shared secret?
-It has vial diffeences.   
+It has vital diffeences.   
 First, it isn't pre-shared. The HMAC key can be generated as needed on the fly. All you need is a cryptograhpic quality random number generator.
 Secondly, you only need it for the duration of the exchange, which could be over in a second.
 
@@ -171,23 +182,14 @@ Then this exchange is not for you. It works by utilizing that both sides can acc
 ### I'm not a web server, but I have one on the other side of the Internet.
 Do you have a secure shared resource like a database that both you and the web server can access in a secure manner? Try storing the HMAC key in the database against the request ID, then allow your web server to acceot requests frm the issuer.
 
-### Why not put the *Configure* step into the *Initiate* phase?
-I did think about that and I could be persuaded that this is a good idea. Allow the Initiator to specify a full URL for the Issuer to make POST requests to and get rid of the Configure step entirely.
-
-The other thing the *Configure* step does is allow the *Issuer* to be reasonably sure the *initiator* actually implements this exchnage, We don't want to be sending random POST requests to web servers that might do something unexpected with a POST request. So without the *Configure* step, the *Verify* step would need to rpovide that role. If I make the decision to do this, I'd want to document that the *Verify* step is required for the first time two serveers perform this interaction. I'd also require that the headers don't include any Cookies or other things that might cause prviledged access.
-
-I know from operting a web server on the public Internet that werid looking POST requests come in all the time. A new class of weird looking POST requests from a stranger shouldn't be a problem.'
-
-A big impact of making this change would be that the claim would be based on controlling a whole URL rather the domain. If you make an *Initiate* request to `example.com/Users/Joe/` and someone else does the same for 'example.com/Users/Bob/', you are almost certainly different individuals and possibily not the individual who controls the domain `example.com`. If you ever wanted to change the URL you perform the exchange at then you'd need some mechanism to record both the old and new URL as having the same rights represented.
-
 ### Why not encrypt the BearerToken in the Issue step?
 It's already encrypted. By TLS.
 
-I am open to this idea as it was a step in an earlier version. The HMAC key was a much longer key and the PBKDF2 produced anough kits for an AES key and IV as well and the HMAC key. I took it out because I couldn't find a reasonable risk factor where the extra encryption layer could have helped.
+I am open to this idea as it was a step in an earlier version. The HMAC key was a much longer key and the PBKDF2 produced anough bits for an AES Key+IV as well and the HMAC key. I took it out because I couldn't find a reasonable risk factor where the extra encryption layer could have helped.
 
-At the end of the day, the Issuer has the Beareer token and passes it to the Initiator. A third oarty can't eaves-drop because TLS protects the channel.
+At the end of the day, the Issuer has the Bearer token and passes it to the Initiator. A third oarty can't eaves-drop because TLS protects the channel.
 
-### What claim does teh Beare token represent?
+### What claim does the Bearer token represent?
 The Initiator supplies a full domain name and the Issuer supplies a bearer token to a web service at that domain. Having the Bearer token represents having taken steps to verify ownership of that domain.
 
 What sort of access that means is up to the Issuer when the Intiator supplies that token back.

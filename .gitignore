@@ -1,3 +1,4 @@
-﻿.vs
+﻿# Folders that Visual Studio 2022 will leave behind.
+.vs
 bin
 obj
