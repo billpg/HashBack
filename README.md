@@ -1,5 +1,5 @@
-# BearerTokenExchange
-Server-to-Server Bearer Token Exchange Protocol
+# Cross Request Token Exchange
+Server-to-Server Secure Token Exchange Protocol
 
 ## The elevator pitch.
 
@@ -13,7 +13,7 @@ Alice and Bob are normal web servers with an API.
 
 It's not so much what happened but what didn't happen. Neither side needed a pre-shared key or shared secret. Neither side need a secure secret store. Both machines (Alice and Bob) in this example are web servers. They both have TLS keys signed by a mutally trusted CA enables the exchange to work.
 
-When you make an HTTPS request, thanks to TLS you can be sure who you are connecting to, but the service receiving the requst can't be sure who the request is coming from. By using *two* HTTPS requests in opposite directions, two web servers may perform a brief handshake and exchange a *Bearer* token. All without needing any pre-shared secrets. They already have TLS configured and it protects that exhnage for free.
+When you make an HTTPS request, thanks to TLS you can be sure who you are connecting to, but the service receiving the requst can't be sure who the request is coming from. By using *two* HTTPS requests in opposite directions, two web servers may perform a brief handshake and exchange a *Bearer* token. All without needing any pre-shared secrets. They already have TLS configured and it protects that exhange for free.
 
 ### What's a Bearer token?
 
@@ -21,13 +21,13 @@ A Bearer token is string of characters. It might be a signed JWT or it might be 
 
 ```
 POST /api/some/secure/api/
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJTZWNNc2ciOiJiaWxscGcuY29tL2oxIn0.nggyu
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJuZ2d5dSI6Imh0dHBzOi8vYmlsbHBnLmNvbS9qMS8ifQ.nggyu
 { "Stuff": "Nonsense" }
 ```
 
-That's basically it. It's like a password but very long and issued by the remote service. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Cookies are a common variation of the Bearer tokens. Bearer tokens typically (but not always) have short life-times and you'd normally be given an expiry time along with the token itself.
- 
-This document describes a mechanism to request a Bearer token.
+That's basically it. It's like a password but very long and issued by the remote service. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Bearer tokens typically (but not always) have short life-times and you'd normally be given an expiry time along with the token itself. Cookies are a common variation of the Bearer token.
+
+The exchange in this document describes a mechanism for a server to request a Bearer token from another server, so that subsequent requests can be secured.
 
 ## The exchange in a nutshell.
 
@@ -42,8 +42,9 @@ The exchange takes the form of these two HTTPS tranactions.
 
 Both participants will have had an established relationship by the time this exchange takes place and will have configured these details in advance.
 - The URL for the Initiator to make a POST request to the Issuer.
-  - The URL will need to be distinct enough to identify the Initiator to the Issuer, perhaps by including a user-id in the URL.
 - The URL for the Issuer to make a POST request back to the Initiator.
+
+Depending on the specific needs, it may be prudent to include a user-id parameter in these URLs, but that will be an implementation detail.
 
 ### Initiate
 
@@ -55,7 +56,7 @@ Content-Type: application/json
 {
     "CrossRequestTokenExchange": "DRAFTY-DRAFT-3",
     "ExchangeId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
-    "InitiatorsKey": "THiDXXrxo2E-xLplG9j4ymi-QdxwMoMxUZi-D4B3vULbHyr"
+    "InitiatorsKey": "rdMWf2RYgWC-OwTzzO8VHqK-27kAKK6qQf9-JqN2xU0ICcW"
 }
 ```
 
@@ -65,13 +66,16 @@ Content-Type: application/json
   - This indicates the client is attempting to use the CrossRequestTokenExchange process. The value of this property is the version string, with `DRAFTY-DRAFT-3` indicating this version of this document.
   - The client might prefer to use a later version. If the service does not support that version, it may indicate the versions it does know in a `400` response. (See section **Version Negotiaton** later.)
 - `"ExchangeId":`
-  - The Issue request that fdollows will include this GUID. It must be a valid GUID.
+  - The Issue request that follows will include this value, which must be a valid GUID.
 - `"InitiatorsKey":`
   - A key that, when combined with the issuer's own key, will be used to "sign" the Bearer token, confirming the Bearer key came from the expected source.
   - The value must consist of only printable ASCII characters (33 to 126) and must together represent at least 256 bits of cryptographic quality randomness.
   - The HMAC key will come from a PBKDF2 using this initiator's key and the isser's key, so it doesn't matter which encoding mechanism (hex, base64, etc) is used.
+  - This value's length must be 1024 characters or shorter.
 
 The issuer service will keep this request open until the exchange has concluded. If the exchnage was successful, it will return a `204` response to close the exchange. If the issuer detects any error in the proces of handling this request, it should instead return an applicable HTTP error with enough detail for a developer to diagnose and fix the error in the response body. Any error response from the issuer is an indication that any Bearer token it might have retreived should be discarded.
+
+Once both HTTPS transactons have closed and the exchange was sucessful, the Initiator now has a Bearer token it may us with the Issuer's web servuce. 
 
 ### Issue
 
@@ -85,25 +89,25 @@ Content-Type: application/json
 {
     "CrossRequestTokenExchange": "DRAFTY-DRAFT-3",
     "ExchangeId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
-    "BearerToken": "This_is_an_impossible_to_guess_token",
+    "BearerToken": "Token_09561454469379876976083516242009314095393956",
     "ExpiresAt": "2023-10-24T14:15:16Z",
-    "IssuersKey": "5Ml8wacaRTu-qGvw5KEKeHy-eGYtJAML4P9-nrWo7sLjpz0",
-    "BearerTokenSignature": "FE06A2E726F157A5D30DCD47C9DAE5F43805B90594EB457A58B858AD38D1235F",
+    "IssuersKey": "Ti9jLhtBj4l-FLj3MvjbXnU-6FAMineB5Tv-sHn9p8huIEj",
+    "BearerTokenSignature": "EA888FB47D9FEE03229757E2F6865AF0CF279BA33EAA702271E2A8AC6190177B",
 }
 ```
 
 - `POST`
   - The URL agred in advance.
 - `"CrossRequestTokenExchange"`
-  - An acknowledgmenet that the Issuer is usuing this version of this protocol.
+  - An acknowledgment that the Issuer is using this version of this protocol.
 - `"ExchangeId"`
-  - The request ID copied from the original Initiate request.
+  - The GUID copied from the original Initiate request.
 - `"BearerToken"`
   - This is the requested Bearer token. It must consist only of printable ASCII characters.
 - `"ExpiresAt"`
-  - The UTC expiry time of this Bearer token in ISO format.
+  - The UTC expiry time of this Bearer token in ISO format. (yyyy-mm-ddThh:mm:ss)
 - `"IssuersKey"`
-  - Key material that will go into the HMAC signing key. This string may be zero characters long but any characters must be in the printable ASCII range, 33 to 126.
+  - Key material that will go into the HMAC signing key. This string may be zero to 1024 characters in length. All characters must be in the printable ASCII range, 33 to 126.
 - `"BearerTokenSignature",`
   - The HMAC signature of the BearerToken, signed using the `InitiatorsKey` from the original Initiate request and the `IssuersKey` from this request.
 
@@ -156,6 +160,96 @@ The PBKDF2 function will have the following parameters:
 - *Output* - 256 bits.
 
 The inclusion of the fixed salt is to ensure the derived key could only be found by reading this document. The use of PBKDF2 itself is to make it difficult to construct a selected key. It is belived that single round of hashing would be sufficient, given the input should already represent 256 bits of cryptographic quality randomness, but 99 rounds ups the burden a little.
+
+# Case Studies
+
+## A Saas API.
+
+**saas.example** is a website with an API designed for their customers to use. When a customer wishes to use this API, it must first go through this exchange to obtain a Bearer token. The service documents that users of their API may make Initiate requests to the URL `https://saas.example/api/login/crte?userId=id`, filling in their unique user ID in the query string.
+
+**Carol** is a customer of Saas. She's recently signed up and has been allocated her unique user id, 12. She's logged into the Saas customer portal and browsed to their authentiation page. Under the CRTE section, she's configued her asccount that `https://caarol.example/saas/crte-receive-token` is her Issue URL, where she's implemented a handler.
+
+Time passes and Carol needs to make a request to the Saas API. As she has no Bearer tokens, she makes a POST request to the documented API:
+```
+POST https://saas.example/api/login/crte?userId=12
+Content-Type: application/json
+{
+    "CrossRequestTokenExchange": "DRAFTY-DRAFT-3",
+    "ExchangeId": "F952D24D-739E-4F1E-8153-C57415CDE59A",
+    "InitiatorsKey": "d28a9nCdKiO-0zErstyHMRk-GTNVKcj8YSs-6x362hWA4wa"
+}
+```
+
+The Saas website code looks up user 12 and finds an active user with CRTE configured - if not, it would respond with an error. At this point it does not yet know if the Initiate request came from the real Carol yet. 
+
+Despite this, the Saas service generates a Brarer token by base64 encodig some securly generated bytes and signs the token using HMAC. It does not yet save this token to it's own database but holds it in memory until such time the providence of Carol as the Initiator can be confirmed.
+
+Using Carol's configured URL and the generated Bearer token, the Saas web service software opens up a new HTTPS request:
+```
+POST https://carol.example/saas/crte-receive=client-token
+Content-Type: application/json
+{
+    "CrossRequestTokenExchange": "DRAFTY-DRAFT-3",
+    "ExchangeId": "F952D24D-739E-4F1E-8153-C57415CDE59A",
+    "BearerToken": "Token_41401899608293768448699806747291819850802610",
+    "ExpiresAt": "2023-10-24T14:15:16",
+    "IssuersKey": "NEYH0hiltyU-mytenH9TYtZ-U6flEyxEBrR-Y8d71J41scH",
+    "BearerTokenSignature": "7CE717B05DCDBC0301EAB3E1027CF64E7BA0E1BE9FD2B8951759384DA96EABBB",
+}
+```
+
+As Carol really is the Initiator, her web service can look up the supplied ExchnageId and find the Initiate request it opened earlier. It has a Bearer token but it doesn't yet know if this is the genuinely the Saas service making an Issue request yet. To check this, it performs the same steps to generate the HMAC key for this exchnage and uses that to check the signature. Happy that everything is verified, it stores the Bearer token but it can't use the token just yet.
+
+To confirm that all is well, Carol's web service closes the Issue request by sending a 204 status, indicating that it accepts the Bearer token. The Saas web server finally writes the token it generated into the database. Once that step is complete and successful, the Saas software finally closes the Initiate request with a 204, this time signalling that Carol may now use the Beaer token it issued.
+
+```
+GET https://saas.example/api/status.json
+Authorization: Bearer Token_41401899608293768448699806747291819850802610
+```
+
+## Webhooks
+
+The authentication requests don't always go from Carol to Saas. Occasionally, the Saas service will need to call back to Carol's web service to deal with an event. When this happens, Carol's web service needs to be certain the request is coming from Saas and not someone else trying to get privilendged information from Cartol's Webhook handler.
+
+To deal with this, as well as comfiguring a Webhook URL, Carol has also configured her own Initiate end-point. should the Saas service need to auuthenticate itself.
+
+Time passes and the Saas service needs to call Carol's API to make a decision, but it doesn't have a value Bearer token from her. It looks up the URL she configured and makes an HTTPS request:
+```
+POST https://carol.example/saas/crte-generate-token-for-webhook
+Content-Type: application/json
+{
+    "CrossRequestTokenExchange": "DRAFTY-DRAFT-3",
+    "ExchangeId": "B405DE48-36F4-4F42-818C-9BE28D6B3832",
+    "InitiatorsKey": "dAOkkvk9Ojm-Vuh20X2KX46-HgsPiksQHrw-iIApjGjvjMk"
+}
+```
+
+Carol's web service opens a new HTTPS request back to the Saas web site and in a similar way to before, it populates this new request with a Bearer token it had generated and an HMAC signature. The Saas API conduments that the webhook CRTE Issue requests should go to `https://saas.example/api/issue-crte?user_id=is` with the user's id added to the query string parameter.
+```
+POST https://saas.example/api/issue-crte?user_id=12
+Content-Type: application/json
+{
+    "CrossRequestTokenExchange": "DRAFTY-DRAFT-3",
+    "ExchangeId": "B405DE48-36F4-4F42-818C-9BE28D6B3832",
+    "BearerToken": "Token_51968699312599211031848828204659448702950696",
+    "ExpiresAt": "2023-10-24T14:15:16",
+    "IssuersKey": "HUXBnbHNajT-10GpQjxWwTQ-yPrf4cx206V-LBHezSlGVcB",
+    "BearerTokenSignature": "5FF10ABB78EA3C250E68BA503ECE4E1DBB3342993B3E294651743300D91E07A7",
+}
+```
+
+The Saas service first acknowledes acceptance of the token by returning 204 to its incoming HTTPS request. Carol's web service handler acknowledges the acknowledgment by also responding to its incomming request with 204.
+
+With a token that's been confirmed valid, the Saas service may now make its Webhook call.
+
+```
+POST https://carol.example/saas/webhook
+Authorization: Bearer Token_51968699312599211031848828204659448702950696
+Content-Type: application/json
+{ "IsThisAWebhook?": true }
+```
+
+
 
 ## Anticipated Asked Questions
 
