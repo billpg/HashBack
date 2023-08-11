@@ -54,8 +54,8 @@ POST https://issuer.example/api/initiate?initiator_user_id=123456
 Content-Type: application/json
 {
     "CrossRequestTokenExchange": "DRAFTY-DRAFT-3",
-    "RequestId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
-    "InitiatorsKey": "THiDXXrxo2E-xLplG9+4ymi-QdxwMoMxUZi-D4B3vULbHyr"
+    "ExchangeId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
+    "InitiatorsKey": "THiDXXrxo2E-xLplG9j4ymi-QdxwMoMxUZi-D4B3vULbHyr"
 }
 ```
 
@@ -64,8 +64,8 @@ Content-Type: application/json
 - `"CrossRequestTokenExchange":`
   - This indicates the client is attempting to use the CrossRequestTokenExchange process. The value of this property is the version string, with `DRAFTY-DRAFT-3` indicating this version of this document.
   - The client might prefer to use a later version. If the service does not support that version, it may indicate the versions it does know in a `400` response. (See section **Version Negotiaton** later.)
-- `"RequestId":`
-  - Each subsequent request in this exchange will include a copy of this GUID.
+- `"ExchangeId":`
+  - The Issue request that fdollows will include this GUID. It must be a valid GUID.
 - `"InitiatorsKey":`
   - A key that, when combined with the issuer's own key, will be used to "sign" the Bearer token, confirming the Bearer key came from the expected source.
   - The value must consist of only printable ASCII characters (33 to 126) and must together represent at least 256 bits of cryptographic quality randomness.
@@ -84,11 +84,11 @@ POST https://initiator.example/api/Issue?issuer_user_id=12345
 Content-Type: application/json
 {
     "CrossRequestTokenExchange": "DRAFTY-DRAFT-3",
-    "RequestId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
+    "ExchangeId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
     "BearerToken": "This_is_an_impossible_to_guess_token",
     "ExpiresAt": "2023-10-24T14:15:16Z",
-    "IssuersKey": "5Ml8wacaRT/-qGvw5KEKeHy-eGYtJAML4P9-nrWo7sLjpz0",
-    "BearerTokenSignature": "EDD994B768013B5296F7572FCD86B379F6A3399B1971B47B3C885DB46CCF9521",
+    "IssuersKey": "5Ml8wacaRTu-qGvw5KEKeHy-eGYtJAML4P9-nrWo7sLjpz0",
+    "BearerTokenSignature": "FE06A2E726F157A5D30DCD47C9DAE5F43805B90594EB457A58B858AD38D1235F",
 }
 ```
 
@@ -96,7 +96,7 @@ Content-Type: application/json
   - The URL agred in advance.
 - `"CrossRequestTokenExchange"`
   - An acknowledgmenet that the Issuer is usuing this version of this protocol.
-- `"RequestId"`
+- `"ExchangeId"`
   - The request ID copied from the original Initiate request.
 - `"BearerToken"`
   - This is the requested Bearer token. It must consist only of printable ASCII characters.
@@ -157,15 +157,6 @@ The PBKDF2 function will have the following parameters:
 
 The inclusion of the fixed salt is to ensure the derived key could only be found by reading this document. The use of PBKDF2 itself is to make it difficult to construct a selected key. It is belived that single round of hashing would be sufficient, given the input should already represent 256 bits of cryptographic quality randomness, but 99 rounds ups the burden a little.
 
-The following test strings can be used to verify an implementation:
-- Initiator's Key: "THiDXXrxo2E-xLplG9+4ymi-QdxwMoMxUZi-D4B3vULbHyr"
-- Issuer's Key: "5Ml8wacaRT/-qGvw5KEKeHy-eGYtJAML4P9-nrWo7sLjpz0"
-- HMAC Key (in hex): 6EDC1CD1CD9413CD5608C7AC513BCE9D8D04BB6EA2EE7D5EA846065378C1FEAF
-- Bearer Token: "Test-Bearer-Token"
-- HMAC Signature (in hex): 34B870327E8D2B7B5604408CC217ED94335739544A5E1DC05CB86352A366A384
-
-
-
 ## Anticipated Asked Questions
 
 ### What's wrong with keeping a pre-shared secret long term?
@@ -205,7 +196,7 @@ TLS will stop this. The security of this protocol depends on TLS working. If TLS
 ### "What if an attacker sends a fake TokenRequest to Bob, pretending to be Alice?"
 Bob will issue a new token and send it to Alice in the form of a TokenIssue request. Alice will reject the request because she wasn't expecting one.
 
-### "What if the attacker sends a fake TokenRequest to Bob, but at the same time Alice is making a request and knowing what RequestID she will use?"
+### "What if the attacker sends a fake TokenRequest to Bob, but at the same time Alice is making a request and knowing what ExchangeId she will use?"
 The genuine TokenIssue request from Bob to Alice will have a genuine token, but this will fail the HMAC check because the attacker doesn't know what HMAC key she supplied to Bob in the genuine TokenRequest body.
 
 Even if Alice doesn't check the HMAC hash, this is not a problem. The attacker can't intercept it thanks to TLS. The token was genuinely issued so there's no problem if they go ahead and use it. That it was induced by an attacker is no reason to discard it.
