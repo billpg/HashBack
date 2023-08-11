@@ -1,3 +1,4 @@
-﻿/billpg.BearerTokenExample/.vs
-/billpg.BearerTokenExample/bin
-/billpg.BearerTokenExample/obj
+﻿# Folders that Visual Studio 2022 will leave behind.
+.vs
+bin
+obj
