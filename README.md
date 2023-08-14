@@ -249,8 +249,6 @@ Content-Type: application/json
 { "IsThisAWebhook?": true }
 ```
 
-
-
 ## Anticipated Asked Questions
 
 ### What's wrong with keeping a pre-shared secret long term?
@@ -262,80 +260,36 @@ First, it isn't pre-shared. The HMAC key can be generated as needed on the fly. 
 Secondly, you only need it for the duration of the exchange, which could be over in a second.
 
 ### I don't have a web server. I'm behind a firewall.
-Then this exchange is not for you. It works by utilizing that both sides can accept TLS connections and if one side can;t do that then this isn;t going to work.
+Then this exchange is not for you. It works by utilizing that both sides can accept TLS connections and if one side can't do that then this isn't going to work.
 
 ### I'm not a web server, but I have one on the other side of the Internet.
-Do you have a secure shared resource like a database that both you and the web server can access in a secure manner? Try storing the HMAC key in the database against the request ID, then allow your web server to acceot requests frm the issuer.
+Do you have a secure shared resource like a database that both you and the web server can access in a secure manner? Try storing the HMAC key in the database against the exchange ID, then allow your web server to acceot requests from the issuer.
 
 ### Why not encrypt the BearerToken in the Issue step?
 It's already encrypted. By TLS.
 
-I am open to this idea as it was a step in an earlier version. The HMAC key was a much longer key and the PBKDF2 produced anough bits for an AES Key+IV as well and the HMAC key. I took it out because I couldn't find a reasonable risk factor where the extra encryption layer could have helped.
+I am open to this idea as it was a step in an earlier version. The Initiator's key was a much longer and the PBKDF2 produced anough bits for an AES Key+IV as well and the HMAC key. I took it out because I couldn't find a reasonable risk factor where the extra encryption layer could have helped.
 
-At the end of the day, the Issuer has the Bearer token and passes it to the Initiator. A third oarty can't eaves-drop because TLS protects the channel.
-
-### What claim does the Bearer token represent?
-The Initiator supplies a full domain name and the Issuer supplies a bearer token to a web service at that domain. Having the Bearer token represents having taken steps to verify ownership of that domain.
-
-What sort of access that means is up to the Issuer when the Intiator supplies that token back.
+At the end of the day, the Issuer has the Bearer token and passes it to the Initiator. A third party can't eaves-drop because TLS protects the channel.
 
 ### How long should a beaer token last until expiry?
-Up to you but I'd go for an hour. If the exchange takes too long, remember you can do it in advance and have the Beaerer token ready if needed.
+Up to you but (finger in the air) I'd go for an hour. If the exchange takes too long, remember you can do it in advance and have the Beaerer token ready if needed.
 
 ## A brief security analysis
 
 ### "What if an attacker attempts to eavesdrop or spoof either request?"
 TLS will stop this. The security of this protocol depends on TLS working. If TLS is broken then so is this exchange.
 
-### "What if an attacker sends a fake TokenRequest to Bob, pretending to be Alice?"
-Bob will issue a new token and send it to Alice in the form of a TokenIssue request. Alice will reject the request because she wasn't expecting one.
+### "What if an attacker sends a fake Initiate request?"
+Then the Issuer will generate a unasked-for Bearer token and send it to the real Initiator. They will reject the issued Beaer token because she wasn't expecting one and respond with an error to the Issuer, who may use this as a sign to delete the issued token and put the fake Initiator's IP address on a block-list.
 
-### "What if the attacker sends a fake TokenRequest to Bob, but at the same time Alice is making a request and knowing what ExchangeId she will use?"
-The genuine TokenIssue request from Bob to Alice will have a genuine token, but this will fail the HMAC check because the attacker doesn't know what HMAC key she supplied to Bob in the genuine TokenRequest body.
+### "What if the attacker sends a fake Initiate request to the real Ussuer, but the attacker knows what exchangeID GUID will use?
+Some varieties of GUID are predictable and the attacker might predict when a genuine Initiator is about to Initiate and what exchnageID GUID they will use. In this event, the Issuer will make to Issue requests to the real Initiator. They will rejct one and accept the other, because the attacker doesn't know how to sign the token.
 
-Even if Alice doesn't check the HMAC hash, this is not a problem. The attacker can't intercept it thanks to TLS. The token was genuinely issued so there's no problem if they go ahead and use it. That it was induced by an attacker is no reason to discard it.
+### "What if an attacker sends a fake Issue request?"
+If the Initiator isn't expecting an Issue request, they won't have a HMAC key to check the signature, so can reject the request.
 
-### "What if an attacker sends a fake TokenIssue to Alice, pretending to be Bob."
-If Alice isn't expecting a TokenIssue request, she will reject an unasked one.
+If the Initiator *is* expecting an Issue request, they will be able to test it came from the genuine Issuer by checking the HMAC hash.
 
-If Alice is expecting a TokenIssue, she will be able to test it came from Bob by checking the HMAC hash. Only Alice and Bob know what the HMAC key is because Alice generated it from cryptographic quality randomness and sent to Bob. Thanks to TLS, no-one else knows the key.
-
-If Alice, for whatever reason, decides to skip testing the HMAC hash, she will have a fake Bearer token. This will fail the first time she tries to use because Bob will reject the request as an unknown Bearer token. (The attacker doesn't know how to generate a genuine Bearer token that Bob will accept.)
-
-### "What if Alice uses predictable randomness when generating the HMAC key?"
-The an attacker will be able to send in a fake TokenIssue request to Alice with an HMAC hash that passes validation. Because the attacker still doesn't know how to issue a Bearer token, Bob will reject that Bearer token the first time Alice tries to use it.
-
-Alice shoud use unpredictable cryptographic quality randomness when generating the HMAC key.
-
-### "What if an attacker requests a genuine Bearer token for themselves and then pass that attacker onto Alice in a fake TokenIssue request?"
-The attacker still doesn't know how to fake an HMAC hash without knowing the HAC key Alice generated, so this will fail Alice's HMAC test.
-
-If Alice skips the HMAC test, she will have a genuine Bearer token that she thinks is hers, but one that actually identifies the attacker's domain, not Alice's. As Bob will recognise the token as the attacker's, he will not accept any action that requires a Alice's token.
-
-Alice should perform the HMAC test on any TokenIssue requests she receives.
-
-### "What if an attacker makes a TokenRequest to Bob but pretending to be from Carol, a website that does not implement this protocol?"
-Then Bob will issue a token for carol.example, but the TokenIssue request passing it along to that unwitting website will fail with a 404 error.
-
-The choice of fixing the request to the `/.well-known/` folder was deliberate. If an attacker could induce Bob to perform a POST request to any URL the attacker chose, the service might misinterpret the request as something other than a TokenIssue request.
-
-If we may consider a worst case scenario, the default behaviour of Carol is to publish the contents of all incoming requests, the attacker would have a copy of the valid Bearer token by reviewing those published logs, but it would be a Bearer token with a claim for a domain that doesn't have a history of using this protocol. The attacker could equally purchase their own domain and get a valid Bearer token that way.
-
-For this reason, websites issuing tokens via a TokenIssue request who additionally do not require a prior relationship, should first check the original TokenRequest message is genuine by performing a RequestVerify request.
-
-### "What if an attacker signes up for someone's website under the user name '.well-known' and can host server-side scripts there?"
-If someone can cause code to run in response to request at `/.well-known/' URLs, that individual owns the service.
-
-Services allowing users to select their own names at the top level should set this top-level folder aside.
-
-### "What if the intiator's domain has expired and the attacker has purchased it.
-This protocol verifies claims based on operating a website at a particular domain. If you own the domain, then you have the means to be authenticated at that domain. If that kind of authentication claim is not suitable, this protocol is not appropriate.
-
-## Questions to investigate.
-
-- Given that there's a RequestVerify step, do we need to restrict URLs to the `/.well-known/` folder and instead allow any URL to be specified as the one to send RequestVerify and Tokenissue requests to? Instead of a domain, the claim would be based on the whole URL instead.
-- Would it be better to pass the HMAC key through PBKDF2 with a fixed salt first?
-- Am I doing HMAC correctly?
-- Does there need to be pre-flight step before a POST request?
-- An earlier version AES encrypted the Bearer token in the TokenIssue request using an AES key and IV from the initiator, alongside the HMAC key. I removed it as my security analysis didn't show it was needed. Was I right to take it out?
-- What should I call it? What string should I find-and-replace 'CrossRequestTokenExchange' with?
+### "What if Initiator uses predictable randomness when generating the HMAC key?"
+The Initiator should use unpredictable cryptographic quality randomness when generating the Initiator's key. Any platform capable of making a TLS connection should be able to do this.

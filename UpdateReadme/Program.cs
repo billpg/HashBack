@@ -45,27 +45,18 @@ var readmeLines = File.ReadAllLines(readmePath).ToList();
 var readmeOrigText = string.Join("\r\n", readmeLines);
 
 /* Start a dictionary of keys and values. */
-var keyValues = new Dictionary<string, string>();
-
-/* Use fixed initiator and issuer strings to avoid un-needed changes. */
-const string initiatorsKey = "THiDXXrxo2E-xLplG9j4ymi-QdxwMoMxUZi-D4B3vULbHyr";
-const string issuersKey = "5Ml8wacaRTu-qGvw5KEKeHy-eGYtJAML4P9-nrWo7sLjpz0";
-keyValues["InitiatorsKey"] = initiatorsKey;
-keyValues["IssuersKey"] = issuersKey;
-
-/* Turn the two keys into a HMAC key. */
-var hmacKey = CryptoHelpers.CalculateHashKey(initiatorsKey, issuersKey);
-
-/* Generate and sign bearer token. */
-string bearerToken = "This_is_an_impossible_to_guess_token";
-var tokenSignature = CryptoHelpers.SignBearerToken(hmacKey, bearerToken);
-keyValues["BearerToken"] = bearerToken;
-keyValues["BearerTokenSignature"] = tokenSignature;
+var keyValues = GenerateKeyValues("Main");
 
 /* Loop through the entire README, looking for the JSON lines with the
  * selected keys that will need rewriting. */
 foreach (int readmeLineIndex in Enumerable.Range(0, readmeLines.Count))
 {
+    /* Switch to a new set of values for each case study. */
+    if (readmeLines[readmeLineIndex].Contains("Case Studies"))
+        keyValues = GenerateKeyValues("CaseStudyApi");
+    if (readmeLines[readmeLineIndex].Contains("# Webhooks"))
+        keyValues = GenerateKeyValues("CaseStudyWebhooks");
+
     /* Split the current line by quote. If not exactly five parts, move on. */
     var currentLine = readmeLines[readmeLineIndex].Split('"');
     if (currentLine.Length != 5)
@@ -94,7 +85,6 @@ if (readmeOrigText != string.Join("\r\n", readmeLines))
 
 /* Announce end. */
 Console.WriteLine("Finished helper/readme update.");
-
 
 /* Find the file with the given name, starting from this file's folder moving upwards. */
 string FindFileByName(string fileName)
@@ -164,4 +154,61 @@ static IEnumerable<string> AddSuffixExceptLast(IEnumerable<string> lines, string
     /* Ended loop. Return the final line (if there was one) without the suffic. */
     if (prev != null)
         yield return prev;
+}
+
+/* Deterministically generate keys and values for the example JSON objects. */
+Dictionary<string,string> GenerateKeyValues(string realm)
+{
+    /* Start an emopty collection. */
+    var keyValues = new Dictionary<string, string>();
+
+    /* Hash the realm to produce intiator and issuer keys. */
+    string initiatorsKey = GenerateKeyFromString(realm + "Initiator");
+    string issuersKey = GenerateKeyFromString(realm + "Issuer");
+    keyValues["InitiatorsKey"] = initiatorsKey;
+    keyValues["IssuersKey"] = issuersKey;
+
+    /* Turn the two keys into a HMAC key. */
+    var hmacKey = CryptoHelpers.CalculateHashKey(initiatorsKey, issuersKey);
+
+    /* Generate and sign bearer token. */
+    string bearerToken = ToBearerToken(GenerateKeyFromString(realm + "token"));
+    var tokenSignature = CryptoHelpers.SignBearerToken(hmacKey, bearerToken);
+    keyValues["BearerToken"] = bearerToken;
+    keyValues["BearerTokenSignature"] = tokenSignature;
+
+    /* Completed collection. */
+    return keyValues;
+}
+
+/* Create a random-looking string from a starting string. */
+string GenerateKeyFromString(string v)
+{
+    /* Hash the input string. */
+    using var sha = System.Security.Cryptography.SHA256.Create();
+    byte[] hash = sha.ComputeHash(System.Text.Encoding.ASCII.GetBytes(v));
+
+    /* Start a string builder with the base64 of the hash. */
+    var key = new System.Text.StringBuilder(Convert.ToBase64String(hash).TrimEnd('='));
+    key.Append(key[3]);
+
+    /* Change the new + and / to "j". */
+    for (int i=0; i<key.Length; i++)
+        if (key[i] == '+' || key[i] == '/')
+            key[i] = 'j';
+
+    /* Add a hyphen every 11 characters. */
+    for (int i=3; i>0; i--)
+        key.Insert(i * 11, '-');
+
+    /* Done. Return in string form. */
+    return key.ToString();
+}
+
+/* Convert a string to a digits-only example bearer token. */
+string ToBearerToken(string k)
+{
+    var x = k.Where(c => c != '-').Select(c => c % 10);
+    return "Token_" + string.Concat(x);
+
 }
