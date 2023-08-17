@@ -26,13 +26,27 @@ namespace billpg.CrossRequestTokenExchange
             /// <returns>JSON data peviously passed to StoreInitiateRequest,
             /// or NULL for no-such-exchange.</returns>
             JObject? RetrieveInitiateRequest(Guid exchangeId);
+        }
 
-            /// <summary>
-            /// Called when the exchange is completed and we have a validated token.
-            /// </summary>
-            /// <param name="bearerToken">The Bearer token issed by the issuer.</param>
-            /// <param name="expiresAt">When this token will expire.</param>
-            void OnValidatedToken(string bearerToken, DateTime expiresAt);
+        public class IssueResult
+        {
+            public string? BearerToken { get; }
+            public DateTime? ExpiresAt { get; }
+            public string? BadRequestMessage { get; }
+            public bool IsSuccess => BearerToken is not null;
+
+            private IssueResult(string? bearerToken, DateTime? expiresAt, string? badRequestMessage)
+            {
+                this.BearerToken = bearerToken;
+                this.ExpiresAt = expiresAt;
+                this.BadRequestMessage = badRequestMessage;
+            }
+
+            internal static IssueResult BadRequest(string message)
+                => new IssueResult(null, null, message);
+
+            internal static IssueResult Success(string bearerToken, DateTime expiresAt)
+                => new IssueResult(bearerToken, expiresAt, null);           
         }
 
         /// <summary>
@@ -75,50 +89,50 @@ namespace billpg.CrossRequestTokenExchange
         }
 
         /// <summary>
-        /// Handle an Issue request made by the issuer. If valid, returns null and 
-        /// the validated Bearer token will be passed to the exchange handler.
-        /// If not valid, returns error message to use for a 400 (BadRequest) response.
+        /// Handle an Issue request made by the issuer. Returns an object with
+        /// the successfully extracted token and expiry, or an object showing
+        /// the rejection reason.
         /// </summary>
         /// <param name="issueRequestJson">Parsed Issue request JSON.</param>
-        /// <returns>NULL for success or error message.</returns>
-        public string? HandleIssueRequest(JObject issueRequestJson)
+        /// <returns>Success/Rejection response.</returns>
+        public IssueResult HandleIssueRequest(JObject issueRequestJson)
         {
             /* Pull out the exchangeId of the Issue request. */
             string? exchangeIdAsString = issueRequestJson["ExchangeId"]?.Value<string>();
             if (string.IsNullOrEmpty(exchangeIdAsString))
-                return "Missing/Empty ExchangeId property.";
+                return IssueResult.BadRequest("Missing/Empty ExchangeId property.");
             if (Guid.TryParse(exchangeIdAsString, out Guid exchangeId) == false)
-                return "ExchangeId property is not a GUID.";
+                return IssueResult.BadRequest("ExchangeId property is not a GUID.");
 
             /* Fetch the stored initiate message for this exchangeId. */
             JObject? initiateRequestJson = ExchangeHandler.RetrieveInitiateRequest(exchangeId);
             if (initiateRequestJson == null)
-                return "Can't find an open exchange with this ExchangeId.";
+                return IssueResult.BadRequest("Can't find an open exchange with this ExchangeId.");
 
             /* Exract and validate the issuer's key. */
             string? issuersKey = issueRequestJson["IssuersKey"]?.Value<string>();
             if (issuersKey == null)
-                return "IssuersKey is missing.";
+                return IssueResult.BadRequest("IssuersKey is missing.");
             string? validateIssuersKeyMessage = TextHelpers.ValidateKey(issuersKey, "IssuersKey", 0);
             if (validateIssuersKeyMessage != null)
-                return validateIssuersKeyMessage;
+                return IssueResult.BadRequest(validateIssuersKeyMessage);
 
             /* Extract and validate the initiator's key. */
             string? initiatorsKey = initiateRequestJson["InitiatorsKey"]?.Value<string>();
             if (initiatorsKey == null)
-                return "InitiatorsKey is missing.";
+                return IssueResult.BadRequest("InitiatorsKey is missing.");
             string? validateInitiatorsKeyMessage = TextHelpers.ValidateKey(initiatorsKey, "InitiatorsKey", 33);
             if (validateInitiatorsKeyMessage != null)
-                return validateInitiatorsKeyMessage;
+                return IssueResult.BadRequest(validateInitiatorsKeyMessage);
 
             /* Extract and validate the Bearer token. */
             string? bearerToken = issueRequestJson["BearerToken"]?.Value<string>();
             if (bearerToken == null)
-                return "BearerToken property is missing.";
+                return IssueResult.BadRequest("BearerToken property is missing.");
             if (bearerToken.Length > 1024*8)
-                return $"BearerToken property must be {1024*8} characters or shorter.";
+                return IssueResult.BadRequest($"BearerToken property must be {1024*8} characters or shorter.");
             if (TextHelpers.IsAllPrintableAscii(bearerToken) == false)
-                return "BearerToken property contains non-ASCII characters.";
+                return IssueResult.BadRequest("BearerToken property contains non-ASCII characters.");
 
             /* Calculate the expected HMAC signature. */
             string expectedHmac = CryptoHelpers.SignBearerToken(initiatorsKey, issuersKey, bearerToken);
@@ -126,30 +140,27 @@ namespace billpg.CrossRequestTokenExchange
             /* Load and validate the supplied HMAC signature. */
             string? suppliedHmac = issueRequestJson["BearerTokenSignature"]?.Value<string>();
             if (suppliedHmac == null)
-                return "BearerTokenSignature property is missing.";
+                return IssueResult.BadRequest("BearerTokenSignature property is missing.");
             if (suppliedHmac.Length != 256/4 || TextHelpers.IsAllHex(suppliedHmac) == false)
-                return $"BearerTokenSignature property must be exactly {256/4} hex digits.";
+                return IssueResult.BadRequest($"BearerTokenSignature property must be exactly {256/4} hex digits.");
 
             /* Compare the two HMAC results. */
             if (suppliedHmac.ToUpperInvariant() != expectedHmac)
-                return "Supplied signature does not match the expected signature.";
+                return IssueResult.BadRequest("Supplied signature does not match the expected signature.");
 
             /* Pull out the bearer token's expiry. */
             string? expiresAtAsString = issueRequestJson["ExpiresAt"]?.Value<string>();
             if (expiresAtAsString == null)
-                return "ExpiresAt property is missing.";
+                return IssueResult.BadRequest("ExpiresAt property is missing.");
             if (expiresAtAsString.EndsWith("Z") == false)
                 expiresAtAsString += "Z";
             if (DateTime.TryParse(expiresAtAsString, out DateTime expiresAt) == false)
-                return "ExpiresAt property is not a valid date-time.";
+                return IssueResult.BadRequest("ExpiresAt property is not a valid date-time.");
             if (expiresAt < DateTime.UtcNow)
-                return "ExpiresAt property is in the past.";
-
-            /* Store the validated bearer token. */
-            ExchangeHandler.OnValidatedToken(bearerToken, expiresAt);
+                return IssueResult.BadRequest("ExpiresAt property is in the past.");
 
             /* Return, acknowledging success. */
-            return null;
+            return IssueResult.Success(bearerToken, expiresAt);
         }
     }
 }
