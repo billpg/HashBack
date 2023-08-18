@@ -23,7 +23,7 @@ namespace billpg.CrossRequestTokenExchange
         /// <param name="initiatorsKey">The initiator's key, supplied in the InitiateRequest.</param>
         /// <param name="issuersKey">The issuer's key, supplied in an ValidateRequest or a IssueRequest.</param>
         /// <returns>Derived HMAC key bytes.</returns> 
-        public static IList<byte> CalculateHashKey(string initiatorsKey, string issuersKey)
+        private static IList<byte> CalculateHashKey(string initiatorsKey, string issuersKey)
             => System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(
                 password: CombineKeyStrings(initiatorsKey, issuersKey).ToArray(),
                 salt: FixedPbkdf2Salt.ToArray(),
@@ -81,10 +81,10 @@ namespace billpg.CrossRequestTokenExchange
         /// <param name="bearerToken">ASII Bearer tokento sign.</param>
         /// <returns>Signatuure of bearer token using both supplied keys.</returns>
         public static string SignBearerToken(string initiatorKey, string issuerKey, string bearerToken)
-            => SignBearerToken(CalculateHashKey(initiatorKey, issuerKey), bearerToken);
-
-        public static string SignBearerToken(IList<byte> hmacKey, string bearerToken)
         {
+            /* Derive the hash key from the two supplied keys. */
+            IList<byte> hmacKey = CalculateHashKey(initiatorKey, issuerKey);
+
             /* Convert the bearer token into an array of bytes. */
             byte[] bearerTokenAsBytes = Encoding.ASCII.GetBytes(bearerToken);
 

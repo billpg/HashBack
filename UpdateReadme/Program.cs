@@ -168,12 +168,9 @@ Dictionary<string,string> GenerateKeyValues(string realm)
     keyValues["InitiatorsKey"] = initiatorsKey;
     keyValues["IssuersKey"] = issuersKey;
 
-    /* Turn the two keys into a HMAC key. */
-    var hmacKey = CryptoHelpers.CalculateHashKey(initiatorsKey, issuersKey);
-
     /* Generate and sign bearer token. */
     string bearerToken = ToBearerToken(GenerateKeyFromString(realm + "token"));
-    var tokenSignature = CryptoHelpers.SignBearerToken(hmacKey, bearerToken);
+    var tokenSignature = CryptoHelpers.SignBearerToken(initiatorsKey, issuersKey, bearerToken);
     keyValues["BearerToken"] = bearerToken;
     keyValues["BearerTokenSignature"] = tokenSignature;
 

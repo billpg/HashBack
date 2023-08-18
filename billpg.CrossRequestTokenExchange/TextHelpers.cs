@@ -57,7 +57,7 @@ namespace billpg.CrossRequestTokenExchange
             /* Test each character in a loop. */
             return hash.All(IsHex);
             static bool IsHex(char digit)
-                => (digit >= '0' && digit <= '0')
+                => (digit >= '0' && digit <= '9')
                 || (digit >= 'A' && digit <= 'F')
                 || (digit >= 'a' && digit <= 'f');
         }

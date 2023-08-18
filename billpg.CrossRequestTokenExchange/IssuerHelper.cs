@@ -77,16 +77,17 @@ namespace billpg.CrossRequestTokenExchange
 
             /* Passed validation. Build Issue request. */
             (string bearerToken, DateTime expiresAt) = issueBearerToken();
+            string issuersKey = CryptoHelpers.GenerateRandomKeyString();
+            var signature = CryptoHelpers.SignBearerToken(initiatorsKey, issuersKey, bearerToken);
 
             /* Build JSON for issue request. */
-            string issuersKey = CryptoHelpers.GenerateRandomKeyString();
             var issueRequest = new JObject
             {
                 ["ExchangeId"] = exchangeId,
                 ["BearerToken"] = bearerToken,
-                ["ExpiresAt"] = expiresAt.ToString("s") + "Z",
+                ["ExpiresAt"] = $"{expiresAt:s}Z",
                 ["IssuersKey"] = issuersKey,
-                ["BearerTokenSignature"] = CryptoHelpers.SignBearerToken(initiatorsKey, issuersKey, bearerToken)
+                ["BearerTokenSignature"] = signature
             };
 
             /* Return JSON to caller. */
