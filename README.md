@@ -113,7 +113,7 @@ Content-Type: application/json
 
 If the intiator finds the Bearer token it has received to be acceptable (including checking the HMAC signature), it must respond to this inner request with a 204 code, indicating all is well. Nonetheless, it must not use the newly issued Bearer token until the issuer also closes its outer request with 204 code as well.
 
-Any error response from the initiator to the issuer indicates it does not accept the issued Bearer token, including any kind of local error. The response body shoudl include enough detail to help a developer resolve the issue.
+Any error response from the initiator to the issuer indicates it does not accept the issued Bearer token, including any kind of local error. The response body should include enough detail to help a developer resolve the issue.
 
 ## Version Negotiation
 
@@ -136,8 +136,9 @@ The requestor may now repeat that request but interacting according to the rules
 
 ## HMAC Key Derivation
 
-The Intiate request body will include a property named `InitiatorsKey` that must contain at least 256 bits of cryptographic quality randomness, expressed in any convenient encoding such as Hex or base64.
-The Issue request body must also include a property named `IssuersKey` that may contain any number of characters including an empty string. Both strings must consist only of printable ASCI characters from 33 to 126.
+The Initiate request body will include a property named `InitiatorsKey` that must contain at least 256 bits of cryptographic quality randomness, expressed in any convenient encoding such as Hex or base64.
+The Issue request body must also include a property named `IssuersKey` that may contain any number of characters including an empty string.    
+Both strings must consist only of printable ASCI characters from 33 to 126.
 
 Both keys are combined and passed into a PBKDF2 function withe the parameters listed below. The output 256 bit block is the HMAC signing key. Both participants, possessing both the key they generated themselves and the key from the orther participant will perform the same operation to derive the HMAC signing key. The Issuer will sign their Bearer token with the HMAC key and the Initiator will verify the Bearer token is genuine by verifying the signature with the HMAC key.
 
@@ -161,13 +162,17 @@ The PBKDF2 function will have the following parameters:
 
 The inclusion of the fixed salt is to ensure the derived key could only be found by reading this document. The use of PBKDF2 itself is to make it difficult to construct a selected key. It is belived that single round of hashing would be sufficient, given the input should already represent 256 bits of cryptographic quality randomness, but 99 rounds ups the burden a little.
 
+That 120 character string as generated from running PBKDF2 over some text and coverting the bytes into capital letters. You are welcome to inspect the code that produced the salt string and confirm it produced the same string when you run it.    
+See https://github.com/billpg/CrossRequestTokenExchange/blob/8affb2b87496c73d0f40511ba35ab1e1cac2ca6d/UpdateReadme/GenFixedSalt.cs    
+(My sincere thanks to my brother Andrew Phillips-Godfrey for checking over the mathematics going on inside that.)   
+
 # Case Studies
 
 ## A Saas API.
 
 **saas.example** is a website with an API designed for their customers to use. When a customer wishes to use this API, it must first go through this exchange to obtain a Bearer token. The service documents that users of their API may make Initiate requests to the URL `https://saas.example/api/login/crte?userId=id`, filling in their unique user ID in the query string.
 
-**Carol** is a customer of Saas. She's recently signed up and has been allocated her unique user id, 12. She's logged into the Saas customer portal and browsed to their authentiation page. Under the CRTE section, she's configued her asccount that `https://caarol.example/saas/crte-receive-token` is her Issue URL, where she's implemented a handler.
+**Carol** is a customer of Saas. She's recently signed up and has been allocated her unique user id, 12. She's logged into the Saas customer portal and browsed to their authentiation page. Under the CRTE section, she's configued her asccount that `https://caarol.example/saas/crte-receive-token` is her URL for the Issuer to send the new Bearer token to, where she's implemented a handler.
 
 Time passes and Carol needs to make a request to the Saas API. As she has no Bearer tokens, she makes a POST request to the documented API:
 ```
@@ -180,7 +185,7 @@ Content-Type: application/json
 }
 ```
 
-The Saas website code looks up user 12 and finds an active user with CRTE configured - if not, it would respond with an error. At this point it does not yet know if the Initiate request came from the real Carol yet. 
+The Saas website code looks up user 12 and finds an active user with CRTE configured - if not, it would respond with an error. At this point, the Saas service does not yet know if the Initiate request came from the real Carol, yet. 
 
 Despite this, the Saas service generates a Brarer token by base64 encodig some securly generated bytes and signs the token using HMAC. It does not yet save this token to it's own database but holds it in memory until such time the providence of Carol as the Initiator can be confirmed.
 
@@ -198,7 +203,7 @@ Content-Type: application/json
 }
 ```
 
-As Carol really is the Initiator, her web service can look up the supplied ExchnageId and find the Initiate request it opened earlier. It has a Bearer token but it doesn't yet know if this is the genuinely the Saas service making an Issue request yet. To check this, it performs the same steps to generate the HMAC key for this exchnage and uses that to check the signature. Happy that everything is verified, it stores the Bearer token but it can't use the token just yet.
+As Carol really is the Initiator, her web service can look up the supplied ExchangeId and find the Initiate request it opened earlier. It has a Bearer token but it doesn't yet know if this is the genuinely the Saas service making an Issue request yet. To check this, it performs the same steps to generate the HMAC key for this exchange and uses that to check the signature. Happy that everything is verified, it stores the Bearer token but it can't use the token just yet.
 
 To confirm that all is well, Carol's web service closes the Issue request by sending a 204 status, indicating that it accepts the Bearer token. The Saas web server finally writes the token it generated into the database. Once that step is complete and successful, the Saas software finally closes the Initiate request with a 204, this time signalling that Carol may now use the Beaer token it issued.
 
@@ -224,7 +229,7 @@ Content-Type: application/json
 }
 ```
 
-Carol's web service opens a new HTTPS request back to the Saas web site and in a similar way to before, it populates this new request with a Bearer token it had generated and an HMAC signature. The Saas API conduments that the webhook CRTE Issue requests should go to `https://saas.example/api/issue-crte?user_id=is` with the user's id added to the query string parameter.
+Carol's web service opens a new HTTPS request back to the Saas web site and in a similar way to before, it populates this new request with a Bearer token it had generated and an HMAC signature. The Saas API conduments that the webhook CRTE Issue requests should go to `https://saas.example/api/issue-crte?user_id=id` with the user's id added to the query string parameter.
 ```
 POST https://saas.example/api/issue-crte?user_id=12
 Content-Type: application/json
@@ -272,7 +277,7 @@ I am open to this idea as it was a step in an earlier version. The Initiator's k
 
 At the end of the day, the Issuer has the Bearer token and passes it to the Initiator. A third party can't eaves-drop because TLS protects the channel.
 
-### How long should a beaer token last until expiry?
+### How long should a bearer token last until expiry?
 Up to you but (finger in the air) I'd go for an hour. If the exchange takes too long, remember you can do it in advance and have the Beaerer token ready if needed.
 
 ## A brief security analysis
@@ -281,10 +286,10 @@ Up to you but (finger in the air) I'd go for an hour. If the exchange takes too 
 TLS will stop this. The security of this protocol depends on TLS working. If TLS is broken then so is this exchange.
 
 ### "What if an attacker sends a fake Initiate request?"
-Then the Issuer will generate a unasked-for Bearer token and send it to the real Initiator. They will reject the issued Beaer token because she wasn't expecting one and respond with an error to the Issuer, who may use this as a sign to delete the issued token and put the fake Initiator's IP address on a block-list.
+Then the Issuer will generate a unasked-for Bearer token and send it to the real Initiator. They will reject the issued Bearer token because she wasn't expecting one and respond with an error to the Issuer, who may use this as a sign to delete the issued token and put the fake Initiator's IP address on a block-list.
 
-### "What if the attacker sends a fake Initiate request to the real Ussuer, but the attacker knows what exchangeID GUID will use?
-Some varieties of GUID are predictable and the attacker might predict when a genuine Initiator is about to Initiate and what exchnageID GUID they will use. In this event, the Issuer will make to Issue requests to the real Initiator. They will rejct one and accept the other, because the attacker doesn't know how to sign the token.
+### "What if the attacker sends a fake Initiate request to the real Ussuer, but the attacker knows what ExchangeId GUID will use?
+Some varieties of GUID are predictable and the attacker might predict when a genuine Initiator is about to Initiate and what exchnageID GUID they will use. In this event, the Issuer will make to Issue requests to the real Initiator. They will reject one and accept the other, because the attacker doesn't know how to sign the token.
 
 ### "What if an attacker sends a fake Issue request?"
 If the Initiator isn't expecting an Issue request, they won't have a HMAC key to check the signature, so can reject the request.
