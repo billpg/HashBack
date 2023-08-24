@@ -1,5 +1,8 @@
 # Cross Request Token Exchange
-Server-to-Server Secure Token Exchange Protocol
+An authentication exchange between two web services.
+
+This document is Copyright William Godfrey, 2023. It may be freely copied under the terms of the  Creative Commons Attribution-NoDerivs license.
+https://creativecommons.org/licenses/by-nd/3.0/
 
 ## The elevator pitch.
 
@@ -61,7 +64,7 @@ Content-Type: application/json
 ```
 
 - `POST`
-  - The choice of URL is mutaually agreed by both participants in advance. The issuer will need to know from this URL who the initiator is.
+  - The choice of URL is mutually agreed by both participants in advance. The issuer will need to know from this URL who the initiator is.
 - `"CrossRequestTokenExchange":`
   - This indicates the client is attempting to use the CrossRequestTokenExchange process. The value of this property is the version string, with `DRAFTY-DRAFT-3` indicating this version of this document.
   - The client might prefer to use a later version. If the service does not support that version, it may indicate the versions it does know in a `400` response. (See section **Version Negotiaton** later.)
@@ -73,7 +76,7 @@ Content-Type: application/json
   - The HMAC key will come from a PBKDF2 using this initiator's key and the isser's key, so it doesn't matter which encoding mechanism (hex, base64, etc) is used.
   - This value's length must be 1024 characters or shorter.
 
-The issuer service will keep this request open until the exchange has concluded. If the exchnage was successful, it will return a `204` response to close the exchange. If the issuer detects any error in the proces of handling this request, it should instead return an applicable HTTP error with enough detail for a developer to diagnose and fix the error in the response body. Any error response from the issuer is an indication that any Bearer token it might have retreived should be discarded.
+The issuer service will keep this request open until the exchange has concluded. If the exchange was successful, it will return a `204` response to close the exchange. If the issuer detects any error in the proces of handling this request, it should instead return an applicable HTTP error with enough detail for a developer to diagnose and fix the error in the response body. Any error response from the issuer is an indication that any Bearer token it might have retreived should be discarded.
 
 Once both HTTPS transactons have closed and the exchange was sucessful, the Initiator now has a Bearer token it may us with the Issuer's web servuce. 
 
@@ -81,7 +84,7 @@ Once both HTTPS transactons have closed and the exchange was sucessful, the Init
 
 The Issue step is performed by the Issuer to pass the Bearer token to the Initiator. This happens in a separate HTTPS tranaction while the original Initiaate request is kept open.
 
-Because the Issuer is sending the Bearer token to a pre-agred POST URL over HTTPS, they can be sure no-one else will have eavesdropped on that transaction. Because the request body includes an HMAC signature based on the key material supplied by the Initiator, they can be sure the Bearer token genuinely from the Issuer.
+Because the Issuer is sending the Bearer token to a pre-agreed POST URL over HTTPS, they can be sure no-one else will have eavesdropped on that transaction. Because the request body includes an HMAC signature based on the key material supplied by the Initiator, they can be sure the Bearer token genuinely from the Issuer.
 
 ```
 POST https://initiator.example/api/Issue?issuer_user_id=12345
@@ -198,7 +201,7 @@ Content-Type: application/json
 }
 ```
 
-As Carol really is the Initiator, her web service can look up the supplied ExchnageId and find the Initiate request it opened earlier. It has a Bearer token but it doesn't yet know if this is the genuinely the Saas service making an Issue request yet. To check this, it performs the same steps to generate the HMAC key for this exchnage and uses that to check the signature. Happy that everything is verified, it stores the Bearer token but it can't use the token just yet.
+As Carol really is the Initiator, her web service can look up the supplied ExchangeId and find the Initiate request it opened earlier. It has a Bearer token but it doesn't yet know if this is the genuinely the Saas service making an Issue request yet. To check this, it performs the same steps to generate the HMAC key for this exchange and uses that to check the signature. Happy that everything is verified, it stores the Bearer token but it can't use the token just yet.
 
 To confirm that all is well, Carol's web service closes the Issue request by sending a 204 status, indicating that it accepts the Bearer token. The Saas web server finally writes the token it generated into the database. Once that step is complete and successful, the Saas software finally closes the Initiate request with a 204, this time signalling that Carol may now use the Beaer token it issued.
 
@@ -284,7 +287,7 @@ TLS will stop this. The security of this protocol depends on TLS working. If TLS
 Then the Issuer will generate a unasked-for Bearer token and send it to the real Initiator. They will reject the issued Beaer token because she wasn't expecting one and respond with an error to the Issuer, who may use this as a sign to delete the issued token and put the fake Initiator's IP address on a block-list.
 
 ### "What if the attacker sends a fake Initiate request to the real Ussuer, but the attacker knows what exchangeID GUID will use?
-Some varieties of GUID are predictable and the attacker might predict when a genuine Initiator is about to Initiate and what exchnageID GUID they will use. In this event, the Issuer will make to Issue requests to the real Initiator. They will rejct one and accept the other, because the attacker doesn't know how to sign the token.
+Some varieties of GUID are predictable and the attacker might predict when a genuine Initiator is about to Initiate and what exchangeID GUID they will use. In this event, the Issuer will make to Issue requests to the real Initiator. They will rejct one and accept the other, because the attacker doesn't know how to sign the token.
 
 ### "What if an attacker sends a fake Issue request?"
 If the Initiator isn't expecting an Issue request, they won't have a HMAC key to check the signature, so can reject the request.
