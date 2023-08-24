@@ -56,4 +56,44 @@ namespace billpg.CrossRequestTokenExchange
             => new IssueResult(bearerToken, expiresAt, null);
     }
 
+    public class InitiateRequestAction
+    {
+        public int? RespondToRequestStatusCode { get; }
+        public JObject? RespondToRequestBody { get; }
+        public JObject? MakeIssueRequestBody { get; }
+
+        public InitiateRequestAction(
+            int? respondToRequestStatusCode,
+            JObject? respondToRequestBody,
+            JObject? makeIssueRequestBody)
+        {
+            this.RespondToRequestStatusCode = respondToRequestStatusCode;
+            this.RespondToRequestBody = respondToRequestBody;
+            this.MakeIssueRequestBody = makeIssueRequestBody;
+        }
+
+        internal static InitiateRequestAction BadRequest(string message)
+            => new InitiateRequestAction(
+                400,
+                new JObject
+                {
+                    ["Message"] = message
+                },
+                null);
+
+        internal static InitiateRequestAction BadRequestListVersions(string message)
+        => new InitiateRequestAction(
+            400,
+            new JObject
+            {
+                ["Message"] = message,
+                ["AcceptVersion"] = new JArray { "DRAFTY-DRAFT-3" }
+            },
+            null);
+
+        internal static InitiateRequestAction MakeIssueRequest(JObject issueRequest)
+            => new InitiateRequestAction(null, null, issueRequest);
+    }
+
+
 }
