@@ -7,35 +7,42 @@ using System.Threading.Tasks;
 
 namespace billpg.CrossRequestTokenExchange
 {
-    public class IssuerHelper
+    public static class IssuerHelper
     {
-
-        public InitiateRequestAction HandleInitiateRequest(
-            JObject initiatorRequestBody, 
-            Func<(string bearerToken, DateTime expiresAt)> issueBearerToken)
+        /// <summary>
+        /// Handle an incomming Initiate request, returning advice either instructions to make
+        /// an returning Issie request (as Issuer) or instructions to respond to the Initiate
+        /// request with an error.
+        /// </summary>
+        /// <param name="initiatorRequestBody">The parsed JSON body from the Initiate requst.</param>
+        /// <param name="issueBearerToken">A delegate to call if a Beaer token is needed.</param>
+        /// <returns>Advice on what to do next.</returns>
+        public static InitiateRequestNextStepAdvice HandleInitiateRequest(
+            JObject initiatorRequestBody,
+            IssueBearerToken issueBearerToken)
         {
-            /* Test the initiator is using a known version of this exchnage. */
+            /* Test the initiator is using a known version of this exchange. */
             string? exchangeVersion = initiatorRequestBody["CrossRequestTokenExchange"]?.Value<string>();
             if (exchangeVersion == null)
-                return InitiateRequestAction.BadRequest("Missing CrossRequestTokenExchange property.");
-            if (exchangeVersion != "DRAFTY-DRAFT-3")
-                return InitiateRequestAction.BadRequestListVersions("Unknown exchange version.");
+                return InitiateRequestNextStepAdvice.BadRequest("Missing CrossRequestTokenExchange property.");
+            if (exchangeVersion != VersionString.DRAFTY_DRAFT_3)
+                return InitiateRequestNextStepAdvice.BadRequestListVersions("Unknown exchange version.");
 
             /* Extract and parse the exchangeId. */
             string? exchangeIdAsString = initiatorRequestBody["ExchangeId"]?.Value<string>();
             if (exchangeIdAsString == null)
-                return InitiateRequestAction.BadRequest("Missing ExchangeId property.");
+                return InitiateRequestNextStepAdvice.BadRequest("Missing ExchangeId property.");
             if (Guid.TryParse(exchangeIdAsString, out Guid exchangeId) == false)
-                return InitiateRequestAction.BadRequest("ExchangeId is not a valid GUID.");
+                return InitiateRequestNextStepAdvice.BadRequest("ExchangeId is not a valid GUID.");
 
             /* Extract and validate the initiator's key. */
             string? initiatorsKey = initiatorRequestBody["InitiatorsKey"]?.Value<string>();
             if (initiatorsKey == null)
-                return InitiateRequestAction.BadRequest("Missing InitiatorsKey property.");
+                return InitiateRequestNextStepAdvice.BadRequest("Missing InitiatorsKey property.");
             if (initiatorsKey.Length < 33)
-                return InitiateRequestAction.BadRequest("InitiatorsKey must be at least 33 characters long.");
+                return InitiateRequestNextStepAdvice.BadRequest("InitiatorsKey must be at least 33 characters long.");
             if (initiatorsKey.Length > 1024)
-                return InitiateRequestAction.BadRequest("InitiatorsKey must be 1024 characters or shorter.");
+                return InitiateRequestNextStepAdvice.BadRequest("InitiatorsKey must be 1024 characters or shorter.");
 
             /* Passed validation. Build Issue request. */
             (string bearerToken, DateTime expiresAt) = issueBearerToken();
@@ -53,7 +60,7 @@ namespace billpg.CrossRequestTokenExchange
             };
 
             /* Return JSON to caller. */
-            return InitiateRequestAction.MakeIssueRequest(issueRequest);
+            return InitiateRequestNextStepAdvice.MakeIssueRequest(issueRequest);
         }
     }
 }

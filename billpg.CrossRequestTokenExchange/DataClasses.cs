@@ -7,6 +7,11 @@ using System.Threading.Tasks;
 
 namespace billpg.CrossRequestTokenExchange
 {
+    public static class VersionString
+    {
+        public const string DRAFTY_DRAFT_3 = "DRAFTY-DRAFT-3";
+    }
+
     public class OpenInitiate
     {
         public Guid ExchangeId { get; }
@@ -27,7 +32,7 @@ namespace billpg.CrossRequestTokenExchange
         public JObject RequestBody
             => new JObject
             {
-                ["CrossRequestTokenExchange"] = "DRAFTY-DRAFT-3",
+                ["CrossRequestTokenExchange"] = VersionString.DRAFTY_DRAFT_3,
                 ["ExchangeId"] = this.ExchangeId.ToString().ToUpperInvariant(),
                 ["InitiatorsKey"] = this.InitiatorsKey
             };
@@ -56,13 +61,19 @@ namespace billpg.CrossRequestTokenExchange
             => new IssueResult(bearerToken, expiresAt, null);
     }
 
-    public class InitiateRequestAction
+    public delegate (string bearerToken, DateTime expiresAt) IssueBearerToken();
+
+    public class InitiateRequestNextStepAdvice
     {
         public int? RespondToRequestStatusCode { get; }
         public JObject? RespondToRequestBody { get; }
         public JObject? MakeIssueRequestBody { get; }
+        public bool IsMakeIssueRequest 
+            => this.MakeIssueRequestBody is not null;
+        public bool IsRespondError 
+            => this.RespondToRequestStatusCode.HasValue;
 
-        public InitiateRequestAction(
+        private InitiateRequestNextStepAdvice(
             int? respondToRequestStatusCode,
             JObject? respondToRequestBody,
             JObject? makeIssueRequestBody)
@@ -72,8 +83,8 @@ namespace billpg.CrossRequestTokenExchange
             this.MakeIssueRequestBody = makeIssueRequestBody;
         }
 
-        internal static InitiateRequestAction BadRequest(string message)
-            => new InitiateRequestAction(
+        internal static InitiateRequestNextStepAdvice BadRequest(string message)
+            => new InitiateRequestNextStepAdvice(
                 400,
                 new JObject
                 {
@@ -81,18 +92,18 @@ namespace billpg.CrossRequestTokenExchange
                 },
                 null);
 
-        internal static InitiateRequestAction BadRequestListVersions(string message)
-        => new InitiateRequestAction(
+        internal static InitiateRequestNextStepAdvice BadRequestListVersions(string message)
+        => new InitiateRequestNextStepAdvice(
             400,
             new JObject
             {
                 ["Message"] = message,
-                ["AcceptVersion"] = new JArray { "DRAFTY-DRAFT-3" }
+                ["AcceptVersion"] = new JArray { VersionString.DRAFTY_DRAFT_3 }
             },
             null);
 
-        internal static InitiateRequestAction MakeIssueRequest(JObject issueRequest)
-            => new InitiateRequestAction(null, null, issueRequest);
+        internal static InitiateRequestNextStepAdvice MakeIssueRequest(JObject issueRequest)
+            => new InitiateRequestNextStepAdvice(null, null, issueRequest);
     }
 
 
