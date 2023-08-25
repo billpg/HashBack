@@ -1,7 +1,7 @@
 # Cross Request Token Exchange
 An authentication exchange between two web services.
 
-This document is Copyright William Godfrey, 2023. It may be freely copied under the terms of the  Creative Commons Attribution-NoDerivs license.
+This document is Copyright William Godfrey, 2023. It may be freely copied under the terms of the "Creative Commons Attribution-NoDerivs" license.
 https://creativecommons.org/licenses/by-nd/3.0/
 
 ## The elevator pitch.
@@ -14,9 +14,9 @@ Alice and Bob are normal web servers with an API.
   - "Thanks Bob."
 - "Thanks Alice."
 
-It's not so much what happened but what didn't happen. Neither side needed a pre-shared key or shared secret. Neither side need a secure secret store. Both machines (Alice and Bob) in this example are web servers. They both have TLS keys signed by a mutally trusted CA enables the exchange to work.
+It's not so much what happened but what didn't happen. Neither side needed a pre-shared key, a shared secret nor a place to securely store them. Both machines are web servers with TLS already set up and this is what enables the exchange to work.
 
-When you make an HTTPS request, thanks to TLS you can be sure who you are connecting to, but the service receiving the requst can't be sure who the request is coming from. By using *two* HTTPS requests in opposite directions, two web servers may perform a brief handshake and exchange a *Bearer* token. All without needing any pre-shared secrets. They already have TLS configured and it protects that exhange for free.
+When you make an HTTPS request, thanks to TLS you can be sure who you are connecting to, but the service receiving the requst can't be sure who the request is coming from. By using **two separate** HTTPS requests in opposite directions, the two web servers may perform a brief handshake and exchange a *Bearer* token.
 
 ### What's a Bearer token?
 
@@ -38,8 +38,15 @@ There are two particpants in this exchange:
 - The **Initiator** is requesting a Bearer token.
 - The **Issuer** issues that Bearer token back to the Initiator.
 
-The exchange takes the form of these two HTTPS tranactions.
+They connect to each other as follows:
+1. The Initiator opens a POST request to the Issuer, supplying identification and some random bytes for key material.
+2. The Issuer, keeping that first request open, opens a separate POST request to the Initator's web API.
+  - This request will contain a new Bearer token for the Initiator, with a signature using the key material from the first request.
+3. The Initator's API handler checks the signature and if valid, stores the Bearer token for later use.
+4. The Initator closes the second POST request, signalling it accepts the token with thanks.
+5. The Issuer closes the first POST request, signalling the token it issued is now ready to be used.
 
+The two POST request and the response are two distinct HTTPS tranactions.
 - **Initiate** where the *Initiator* starts of the exchange by calling the *Issuer*.
 - **Issue** where the *Issuer* supplies the issued Bearer token to the *Initiator*.
 
@@ -51,7 +58,7 @@ Depending on the specific needs, it may be prudent to include a user-id paramete
 
 ### Initiate
 
-The process is started by the Initiator, who needs a Bearer token from the issuer.
+The process is started by the Initiator, who needs a Bearer token from the Issuer.
 
 ```
 POST https://issuer.example/api/initiate?initiator_user_id=123456
@@ -120,7 +127,7 @@ Any error response from the initiator to the issuer indicates it does not accept
 
 ## Version Negotiation
 
-The intial request JSON includes a property named `CrossRequestTokenExchange` with a value specifying the version of this protocol the client is using. As this is the first (and so far, only) version, all requests should include this string. 
+The intial request JSON includes a property named `CrossRequestTokenExchange` with a value, "DRAFTY_DRAFT-3", specifying the version of this protocol the client is using. As this is the first (and so far, only) version, all requests should use only this string. 
 
 If a request arrives with a different unknown string value to this property, the servive should respond with a `400` (bad request) response, but with a JSON body including a property named `"AcceptVersion"`, listing all the supported versions in a JSON array of strings.
 
@@ -135,7 +142,7 @@ POST https://bob.example/api/BearerRequest
 }
 ```
 
-The requestor may now repeat that request but interacting according to the rules of this document.
+The requestor may now repeat that request but interacting according to the rules of this document instead of the newer version.
 
 ## HMAC Key Derivation
 
@@ -163,7 +170,9 @@ The PBKDF2 function will have the following parameters:
 - *Rounds* - 99.
 - *Output* - 256 bits.
 
-The inclusion of the fixed salt is to ensure the derived key could only be found by reading this document. The use of PBKDF2 itself is to make it difficult to construct a selected key. It is belived that single round of hashing would be sufficient, given the input should already represent 256 bits of cryptographic quality randomness, but 99 rounds ups the burden a little.
+The HMAC key is derived in this way (instead of allowing the Initiator to provide the HMAC key directly in hex) to avoid the possibility of the Issuer's API from being exploited as an HMAC-on-demand service. The Initator specifies at least 256 bits of key material, but is prevented from selecting the actual HMAC key by using PBKDF2 with both a salt that's has been set in advance and that the Issuer has the option to add their own bytes into the mix.
+
+The inclusion of the fixed salt is to ensure the derived key could only be found by reading this document. If someone were to set up an HMAC-on-demand service and coincidentally picked the same JSON property names as used in this exchange, it could not be used in a CRTE exchange unless it also knew about this fixed-in-advance salt and applied it to each request without being asked to.
 
 That 120 character string as generated from running PBKDF2 over some text and coverting the bytes into capital letters. You are welcome to inspect the code that produced the salt string and confirm it produced the same string when you run it.    
 See https://github.com/billpg/CrossRequestTokenExchange/blob/8affb2b87496c73d0f40511ba35ab1e1cac2ca6d/UpdateReadme/GenFixedSalt.cs    
@@ -175,7 +184,7 @@ See https://github.com/billpg/CrossRequestTokenExchange/blob/8affb2b87496c73d0f4
 
 **saas.example** is a website with an API designed for their customers to use. When a customer wishes to use this API, it must first go through this exchange to obtain a Bearer token. The service documents that users of their API may make Initiate requests to the URL `https://saas.example/api/login/crte?userId=id`, filling in their unique user ID in the query string.
 
-**Carol** is a customer of Saas. She's recently signed up and has been allocated her unique user id, 12. She's logged into the Saas customer portal and browsed to their authentiation page. Under the CRTE section, she's configued her asccount that `https://caarol.example/saas/crte-receive-token` is her URL for the Issuer to send the new Bearer token to, where she's implemented a handler.
+**Carol** is a customer of Saas. She's recently signed up and has been allocated her unique user id, 12. She's logged into the Saas customer portal and browsed to their authentiation page. Under the CRTE section, she's configued her account that `https://carol.example/saas/crte-receive-token` is her URL for the Issuer to send the new Bearer token to, where she's implemented a handler.
 
 Time passes and Carol needs to make a request to the Saas API. As she has no Bearer tokens, she makes a POST request to the documented API:
 ```
@@ -219,7 +228,7 @@ Authorization: Bearer Token_41401899608293768448699806747291819850802610
 
 The authentication requests don't always go from Carol to Saas. Occasionally, the Saas service will need to call back to Carol's web service to deal with an event. When this happens, Carol's web service needs to be certain the request is coming from Saas and not someone else trying to get privilendged information from Cartol's Webhook handler.
 
-To deal with this, as well as comfiguring a Webhook URL, Carol has also configured her own Initiate end-point. should the Saas service need to auuthenticate itself.
+To deal with this, as well as comfiguring a Webhook URL, Carol has also configured her own Initiate end-point, should the Saas service need to authenticate itself.
 
 Time passes and the Saas service needs to call Carol's API to make a decision, but it doesn't have a value Bearer token from her. It looks up the URL she configured and makes an HTTPS request:
 ```
@@ -232,7 +241,7 @@ Content-Type: application/json
 }
 ```
 
-Carol's web service opens a new HTTPS request back to the Saas web site and in a similar way to before, it populates this new request with a Bearer token it had generated and an HMAC signature. The Saas API conduments that the webhook CRTE Issue requests should go to `https://saas.example/api/issue-crte?user_id=id` with the user's id added to the query string parameter.
+Carol's web service opens a new HTTPS request back to the Saas web site and in a similar way to before, it populates this new request with a Bearer token it had generated and an HMAC signature. The Saas API documents that the webhook CRTE Issue requests should go to `https://saas.example/api/issue-crte?user_id=id` with the user's id added to the query string parameter.
 ```
 POST https://saas.example/api/issue-crte?user_id=12
 Content-Type: application/json
@@ -262,23 +271,25 @@ Content-Type: application/json
 ### What's wrong with keeping a pre-shared secret long term?
 They require management and secure storage. If we've already made the investment in configuring TLS on both sides, why not utilize that and get rid of the pre-shared secrets?
 
-### Isn't the HMAC key a pre-shared secret?
-It has vital diffeences.   
-First, it isn't pre-shared. The HMAC key can be generated as needed on the fly. All you need is a cryptograhpic quality random number generator.
-Secondly, you only need it for the duration of the exchange, which could be over in a second.
-
 ### I don't have a web server. I'm behind a firewall.
 Then this exchange is not for you. It works by utilizing that both sides can accept TLS connections and if one side can't do that then this isn't going to work.
 
 ### I'm not a web server, but I have one on the other side of the Internet.
-Do you have a secure shared resource like a database that both you and the web server can access in a secure manner? Try storing the HMAC key in the database against the exchange ID, then allow your web server to acceot requests from the issuer.
+Then you need a secure channel between yourself and that web server with which you can pass messages back and forth.
+
+### Isn't the InitiatorsKey key a pre-shared secret?
+If you like, but the scope is very different.
+
+With an API with a traditional pre-shared secret, you generate/issue the pre-shared key in advance and arrange to store that secret for the long term. Your code needs to be able to access it without human assistance and it's a pain if it leaks, requiring you to get a new key and store it again.
+
+The InitiatorsKey, on the other hand is only needed for the duration of the exchange. If you can arrange for the Issue request-body to be channeled into the waiting Initiator's process, the Initiator's key doesn't even have to leave the local memory of that process. Once the exchnage is over, the InitiatorsKey can be discarded.
 
 ### Why not encrypt the BearerToken in the Issue step?
-It's already encrypted. By TLS.
+It is encrypted - thanks to TLS.
 
-I am open to this idea as it was a step in an earlier version. The Initiator's key was a much longer and the PBKDF2 produced anough bits for an AES Key+IV as well and the HMAC key. I took it out because I couldn't find a reasonable risk factor where the extra encryption layer could have helped.
+I am open to this idea as it was a step in an earlier version. I had the Initiator's key to be much longer, so that PBKDF2 could produce anough bits for an AES Key+IV as well and the HMAC key. In the end I took it out because I felt it was needlessly complicating things. The exchange already relies on TLS so it made sense not to expend effort duplicating things.
 
-At the end of the day, the Issuer has the Bearer token and passes it to the Initiator. A third party can't eaves-drop because TLS protects the channel.
+At the end of the day, the Issuer has the Bearer token and passes it to the Initiator. A third party can't eaves-drop of that because TLS protects the channel.
 
 ### How long should a bearer token last until expiry?
 Up to you but (finger in the air) I'd go for an hour. If the exchange takes too long, remember you can do it in advance and have the Beaerer token ready if needed.
@@ -288,16 +299,16 @@ Up to you but (finger in the air) I'd go for an hour. If the exchange takes too 
 ### "What if an attacker attempts to eavesdrop or spoof either request?"
 TLS will stop this. The security of this protocol depends on TLS working. If TLS is broken then so is this exchange.
 
-### "What if an attacker sends a fake Initiate request?"
-Then the Issuer will generate a unasked-for Bearer token and send it to the real Initiator. They will reject the issued Bearer token because she wasn't expecting one and respond with an error to the Issuer, who may use this as a sign to delete the issued token and put the fake Initiator's IP address on a block-list.
+### "What if an attacker sends a fake Initiate request to an Issuer?"
+The Issuer will generate a unasked-for Bearer token and send it to the real Initiator, who will reject it because it wasn't expecting one.
 
-### "What if the attacker sends a fake Initiate request to the real Issuer, but the attacker knows what ExchangeId GUID will use?
-Some varieties of GUID are predictable and the attacker might predict when a genuine Initiator is about to Initiate and what ExchangeId GUID they will use. In this event, the Issuer will make two Issue requests to the real Initiator. The Initiator receiving these Issue requests will accept the one that passes the signature check and reject the other, because the attacker won't know how to sign the token without the HMAC key.
+### "What if the attacker sends a fake Initiate request to an Issuer but at the same time as a real Initiator and knowing what ExchangeId GUID it will use?
+Some varieties of GUID are predictable and the attacker might predict when a genuine Initiator is about to Initiate and what ExchangeId GUID they will use. In this event, the Issuer will make two Issue requests to the real Initiator. The Initiator receiving these Issue requests will accept the one that passes the signature check and reject the other. The attacker won't know how to sign the token without the Initiator's key which should not be predicatable.
 
 ### "What if an attacker sends a fake Issue request?"
 If the Initiator isn't expecting an Issue request, they won't have a HMAC key to check the signature, so can reject the request.
 
-If the Initiator *is* expecting an Issue request, they will be able to test it came from the genuine Issuer by checking the HMAC hash.
+If the Initiator *is* expecting an Issue request, they will be able to test it came from the genuine Issuer by checking the signature. The attacker won't know how to generate a signature without the unpredictable Initiator's key.
 
 ### "What if Initiator uses predictable randomness when generating the HMAC key?"
-The Initiator should use unpredictable cryptographic quality randomness when generating the Initiator's key. Any platform capable of making a TLS connection should be able to do this.
+The Initiator should use unpredictable cryptographic quality randomness when generating the Initiator's key.
