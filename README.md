@@ -1,9 +1,6 @@
 # Cross Request Token Exchange
 An authentication exchange between two web services.
 
-This document is Copyright William Godfrey, 2023. It may be freely copied under the terms of the "Creative Commons Attribution-NoDerivs" license.
-https://creativecommons.org/licenses/by-nd/3.0/
-
 ## The elevator pitch.
 
 Alice and Bob are normal web servers with an API.
@@ -14,13 +11,15 @@ Alice and Bob are normal web servers with an API.
   - "Thanks Bob."
 - "Thanks Alice."
 
-It's not so much what happened but what didn't happen. Neither side needed a pre-shared key, a shared secret nor a place to securely store them. Both machines are web servers with TLS already set up and this is what enables the exchange to work.
+Did you notice what didn't happen?
+
+Neither side needed a pre-shared key, a shared secret nor a place to securely store them. Both machines are web servers with TLS already set up and this is what enables the exchange to work.
 
 When you make an HTTPS request, thanks to TLS you can be sure who you are connecting to, but the service receiving the requst can't be sure who the request is coming from. By using **two separate** HTTPS requests in opposite directions, the two web servers may perform a brief handshake and exchange a *Bearer* token.
 
 ### What's a Bearer token?
 
-A Bearer token is string of characters. It might be a signed JWT or it might be a short string of random characters. If you know what that string is, you can include it any web request where you want to show who you are. The token itself is generated (or "issued") by the service that will accept that token later on as proof that you are who you say you are, because no-one else would have the token. 
+A Bearer token is string of characters. It could be a signed JWT or a string of randomness. If you know what that string is, you can include it any web request where you want to show who you are. The token itself is generated (or "issued") by the service that will accept that token later on as proof that you are who you say you are, because no-one else would have the token. 
 
 ```
 POST /api/some/secure/api/
@@ -30,43 +29,34 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJuZ2d5dSI6Imh0dHBzOi8vYmlsbHBnLmNvb
 
 That's basically it. It's like a password but very long and issued by the remote service. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Bearer tokens typically (but not always) have short life-times and you'd normally be given an expiry time along with the token itself. Cookies are a common variation of the Bearer token.
 
-The exchange in this document describes a mechanism for a server to request a Bearer token from another server, so that subsequent requests can be secured.
+The exchange in this document describes a mechanism for a server to request a Bearer token from another server in a secure manner.
 
 ## The exchange in a nutshell.
 
-There are two particpants in this exchange:
+There are two participants in this exchange:
 - The **Initiator** is requesting a Bearer token.
 - The **Issuer** issues that Bearer token back to the Initiator.
 
 They connect to each other as follows:
-1. The Initiator opens a POST request to the Issuer, supplying identification and some random bytes for key material.
-2. The Issuer, keeping that first request open, opens a separate POST request to the Initator's web API.
-  - This request will contain a new Bearer token for the Initiator, with a signature using the key material from the first request.
-3. The Initator's API handler checks the signature and if valid, stores the Bearer token for later use.
-4. The Initator closes the second POST request, signalling it accepts the token with thanks.
-5. The Issuer closes the first POST request, signalling the token it issued is now ready to be used.
-
-The two POST request and the response are two distinct HTTPS tranactions.
-- **Initiate** where the *Initiator* starts of the exchange by calling the *Issuer*.
-- **Issue** where the *Issuer* supplies the issued Bearer token to the *Initiator*.
-
-Both participants will have had an established relationship by the time this exchange takes place and will have configured these details in advance.
-- The URL for the Initiator to make a POST request to the Issuer.
-- The URL for the Issuer to make a POST request back to the Initiator.
+1. The Initiator opens a POST request to the Issuer's API to trigger the exchange, including an HMAC key.
+2. The Issuer, keeping that first request open, opens a separate POST request to the Initator's API.
+    - This request will contain a new Bearer token for the Initiator, with a signature using the HMAC key from the first request.
+3. The Initator checks the signature and closes the second POST request with a 204 code, signalling it accepts the supplied token.
+4. The Issuer finally closes the first POST request with a 204 code, signalling the issued token is now ready to be used.
 
 We'll now look at each step in detail.
 
 ### The Initiate Request
 
-The process is started by the Initiator, who needs a Bearer token from the Issuer. The Initiator makes a POST request to the agreed URL with a JSON body as described below.
+The process is started by the Initiator, who needs a Bearer token from the Issuer. The Issuer will open a new POST request to the URL that the Issuer documented a URL for the Initiator to use. This POST request includes a JSON request body as described below.
 
-The JSON reuqest body must have the following string properties, all required.
+The JSON must have the following string properties, all required.
 - `CrossRequestTokenExchange`
-  - This indicates the client is attempting to use the CrossRequestTokenExchange process and the version. The value "DRAFTY-DRAFT-4" refers to the version of this exchnage described in this document.
+  - This indicates the client is attempting to use the CrossRequestTokenExchange process and the version. The value "DRAFTY-DRAFT-4" refers to the version of this exchange described in this document.
 - `ExchangeId`
-  - A GUID value, which will be repeated back in the following Issue request. This allows the client sending the Initiate request and the service receiving the Issue request to associate the two requests.
+  - A GUID value identifying this exchange. The subsequest POST request will include this ID.
 - `HmacKey`
-  - A HMAC key that the Issuer will later use to "sign" the Bearer token, confirming that it came from the expected source.
+  - A HMAC key that the Issuer will later use to sign the Bearer token, confirming that it came from the expected source.
   - The value must consist of exactly 64 hex digits which represent 256 bits of cryptographic quality randomness.
   
 The request must not use any `Authorization` or `Cookie` headers.
@@ -82,19 +72,19 @@ Content-Type: application/json
 }
 ```
 
-The Issuer's web service will receive this request and will return an immediate error response if there are any problems, including a bad request or an internal server error. If all is well, it will keep this initial request open until the exchange has concluded.
+The Issuer's web service will receive this request and if there are any problems, will return an immediate error response. If all is well, it will keep this initial request open until the exchange has concluded.
 
 ### The Issue Request
 
-While keeping the initial POST request open, the Issuer's web service (receiving that request) will open a new POST request back to the Issuer, using the URL agreed in advance. This second request is to pass the newly generated Bearer token itself to the Initiator.
+While keeping the initial POST request open, the Issuer's web service (receiving that request) will open a new POST request back to the Initiator, using the URL agreed in advance. This second request is to pass the newly generated Bearer token itself to the Initiator.
 
 The Issuer will generated the token (not yet knowing for sure the initial request was genuine), sign the token using the HMAC key supplied in the initial request and include both in the second POST request.
 
-Because the Issuer is sending the Bearer token to a pre-agreed POST URL over HTTPS, they can be sure no-one else will have eavesdropped on that transaction. Because the request body includes an HMAC signature based on the HMAC key, the Initiator can be sure the token genuinely came from the Issuer.
+Because the Issuer is sending the Bearer token to a pre-agreed POST URL over HTTPS, they can be sure no-one else will have eavesdropped on that transaction. Because the request body includes an HMAC signature based on that HMAC key that no-one else knows, the Initiator can be sure the token genuinely came from the Issuer.
 
 The JSON request body is made up of the following string value properties, all of which are required.
 - `ExchangeId`
-  - The GUID copied from the original Initiate request body.
+  - The GUID from the original Initiate request body that identifies this exchange.
 - `BearerToken`
   - This is the requested Bearer token. It must consist only of printable ASCII characters.
 - `ExpiresAt`
@@ -121,21 +111,21 @@ Content-Type: application/json
 
 If the Intiator web service finds the Bearer token it has received to be acceptable (including checking the HMAC signature), it may respond to this second request with a 204 code to indicate it accepts the supplied token and that the issuer should (if needed) activate the token.
 
-Any error response indicates to the Issuer caller that the Initator doesn't accept the supplied token. This could mean that it didn't make the original request or that the HMAC signature verification failed, or simply an internal issue preventing the complete processing of the request. The Issuer, receiving such an error response should discard the or otherwise deactivate the token, as it was rejected.
+Any error response indicates to the Issuer caller that the Initator doesn't accept the supplied token. This could mean that it didn't make the original request or that the HMAC signature verification failed, or simply an internal issue preventing the complete processing of the request. The Issuer, receiving such an error response should discard or otherwise deactivate the token.
 
-Even in the event of Initiator accepting the supplied token and indicating as such with a 204 response, the Initiator should not use the token until the entire exchange has complted by the Issuer responding to the first Initiate request.
+Even if accepting the supplied token, the Initiator should not actually use the token until the entire exchange has complted by the Issuer responding to the first Initiate request with a success response.
 
 ### Issuer, responding to the Initiate request.
 
-Once the Initiator has indicated it accepts the supplied token, there is an oportunity, if needed, for the Issuer to activate the generated token, (perhaps by saving it to a database) before the exchange is over. At this point in the exchange, the Issuer will still have an open POST request with the Initator waiting for a response. Once the Issuer is ready to accept actual uses of the generated token, it should indicate this with a 204 response on the initial request, closing the exchange down.
+Once the Initiator has indicated it accepts the supplied token, the Issuer needs to finally indicate the issued token may now be used by finally closing down the Initiate request that has been kept open with a 204 response. This is a signal from the Issuer that any neccessary activation has completed and the token is now ready to be used.
 
-If the Issuer encouters any kind of error, or decides for whatever reason that the supplied token is unusable, it may indicate this with an error response. The Initiator should take this as an indication the token it received and accepted is not usuable and should discard it.
+If there is an error when attempting to activate the newly issued token, the Issuer may indicate this by returning an error response to the Initiator. The Initiator should discard the newly issued token in this event. Any error responses shoudl enough detail in the response body to assist a developer in fixing the problem.
 
 ## Version Negotiation
 
-The intial request JSON includes a property named `CrossRequestTokenExchange` with a value, "DRAFTY-DRAFT-4", specifying the version of this protocol the client is using. As this is the first (and so far, only) version, all requests should use only this string. 
+The intial request JSON includes a property named `CrossRequestTokenExchange` with a value `DRAFTY-DRAFT-4`, specifying the version of this protocol the client is using. As this is the first (and so far, only) version, all requests should use only this string. 
 
-If a request arrives with a different unknown string value to this property, the servive should respond with a `400` (bad request) response, but with a JSON body including a property named `AcceptVersion`, listing all the supported versions in a JSON array of strings. The response may contain other properties but this property at the top level of the JSON response is set aside for version negotiation.
+If a request arrives with a different and unknown string value to this property, the service should respond with a `400` (bad request) response, but with a JSON body that includes a property named `AcceptVersion`, listing all the supported versions in a JSON array of strings. The response may contain other properties but this property at the top level of the JSON response is set aside for version negotiation.
 
 If there is a future version of this exchnage the Initiator prefers to use, it should specify its prefered version in that request and leave it to the Isser service to respond with the list of versions it understands. At this point, the Initiator should select most preferable version on the list and repeat the Initiate request with that version.
 
@@ -154,11 +144,11 @@ POST https://bob.example/api/BearerRequest
 
 ## A Saas API.
 
-**saas.example** is a website with an API designed for their customers to use. When a customer wishes to use this API, it must first go through this exchange to obtain a Bearer token. The service documents that users of their API may make Initiate requests to the URL `https://saas.example/api/login/crte?userId=id`, filling in their unique user ID in the query string.
+**saas.example** is a website with an API designed for their customers to use. When a customer wishes to use this API, their code must first go through this exchange to obtain a Bearer token. The service publishes a document for how their customers including the URL to POST Initiate requests to. (`https://saas.example/api/login/crte?userId=id`, filling in their unique user ID.)
 
 **Carol** is a customer of Saas. She's recently signed up and has been allocated her unique user id, 12. She's logged into the Saas customer portal and browsed to their authentiation page. Under the CRTE section, she's configued her account that `https://carol.example/saas/crte-receive-token` is her URL for the Issuer to send the new Bearer token to, where she's implemented a handler.
 
-Time passes and Carol' server needs to make a request to the Saas API. As the server has no Bearer tokens, the code makes a POST request to the documented API:
+Time passes and Carol's server needs to make a request to the Saas API. As the server has no Bearer tokens, the code makes a POST request to the documented API:
 ```
 POST https://saas.example/api/login/crte?userId=12
 Content-Type: application/json
@@ -169,11 +159,11 @@ Content-Type: application/json
 }
 ```
 
-The Saas website code looks up user 12 and finds an active user with CRTE configured. (If not, it would immediately) respond with an error. At this point, the Saas service does not yet know if the Initiate request came from the real Carol, yet. 
+The Saas website code looks up user 12 and finds an active user with CRTE configured. (If CRTE isn't configured, it would immediately respond with an error.) At this point, the Saas service does not yet know if the Initiate request came from the real Carol, yet. 
 
-Despite this, the Saas service generates a Brarer token by base64 encodig some securly generated bytes and signs the token using HMAC with the key supplied in the initial. It does not yet save this token to it's own database but holds it in memory until such time the providence of Carol as the Initiator can be confirmed.
+The Saas service duly generates a Bearer token and signs the token using HMAC with the key supplied in the initial request. It does not yet save this token to it's own database but holds it in memory until such time the providence of Carol as the Initiator can be confirmed.
 
-Using Carol's configured URL and the generated Bearer token, the Saas web service software opens up a new HTTPS request:
+Using the URL Carol configured earlier, the Saas web service software opens up a new HTTPS request:
 ```
 POST https://carol.example/saas/crte-receive-token
 Content-Type: application/json
@@ -248,7 +238,7 @@ Can you set up that web server to handle requests on your behalf? You would need
 ### I don't have my own web server, but could I use an external service to receive the Issue request instead?
 As long as you trust that service and you have a secure channel between you and teh service. If you don't trust it, or it's a service that publishes the contents of all incoming POST requsts, that would not be a suitable service for this exchange. The body of the Issue request will be secured thanks to TLS, but TLS only secures the traffic between the two end-points, not any additional step beyond the end-points.
 
-## What if I want to use a public service I don't neccessarily trust?
+### What if I want to use a public service I don't neccessarily trust?
 Exactly to support this arrangemt, an earlier draft of this exchange included an AES key alongside the HMAC key. I ommitted it for this version to simplify it, uncertain of its value. I am open to be persuded that this would be a useful addition to this exchange.
 
 With this in place, if you (as the Initiator) make a POST request to an Issuer directly, you'd supply an AES key and IV as well as an HMAC key, all freshly generated from a cryptographic-quality random source. The Issuer would generate the Issue request as before, but instead of sending it in the clear (albetit inside TLS), the Issue request would be AES encrypted as well as HMAC signed. Onlyyour code would be able to check the signature and decrypt the token inside.
@@ -271,6 +261,19 @@ Since this exchange relies on a pre-existing relationship, you could perhaps all
 
 ### Is the HMAC key needed?
 The risk of ignoring the HMAC signature is that an attacker could supply a bad Bearer token, or one belonging to someone else. If that's not a problem then you could ignore the HMAC signature but why not check it anyway?
+
+### What if generating a token is expensive?
+This is another feature I since removed from an earlier draft of theis document and I'm open to be persuaded that it should be put back. The Initiator could, instead of making an "Issue" request, send a "Verify" request first. At this step, the Issuer is asking the Initiator to confirm the request is genine, including a short message signed with the HMAC to confirm the request is itself genuine.
+
+I removed that step in early development to simplify the exchange. Having just two web requests, one in each directon, had a nice symmetry. The main consideration was the realisation that issuing a token is fairly cheap. Both JWT and random strings can be generated without much computing power, especially compared to signing an HMAC and making another POST request.
+
+As the Issuer has a opportunity (in the response to the initial POST request) to withdraw an issued token, the Issuer could defer activating the generated token (perhaps saving it to a database) until after the Initiator has accepted it.
+
+### Why do the two particpants have to a pre-existing relationship?
+This is another feature I removed when writing early drafts. 
+
+TODO: Finish writing this answer.
+
 
 ### What if an attacker attempts to eavesdrop or spoof either request?"
 The attacker can't eavesdrop because TLS is securing the channel.
