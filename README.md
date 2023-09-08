@@ -57,7 +57,7 @@ The JSON must have the following string properties, all required.
   - A GUID value identifying this exchange. The subsequest POST request will include this ID.
 - `HmacKey`
   - A HMAC key that the Issuer will later use to sign the Bearer token, confirming that it came from the expected source.
-  - The value must consist of exactly 64 hex digits which represent 256 bits of cryptographic quality randomness.
+  - The value must consist of exactly 256 bits of cryptographic quality randomness encoded in base64.
   
 The request must not use any `Authorization` or `Cookie` headers.
 
@@ -68,7 +68,7 @@ Content-Type: application/json
 {
     "CrossRequestTokenExchange": "DRAFTY-DRAFT-4",
     "ExchangeId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
-    "HmacKey": "rdMWf2RYgWC-OwTzzO8VHqK-27kAKK6qQf9-JqN2xU0ICcW"
+    "HmacKey": "mj4i5dRcagrBzHOmIb8VryPU0zn8Z65T+tiakAJGOaI="
 }
 ```
 
@@ -90,8 +90,8 @@ The JSON request body is made up of the following string value properties, all o
 - `ExpiresAt`
   - The UTC expiry time of this Bearer token in ISO format. (yyyy-mm-ddThh:mm:ssZ)
 - `BearerTokenSignature`
-  - The HMAC signature of the BearerToken, signed using the `HmacKey` from the original Initiate request.
-  - 256 bits encoded as 64 hex digits.
+  - The HMAC signature of the BearerToken value's ASCII bytes, signed using HMAC-SHA256 with the `HmacKey` from the original Initiate request.
+  - The 256 bit HMAC signature encoded in base64.
 
 The request must not include any `Authorization` or `Cookie` headers.
 
@@ -101,9 +101,9 @@ POST https://initiator.example/api/Issue?issuer_user_id=12345
 Content-Type: application/json
 {
     "ExchangeId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
-    "BearerToken": "Token_09561454469379876976083516242009314095393956",
+    "BearerToken": "Token_09561454469379876976083516242009314095393951",
     "ExpiresAt": "2023-10-24T14:15:16Z",
-    "BearerTokenSignature": "EA888FB47D9FEE03229757E2F6865AF0CF279BA33EAA702271E2A8AC6190177B",
+    "BearerTokenSignature": "CLx8KSN7z+QSwob4ZOApIB7qvYD1KiwxA+qkDrZOlJ4=",
 }
 ```
 
@@ -155,7 +155,7 @@ Content-Type: application/json
 {
     "CrossRequestTokenExchange": "DRAFTY-DRAFT-4",
     "ExchangeId": "F952D24D-739E-4F1E-8153-C57415CDE59A",
-    "HmacKey": "d28a9nCdKiO-0zErstyHMRk-GTNVKcj8YSs-6x362hWA4wa"
+    "HmacKey": "NZVyqSyBlVoxBN64YA69i9V2TgzAe6cgxt2uN08BZAo="
 }
 ```
 
@@ -169,9 +169,9 @@ POST https://carol.example/saas/crte-receive-token
 Content-Type: application/json
 {
     "ExchangeId": "F952D24D-739E-4F1E-8153-C57415CDE59A",
-    "BearerToken": "Token_41401899608293768448699806747291819850802610",
-    "ExpiresAt": "2023-10-24T14:15:16",
-    "BearerTokenSignature": "7CE717B05DCDBC0301EAB3E1027CF64E7BA0E1BE9FD2B8951759384DA96EABBB",
+    "BearerToken": "Token_41401899608293768448699806747291819850802711",
+    "ExpiresAt": "2023-10-24T14:15:16Z",
+    "BearerTokenSignature": "MlqLjJzX7X4Ttf7fOHfoxH+Tyc9uigebAqJrR398h1M=",
 }
 ```
 
@@ -197,7 +197,7 @@ Content-Type: application/json
 {
     "CrossRequestTokenExchange": "DRAFTY-DRAFT-4",
     "ExchangeId": "B405DE48-36F4-4F42-818C-9BE28D6B3832",
-    "HmacKey": "dAOkkvk9Ojm-Vuh20X2KX46-HgsPiksQHrw-iIApjGjvjMk"
+    "HmacKey": "3og+Au+MkBPQDhd60RT50e2KnVx86xPI1SLUVtlUa+U="
 }
 ```
 
@@ -207,9 +207,9 @@ POST https://saas.example/api/issue-crte?user_id=12
 Content-Type: application/json
 {
     "ExchangeId": "B405DE48-36F4-4F42-818C-9BE28D6B3832",
-    "BearerToken": "Token_51968699312599211031848828204659448702950696",
-    "ExpiresAt": "2023-10-24T14:15:16",
-    "BearerTokenSignature": "5FF10ABB78EA3C250E68BA503ECE4E1DBB3342993B3E294651743300D91E07A7",
+    "BearerToken": "Token_51968399312599211031848828204659448702950691",
+    "ExpiresAt": "2023-10-24T14:15:16Z",
+    "BearerTokenSignature": "zmalbMtYLNvzNQisyQJaEtwVqfb73+BG9kO/3a8Qv98=",
 }
 ```
 
@@ -270,10 +270,15 @@ I removed that step in early development to simplify the exchange. Having just t
 As the Issuer has a opportunity (in the response to the initial POST request) to withdraw an issued token, the Issuer could defer activating the generated token (perhaps saving it to a database) until after the Initiator has accepted it.
 
 ### Why do the two particpants have to a pre-existing relationship?
-This is another feature I removed when writing early drafts. 
+This is another feature I removed since writing early drafts. 
 
-TODO: Finish writing this answer.
+I wondered if this exchange could work as the only authentication system needed. I imagined signing up for some kind of service and registering by pasting in my own website domain as the only means of authentication. The service would go talk to the website on my domain, exchange tokens and I'm logged in. The Intiate request would include a URL to return the signed token, but the request was otherwise 
 
+This appealed to me, but there was a problem with that approach. Any doer-of-evil could come along to a website that implemented this exchange and cause that service to make a POST request to any URL they wanted on any domain. You couldn't control the request body but that might be enough to cause a problem. To resolve this, I wrote into the draft specification that the claimed URL should first be confirmed by GET-ing a `/.well-known/` file that lists all the URLs that implement this API.
+
+Wanting to simplify the basic specification, I instead changed this step to requiring a prior relationship and for the URL for the POST request to be pre-configured. Any complexity of establishing a relationship is set aside.
+
+I am open to discussing ways of adding mechanisms to use this method without a prior relationship.
 
 ### What if an attacker attempts to eavesdrop or spoof either request?"
 The attacker can't eavesdrop because TLS is securing the channel.
