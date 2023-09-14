@@ -7,6 +7,16 @@ string readmePath = FindFileByName("README.md");
 var readmeLines = File.ReadAllLines(readmePath).ToList();
 var readmeOrigText = string.Join("\r\n", readmeLines);
 
+/* Look for the first use of a JWT. */
+for (int i = 0; i < readmeLines.Count; i++)
+{
+    if (readmeLines[i].StartsWith("Authorization: Bearer ey"))
+    {
+        readmeLines[i] = "Authorization: Bearer " + GenerateJWT();
+        break;
+    }
+}
+
 /* Start a dictionary of keys and values. */
 var keyValues = GenerateKeyValues("Main");
 
@@ -102,5 +112,21 @@ string ToBearerToken(string k)
 {
     var x = k.Where(c => c != '-').Select(c => c % 10);
     return "Token_" + string.Concat(x);
+}
+
+/* Generate a JWT. */
+string GenerateJWT()
+{
+    string Encode(string s)
+    {
+        s = s.Replace('\'', '\"');
+        s = s.Replace('[', '{');
+        s = s.Replace(']', '}');
+
+        string base64 = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes(s)).TrimEnd('=');
+        return base64;
+    }
+
+    return Encode("['':'']") + "." + Encode($"['nggyu':'https://billpg.com/nggyu']") + ".nggyu";
 
 }

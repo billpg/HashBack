@@ -23,7 +23,7 @@ A Bearer token is string of characters. It could be a signed JWT or a string of 
 
 ```
 POST /api/some/secure/api/
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJuZ2d5dSI6Imh0dHBzOi8vYmlsbHBnLmNvbS9qMS8ifQ.nggyu
+Authorization: Bearer eyIiOiIifQ.eyJuZ2d5dSI6Imh0dHBzOi8vYmlsbHBnLmNvbS9uZ2d5dSJ9.nggyu
 { "Stuff": "Nonsense" }
 ```
 
