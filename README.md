@@ -11,7 +11,7 @@ Alice and Bob are normal web servers with an API.
   - "Thanks Bob."
 - "Thanks Alice."
 
-Did you notice what didn't happen?
+Did you notice what **didn't** happen?
 
 Neither side needed a pre-shared key, a shared secret nor a place to securely store them. Both machines are web servers with TLS already set up and this is what enables the exchange to work.
 
@@ -181,7 +181,7 @@ To confirm that all is well, Carol's web service closes the Issue request by sen
 
 ```
 GET https://saas.example/api/status.json
-Authorization: Bearer Token_41401899608293768448699806747291819850802610
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMiIsImlzcyI6InNhYXMuZXhhbXBsZSIsImlhdCI6MTcyNDE2NDY0NX0.EvmSc-g9nx7KwXrLS1O4tx8n-JQFxyyRRHRYwIq_PNA
 ```
 
 ## Webhooks
@@ -219,7 +219,7 @@ With a token that's been confirmed valid, the Saas service may now make its Webh
 
 ```
 POST https://carol.example/saas/webhook
-Authorization: Bearer Token_51968699312599211031848828204659448702950696
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzYWFzIiwiaXNzIjoiY2Fyb2wuZXhhbXBsZSIsImlhdCI6MTcyNDE3NDY0NX0.twhcqejxlqhT7JkMEGsEgYiRf5eIOlC9z7Sqrf6cbI8
 Content-Type: application/json
 { "IsThisAWebhook?": true }
 ```

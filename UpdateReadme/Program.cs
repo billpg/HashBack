@@ -32,6 +32,14 @@ foreach (int readmeLineIndex in Enumerable.Range(0, readmeLines.Count))
     if (readmeLines[readmeLineIndex].Contains("# Webhooks"))
         keyValues = GenerateKeyValues("CaseStudyWebhooks");
 
+    /* Is this an Authorization header? */
+    if (readmeLines[readmeLineIndex].StartsWith("Authorization: Bearer "))
+    {
+        if (readmeLines[readmeLineIndex].EndsWith("nggyu"))
+            continue;
+        readmeLines[readmeLineIndex] = "Authorization: Bearer " + keyValues["BearerToken"];
+    }
+
     /* Split the current line by quote. If not exactly five parts, move on. */
     var currentLine = readmeLines[readmeLineIndex].Split('"');
     if (currentLine.Length != 5)
