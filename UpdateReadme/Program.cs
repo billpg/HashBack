@@ -1,5 +1,7 @@
-﻿using billpg.CrossRequestTokenExchange;
-using System.Diagnostics;
+﻿/* Modify the README.md file with correct tokens and 
+ * signatures using the crypto-helper functions. */
+using billpg.CrossRequestTokenExchange;
+using Newtonsoft.Json.Linq;
 using System.Runtime.CompilerServices;
 
 /* Locate and load README.md into memory. */
@@ -12,7 +14,7 @@ for (int i = 0; i < readmeLines.Count; i++)
 {
     if (readmeLines[i].StartsWith("Authorization: Bearer ey"))
     {
-        readmeLines[i] = "Authorization: Bearer " + GenerateJWT();
+        readmeLines[i] = "Authorization: Bearer " + GenerateEasterEggJWT();
         break;
     }
 }
@@ -89,10 +91,11 @@ Dictionary<string,string> GenerateKeyValues(string realm)
     keyValues["HmacKey"] = hmacKey;
 
     /* Generate and sign bearer token. */
-    string bearerToken = ToBearerToken(GenerateKeyFromString(realm + "token"));
+    string bearerToken = ToBearerToken(realm, out DateTime expiresAt);
     var tokenSignature = CryptoHelpers.SignBearerToken(hmacKey, bearerToken);
     keyValues["BearerToken"] = bearerToken;
     keyValues["BearerTokenSignature"] = tokenSignature;
+    keyValues["ExpiresAt"] = expiresAt.ToString("s") + "Z";
 
     /* Completed collection. */
     return keyValues;
@@ -107,15 +110,52 @@ string GenerateKeyFromString(string v)
     return Convert.ToBase64String(hash);
 }
 
-/* Convert a string to a digits-only example bearer token. */
-string ToBearerToken(string k)
+/* Convert a string into an example JWT. */
+string ToBearerToken(string realm, out DateTime expiresAt)
 {
-    var x = k.Where(c => c != '-').Select(c => c % 10);
-    return "Token_" + string.Concat(x);
+    string sub = 
+        realm == "Main" ? "the_initiator" :
+        realm == "CaseStudyApi" ? "12" :
+        realm == "CaseStudyWebhooks" ? "saas" :
+        throw new ApplicationException();
+    string iss =
+        realm == "Main" ? "the_issuer" :
+        realm == "CaseStudyApi" ? "saas.example" :
+        realm == "CaseStudyWebhooks" ? "carol.example" :
+        throw new ApplicationException();
+    int addSeconds =
+        realm == "Main" ? 0 :
+        realm == "CaseStudyApi" ? 20000000 :
+        realm == "CaseStudyWebhooks" ? 20010000 :
+        throw new ApplicationException();
+    expiresAt = new DateTime(2024, 1, 2, 3, 4, 5, DateTimeKind.Utc).AddSeconds(addSeconds).ToUniversalTime();
+    long iat = As1970Seconds(expiresAt);
+
+    string jwtHeader = JWT64Encode(new JObject { ["typ"] = "JWT", ["alg"] = "HS256" });
+    string jwtBody = JWT64Encode(new JObject { ["sub"] = sub, ["iss"] = iss, ["iat"] = iat });
+    string jwtHeaderDotBody = jwtHeader + "." + jwtBody;
+
+    using var hmac = System.Security.Cryptography.HMAC.Create("HMACSHA256");
+    hmac.Key = System.Text.Encoding.ASCII.GetBytes("your-256-bit-secret");
+    var hash = hmac.ComputeHash(System.Text.Encoding.ASCII.GetBytes(jwtHeaderDotBody));
+    string jwtSig = Convert.ToBase64String(hash).Replace('+','-').Replace('/','_').TrimEnd('=');
+    string jwtFull = jwtHeaderDotBody + "." + jwtSig;
+    return jwtFull;
 }
 
-/* Generate a JWT. */
-string GenerateJWT()
+long As1970Seconds(DateTime dt)
+    => (long)(dt - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
+
+string JWT64Encode(JObject j)
+{
+    string jwtAsJson = j.ToString(Newtonsoft.Json.Formatting.None);
+    var jwtAsBytes = System.Text.Encoding.ASCII.GetBytes(jwtAsJson);
+    var jwtAs64 = Convert.ToBase64String(jwtAsBytes);
+    return jwtAs64.TrimEnd('=');
+}
+
+/* Generate a fake JWT with an easter egg. */
+string GenerateEasterEggJWT()
 {
     string Encode(string s)
     {

@@ -1,10 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
 namespace billpg.CrossRequestTokenExchange
 {
+    /// <summary>
+    /// Some helper functions assistng with the
+    /// cryptography used in the token exchange.
+    /// </summary>
     public static class CryptoHelpers
     {
         /// <summary>
@@ -13,12 +12,12 @@ namespace billpg.CrossRequestTokenExchange
         /// <returns>Generated HMAC key in BASE64.</returns>
         public static string GenerateHmacKey()
         {
-            /* Generate 256 cryptographic quality random bits into a byte block. */
+            /* Generate 256 cryptographic quality random bits into a block of bytes. */
             using var rnd = System.Security.Cryptography.RandomNumberGenerator.Create();
             byte[] randomBytes = new byte[256 / 8];
             rnd.GetBytes(randomBytes);
 
-            /* Encode those bytes as BASE64. */
+            /* Encode those bytes as BASE64, including the trailing equals. */
             return Convert.ToBase64String(randomBytes);
         }
 
@@ -31,16 +30,16 @@ namespace billpg.CrossRequestTokenExchange
         public static string SignBearerToken(string hmacKey, string bearerToken)
         {
             /* Convert the supplied key from BASE64 to bytes. */
-            IList<byte> hmacKeyBytes = Convert.FromBase64String(hmacKey);
+            var hmacKeyBytes = Convert.FromBase64String(hmacKey);
 
             /* Convert the token into an array of ASCII bytes. */
-            byte[] bearerTokenAsBytes = Encoding.ASCII.GetBytes(bearerToken);
+            var bearerTokenAsBytes = System.Text.Encoding.ASCII.GetBytes(bearerToken);
 
             /* Sign the token. */
-            using var hmac = new System.Security.Cryptography.HMACSHA256(hmacKeyBytes.ToArray());
+            using var hmac = new System.Security.Cryptography.HMACSHA256(hmacKeyBytes);
             var signature = hmac.ComputeHash(bearerTokenAsBytes);
 
-            /* Return the signature bytes in BASE64. */
+            /* Return the signature bytes in BASE64, including trailing =. */
             return Convert.ToBase64String(signature);
         }
     }

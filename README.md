@@ -101,9 +101,9 @@ POST https://initiator.example/api/Issue?issuer_user_id=12345
 Content-Type: application/json
 {
     "ExchangeId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
-    "BearerToken": "Token_09561454469379876976083516242009314095393951",
-    "ExpiresAt": "2023-10-24T14:15:16Z",
-    "BearerTokenSignature": "CLx8KSN7z+QSwob4ZOApIB7qvYD1KiwxA+qkDrZOlJ4=",
+    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0aGVfaW5pdGlhdG9yIiwiaXNzIjoidGhlX2lzc3VlciIsImlhdCI6MTcwNDE2NDY0NX0.xc5LzEZGSCaeHRdzBjZ-NFx-NzK-CGTAQa0BpT5hFeo",
+    "ExpiresAt": "2024-01-02T03:04:05Z",
+    "BearerTokenSignature": "HpsheV1lnt22FOssCjDgw02EaVmFsiZOvDBKlZoJPeA=",
 }
 ```
 
@@ -169,9 +169,9 @@ POST https://carol.example/saas/crte-receive-token
 Content-Type: application/json
 {
     "ExchangeId": "F952D24D-739E-4F1E-8153-C57415CDE59A",
-    "BearerToken": "Token_41401899608293768448699806747291819850802711",
-    "ExpiresAt": "2023-10-24T14:15:16Z",
-    "BearerTokenSignature": "MlqLjJzX7X4Ttf7fOHfoxH+Tyc9uigebAqJrR398h1M=",
+    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMiIsImlzcyI6InNhYXMuZXhhbXBsZSIsImlhdCI6MTcyNDE2NDY0NX0.EvmSc-g9nx7KwXrLS1O4tx8n-JQFxyyRRHRYwIq_PNA",
+    "ExpiresAt": "2024-08-20T14:37:25Z",
+    "BearerTokenSignature": "AwSqgNtqrXtmbQdIJq7NyIxpjJ44le1Q+NMcd9LLwgQ=",
 }
 ```
 
@@ -207,9 +207,9 @@ POST https://saas.example/api/issue-crte?user_id=12
 Content-Type: application/json
 {
     "ExchangeId": "B405DE48-36F4-4F42-818C-9BE28D6B3832",
-    "BearerToken": "Token_51968399312599211031848828204659448702950691",
-    "ExpiresAt": "2023-10-24T14:15:16Z",
-    "BearerTokenSignature": "zmalbMtYLNvzNQisyQJaEtwVqfb73+BG9kO/3a8Qv98=",
+    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzYWFzIiwiaXNzIjoiY2Fyb2wuZXhhbXBsZSIsImlhdCI6MTcyNDE3NDY0NX0.twhcqejxlqhT7JkMEGsEgYiRf5eIOlC9z7Sqrf6cbI8",
+    "ExpiresAt": "2024-08-20T17:24:05Z",
+    "BearerTokenSignature": "jXyGOTurJ9X6tMd9aJAygG08VzV7MgPRoIHECw74eNM=",
 }
 ```
 
