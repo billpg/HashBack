@@ -1,7 +1,7 @@
 # Cross Request Token Exchange
 An authentication exchange between two web services.
 
-This version of the document is a **public draft** for review and discussion and has been tagged as `DRAFTY-DRAFT-4`. If you have any comments or notes, please open an issue on this project's public github.
+This version of the document is a **public draft** for review and discussion and has been tagged as `CRTE-PUBLIC-DRAFT-1`. If you have any comments or notes, please open an issue on this project's public github.
 
 This document is Copyright William Godfrey, 2023. You may use its contents under the terms of the Creative-Commons Attribution license.
 
@@ -56,7 +56,7 @@ The process is started by the Initiator, who needs a Bearer token from the Issue
 
 The JSON must have the following string properties, all required.
 - `CrossRequestTokenExchange`
-  - This indicates the client is attempting to use the CrossRequestTokenExchange process and the version. The value "DRAFTY-DRAFT-4" refers to the version of this exchange described in this document.
+  - This indicates the client is attempting to use the CrossRequestTokenExchange process and the version. The value "CRTE-PUBLIC-DRAFT-1" refers to the version of this exchange described in this document.
 - `ExchangeId`
   - A GUID value identifying this exchange. The subsequent POST request will include this ID.
   - The value must be a valid GUID.
@@ -71,7 +71,7 @@ For example:
 POST https://issuer.example/api/token_call?initiator_user_id=123456
 Content-Type: application/json
 {
-    "CrossRequestTokenExchange": "DRAFTY-DRAFT-4",
+    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-1",
     "ExchangeId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
     "HmacKey": "mj4i5dRcagrBzHOmIb8VryPU0zn8Z65T+tiakAJGOaI="
 }
@@ -128,7 +128,7 @@ If there is an error when attempting to activate the newly issued token, the Iss
 
 ## Version Negotiation
 
-The initial TokenCall request JSON includes a property named `CrossRequestTokenExchange` with a value `DRAFTY-DRAFT-4`, specifying the version of this protocol the client is using. As this is the first (and so far, only) version, all requests should use only this string. 
+The initial TokenCall request JSON includes a property named `CrossRequestTokenExchange` with a value `CRTE-PUBLIC-DRAFT-1`, specifying the version of this protocol the client is using. As this is the first (and so far, only) version, all requests should use only this string. 
 
 If a request arrives with a different and unknown string value to this property, the service should respond with a `400` (bad request) response, but with a JSON body that includes a property named `AcceptVersion`, listing all the supported versions in a JSON array of strings. The response may contain other properties but this property at the top level of the JSON response is set aside for version negotiation.
 
@@ -141,7 +141,7 @@ POST https://bob.example/api/BearerRequest
 400 Bad Request
 { 
     "Message": "Unknown version.",
-    "AcceptVersion": [ "DRAFTY-DRAFT-4" ] 
+    "AcceptVersion": [ "CRTE-PUBLIC-DRAFT-1" ] 
 }
 ```
 
@@ -158,7 +158,7 @@ Time passes and Carol's server needs to make a request to the Saas API. As the s
 POST https://saas.example/api/login/crte?userId=12
 Content-Type: application/json
 {
-    "CrossRequestTokenExchange": "DRAFTY-DRAFT-4",
+    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-1",
     "ExchangeId": "F952D24D-739E-4F1E-8153-C57415CDE59A",
     "HmacKey": "NZVyqSyBlVoxBN64YA69i9V2TgzAe6cgxt2uN08BZAo="
 }
@@ -200,7 +200,7 @@ Time passes and the Saas service needs to call Carol's API to make a decision, b
 POST https://carol.example/saas/crte-generate-token-for-webhook
 Content-Type: application/json
 {
-    "CrossRequestTokenExchange": "DRAFTY-DRAFT-4",
+    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-1",
     "ExchangeId": "B405DE48-36F4-4F42-818C-9BE28D6B3832",
     "HmacKey": "3og+Au+MkBPQDhd60RT50e2KnVx86xPI1SLUVtlUa+U="
 }
