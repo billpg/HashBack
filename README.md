@@ -1,7 +1,7 @@
 # Cross Request Token Exchange
 An authentication exchange between two web services.
 
-This version of the document is a **public draft** for review and discussion and has been tagged as `CRTE-PUBLIC-DRAFT-1`. If you have any comments or notes, please open an issue on this project's public github.
+This version of the document is a **public draft** for review and discussion and has been tagged as `CRTE-PUBLIC-DRAFT-2`. If you have any comments or notes, please open an issue on this project's public github.
 
 This document is Copyright William Godfrey, 2023. You may use its contents under the terms of the Creative-Commons Attribution license.
 
@@ -56,7 +56,8 @@ The process is started by the Initiator, who needs a Bearer token from the Issue
 
 The JSON must have the following string properties, all required.
 - `CrossRequestTokenExchange`
-  - This indicates the client is attempting to use the CrossRequestTokenExchange process and the version. The value "CRTE-PUBLIC-DRAFT-1" refers to the version of this exchange described in this document.
+  - This indicates the client is attempting to use the CrossRequestTokenExchange process and the version.
+  - See section "Version Negotiation" for suitable values.
 - `ExchangeId`
   - A GUID value identifying this exchange. The subsequent POST request will include this ID.
   - The value must be a valid GUID.
@@ -71,13 +72,15 @@ For example:
 POST https://issuer.example/api/token_call?initiator_user_id=123456
 Content-Type: application/json
 {
-    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-1",
+    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-2",
     "ExchangeId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
     "HmacKey": "mj4i5dRcagrBzHOmIb8VryPU0zn8Z65T+tiakAJGOaI="
 }
 ```
 
 The Issuer's web service will receive this request and if there are any problems, will return an immediate error response. If all is well, it will keep this initial request open until the exchange has concluded.
+
+The service may, instead of keeping the underlying request open, return a 202 (Accepted) response immediately as the exchange proceeds. The Initiator client will need to periodically poll a GET request using a URL returned inside the 202 response body in place of waiting for the Issuer service to respond. See section "202 Accepted" for more details.
 
 ### The TokenIssue POST Request
 
@@ -126,9 +129,51 @@ Once the Initiator has indicated it accepts the supplied token, the Issuer needs
 
 If there is an error when attempting to activate the newly issued token, the Issuer may indicate this by returning an error response to the Initiator. The Initiator should discard the newly issued token in this event. Any error responses should include enough detail in the response body to assist a developer in fixing the problem.
 
+If the Issuer service responded with a 202 response to the initial POST request, the Initiator client will instead need to poll a GET request via the URL included in the 202 response body. See section "202 Accepted" for more details.
+
+## 202 Accepted
+
+If for whatever reason, an Issuer web service does not (or cannot) keep the TokenCall request open while the TokenIssue request takes place, the service may, in response to a TokenCall request, return a 202 (Accepted) response. This indicates to the Initiator client making the TokenCall request that the request is valid and the service is proceeding with the exchange as normal. This option allows for an exchange to take place without maintaining an open connection.
+
+If the response to a TokenCall is 202, the response must have a JSON body with the following properties:
+
+- `CompletedUrl`
+  - The URL that the client will need to GET periodically to complete the exchange.
+- `ExpiresAt`
+  - The time by which the service will have purged knowledge of this exchange.
+  - UTC timestamp in ISO `yyyy-mm-ddThh:mm:ssZ` format.
+
+For example:
+```
+{
+    "CompletedUrl": "https://issuer.example/api/token_call_completed?initiator_user_id=123456&request_id=C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
+    "ExpiresAt": "2024-01-02T01:04:05Z",
+}
+```
+
+On receipt of this 202 response to the TokenCall POST request, the Initiator client should pull out the URL and start polling a GET request at this URL. The following response codes are expected:
+
+- 202
+  - The exchange has not yet completed and the client should poll again after a reasonable delay.
+  - The response body will be a repeat of the JSON included in the original POST response.
+- 204
+  - The exchange has completed successfully.
+- 4xx/5xx
+  - An error occurred.
+
 ## Version Negotiation
 
-The initial TokenCall request JSON includes a property named `CrossRequestTokenExchange` with a value `CRTE-PUBLIC-DRAFT-1`, specifying the version of this protocol the client is using. As this is the first (and so far, only) version, all requests should use only this string. 
+The initial TokenCall request JSON includes a property named `CrossRequestTokenExchange` with a value that specifies the version of this exchange that the Initiator prefers to use. The following values are recognized:
+
+- `CRTE-PUBLIC-DRAFT-1`
+  - [The first public draft of this exchange.](https://github.com/billpg/CrossRequestTokenExchange/blob/22c67ba14d1a2b38c2a8daf1551f065b077bfbb0/README.md)
+  - The Issuer web server must not use the 202 response to the TokenCall POST request.
+- `CRTE-PUBLIC-DRAFT-2`
+  - The version of the exchange described in this version of this document.
+  - The Issuer server may respond with either 204 or 202 to the TokenCall POST request.
+- `CRTE-PUBLIC-DRAFT-2-202ONLY`
+  - The version of the exchange described in this version of this document, with the restriction that the Issuer server must only use 202 responses to the TokenCall POST request.
+  - An Initiator client should use this version if it is not prepared to keep the TokenCall request open and prefers an immediate response with a polling loop making GET requests to find how the TokenCall request would have ben responded to.
 
 If a request arrives with a different and unknown string value to this property, the service should respond with a `400` (bad request) response, but with a JSON body that includes a property named `AcceptVersion`, listing all the supported versions in a JSON array of strings. The response may contain other properties but this property at the top level of the JSON response is set aside for version negotiation.
 
@@ -141,9 +186,16 @@ POST https://bob.example/api/BearerRequest
 400 Bad Request
 { 
     "Message": "Unknown version.",
-    "AcceptVersion": [ "CRTE-PUBLIC-DRAFT-1" ] 
+    "AcceptVersion": [ "CRTE-PUBLIC-DRAFT-1", "CRTE-PUBLIC-DRAFT-2", "CRTE-PUBLIC-DRAFT-2-202ONLY" ] 
 }
 ```
+
+The Initiator client is empowered to indicate which kind of success response it wants to that request.
+- ...`-1` to only respond 204 once the exchange has completed.
+- ...`-2-202ONLY` to only respond 202 immediately.
+- ...`-2` to leave the decision to the Issuer service.
+
+If the service is written to only support one kind of success response to the TokenCall POST and the request indicates the client only supports the other kind, it should respond immediately with 400 and include the version string that indicates which variety of response it does support. The client will either need to abandon the exchange or switch to an alternative client that can handle this response.
 
 # Case Studies
 
@@ -158,7 +210,7 @@ Time passes and Carol's server needs to make a request to the Saas API. As the s
 POST https://saas.example/api/login/crte?userId=12
 Content-Type: application/json
 {
-    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-1",
+    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-2",
     "ExchangeId": "F952D24D-739E-4F1E-8153-C57415CDE59A",
     "HmacKey": "NZVyqSyBlVoxBN64YA69i9V2TgzAe6cgxt2uN08BZAo="
 }
@@ -200,7 +252,7 @@ Time passes and the Saas service needs to call Carol's API to make a decision, b
 POST https://carol.example/saas/crte-generate-token-for-webhook
 Content-Type: application/json
 {
-    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-1",
+    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-2",
     "ExchangeId": "B405DE48-36F4-4F42-818C-9BE28D6B3832",
     "HmacKey": "3og+Au+MkBPQDhd60RT50e2KnVx86xPI1SLUVtlUa+U="
 }
@@ -314,6 +366,17 @@ Similarly, as IP address tend to be stable, it may be prudent to record the IP a
 The Initiator's web service might also be flooded with fake TokenIssue requests, but in this case because an TokenIssue request doesn't trigger a second request, normal methods to deflect denial-of-service attackers would be sufficient.
 
 It may also be prudent to keep the POST URLs secret, so attackers can't send in a flood of fake requests if they don't know where to send them. As this would only be a method to mitigate a denial-of-service attack, the secret URL doesn't have to be treated as secret needing secure storage. The URL could be set in a unencrypted config file and if it does leak, be replaced without urgency at the participant's convenience. The security of the exchange relies on TLS and the HMAC signature, not the secrecy of the URLs.
+
+### What if a malicious Initiator causes the TokenCall connection to stay open?
+[I am grateful to "buzer" of Hacker News for asking this question.](https://news.ycombinator.com/item?id=38110536)
+
+An attacker sets themselves up as an Initiator and registers a malicious endpoint that never responds as their URL to receive the TokenIssue POST requests. The attacker then makes a TokenCall request to which the duly Issuer responds by making the TokenIssue POST request to the malicious endpoint. As this never responds, that initial connection is kept open, causing a denial-of-service by the many opened connections.
+
+We're used to web services making calls to databases or file systems and waiting for those external systems to respond before responding to its own received request. The difference in this scenario is that the external system we're waiting for is controlled by someone else who may be hostile.
+
+This could be mitigated by the Issuer configuring a low timeout for its inner TokenIssue request. 5 seconds instead of the traditional 30 seconds. The timeout will need to be long enough to reasonably make a round trip, perform a HMAC signature check and store the token.
+
+Nonetheless, public draft number 2 introduces an alternative 202 response code that the Issuer web service may return immediately instead of keeping the initial POST request open. As this is still a public draft for comment and discussion, if the consensus is that one style is the only one that should be specified, I will write a new draft that only allows this one style of response instead of a negotiation between the two. 
 
 ## Next Steps
 
