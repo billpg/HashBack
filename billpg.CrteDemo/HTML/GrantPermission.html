@@ -1,0 +1,23 @@
+<html>
+    <head>
+        <title>Cross Request Token Exchange - Granting Permission.</title>
+    </head>
+    <body>
+        <h1>Granting Permission.</h1>
+        <p>The CRTE protocol requires a pre-existing relationship between the two participants. As this demo needs to allow for passers-by to use it, this implemention requires a small JSON file to be added that effectively grants permission to this service to make POST requests to yours.</p>
+
+        <p>This JSON file must be placed so that it can be retrived with a GET request to:<br/>
+            <tt>https://(your domain)/.well-known/billpg-com-crte.json</tt></p>
+
+        <p>The response to this GET request must be a JSON file with the following contents:</p>
+
+        <p>
+            <tt>{</tt>
+            <tt> "Permission": "As owner of this server, permission is hereby granted to make POST requests to the following URLs:",</tt>
+            <tt> "PermittedUrls": []</tt>
+            <tt>}</tt>
+        </p>
+
+        <p>The "PermittedUrls" array should contain a list of full URLs as JSON strings. This service will only connect to your service on these URLs listed. If there is any issue with the file it has retrieved, it will report back an error.</p>
+    </body>
+</html>
