@@ -5,6 +5,8 @@ This version of the document is a **public draft** for review and discussion and
 
 This document is Copyright William Godfrey, 2023. You may use its contents under the terms of the Creative-Commons Attribution license.
 
+(Note, a version tagged as ["CRTE-PUBLIC-DRAFT-2"](https://github.com/billpg/CrossRequestTokenExchange/tree/old_main) was accidentally pushed to main before it was ready. The next public draft will be version 3 to avoid confusion. Please consider this draft as the current.)
+
 ## The elevator pitch.
 
 Alice and Bob are both normal web servers.
