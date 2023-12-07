@@ -1,25 +1,25 @@
 # Cross Request Token Exchange
 An authentication exchange between two web services.
 
-This version of the document is a **public draft** for review and discussion and has been tagged as `CRTE-PUBLIC-DRAFT-2`. If you have any comments or notes, please open an issue on this project's public github.
+This version of the document is a **public draft** for review and discussion and has been tagged as `CRTE-PUBLIC-DRAFT-3`. If you have any comments or notes, please open an issue on this project's public github.
 
 This document is Copyright William Godfrey, 2023. You may use its contents under the terms of the Creative-Commons Attribution license.
 
 ## The elevator pitch.
 
-Alice and Bob are both normal web servers.
-- (Alice opens an HTTPs request to Bob.)
-- "Hey Bob. I want to use your API but I need a Bearer token."
-  - (Bob opens a separate HTTPS request to Alice.)
-  - "Hey Alice, have this Bearer token."
-  - "Thanks Bob."
-- "Thanks Alice."
+- (Alice opens an HTTPS request to Bob.)
+  - "Hey Bob. I want to use your API but I need a Bearer token."
+- (Bob opens a separate HTTPS request back to Alice.)
+  - "Hey Alice. I've got this request for a Bearer token from someone claiming to be you."
+  - "That's me."
+- (Bob responds to Alice's original HTTPS request.)
+  - "Here's your Bearer token."
 
 Did you notice what **didn't** happen?
 
-Neither side needed a pre-shared key, a shared secret nor a place to securely store them. Both machines are web servers with TLS already set up and this is what enables the exchange to work.
+No-one needed a pre-shared key nor a shared secret. No-one needed a place to securely store them. The two web servers already have TLS set up and this is what enables the exchange to work.
 
-When you make an HTTPS request, thanks to TLS you can be sure who you are connecting to, but the service receiving the request can't be sure who the request is coming from. By using **two separate** HTTPS requests in opposite directions, the two web servers may perform a brief handshake and exchange a *Bearer* token.
+When you make an HTTPS request, thanks to TLS you can be sure who you are connecting to, but the service receiving the request can't be sure who the request is coming from. By using **two separate** HTTPS requests, the two web servers may perform a brief handshake and exchange a *Bearer* token.
 
 ### What's a Bearer token?
 
@@ -38,107 +38,145 @@ The exchange in this document describes a mechanism for a server to request a Be
 ## The exchange in a nutshell.
 
 There are two participants in this exchange:
-- The **Initiator** is requesting a Bearer token.
+- The **Caller** is requesting a Bearer token.
 - The **Issuer** issues that Bearer token back to the Initiator.
 
+Both participants will have a prior established relationship and be preconfigured with URLs to make their POST requests.
+
 They connect to each other as follows:
-1. The Initiator opens a POST request (called the `TokenCall`) to the Issuer's API to trigger the exchange, including an HMAC key.
-2. The Issuer, keeping that first request open, opens a separate POST request (called the `TokenIssue`) to the Initiator's API.
-    - This request will contain a new Bearer token for the Initiator, with a signature using the HMAC key from the first request.
-3. The Initiator checks the signature and closes the second POST request with a 204 code, signalling it accepts the supplied token.
-4. The Issuer finally closes the first POST request with a 204 code, signalling the issued token is now ready to be used.
+1. The Caller opens a POST request (called the `TokenCall`) to the Issuer's API to trigger the exchange.
+2. The Issuer opens a separate POST request (called the `ConfirmCall`) back to the Caller's API to verify the initial request is genuine.
+3. The Caller responds to the `ConfirmCall` POST request with a Yes or No.
+4. The Issuer responds to the `TokenCall` POST request with either a Bearer token or an error.
 
 We'll now look at each step in detail.
 
 ### The TokenCall POST Request
 
-The process is started by the Initiator, who needs a Bearer token from the Issuer. The Initiator will open a new POST request to the URL that the Issuer documented a URL for the Initiator to use. This POST request includes a JSON request body as described below.
+The process is started by the Caller, who needs a Bearer token from the Issuer. The Caller will open a new POST request to the URL that the Issuer has documented.
 
-The JSON must have the following string properties, all required.
+#### The POST Request
+
+The request body JSON must have the following string properties, all required.
 - `CrossRequestTokenExchange`
   - This indicates the client is attempting to use the CrossRequestTokenExchange process and the version.
-  - See section "Version Negotiation" for suitable values.
+  - The value to this string will be "CRTE-PUBLIC-DRAFT-3". (See section "Version Negotion" for additional discussion.)
 - `ExchangeId`
   - A GUID value identifying this exchange. The subsequent POST request will include this ID.
   - The value must be a valid GUID.
-- `HmacKey`
-  - An HMAC key that the Issuer will later use to sign the Bearer token, confirming that it came from the expected source.
-  - The value must consist of exactly 256 bits of cryptographic quality randomness encoded in BASE64, including the trailing equals character.
+- `OneUsePassword`
+  - A string of 40-1000 printable ASCII characters that the Issuer will use to confirm the Caller's authenticity in the `ConfirmCall` request.
+  - The string should be derived from at least 256 bits of cryptographic quality randomness.
   
 The request must not use any `Authorization` or `Cookie` headers, unless by private agreement separate to this document.
 
 For example:
 ```
-POST https://issuer.example/api/token_call?initiator_user_id=123456
+POST https://issuer.example/api/token_call?caller_user_id=123456
 Content-Type: application/json
 {
-    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-2",
+    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-3",
     "ExchangeId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
-    "HmacKey": "mj4i5dRcagrBzHOmIb8VryPU0zn8Z65T+tiakAJGOaI="
+    "OneUsePassword": "TODO: password goes here"
 }
 ```
 
-The Issuer's web service will receive this request and if there are any problems, will return an immediate error response. If all is well, it will keep this initial request open until the exchange has concluded.
+#### The POST Response
 
-The service may, instead of keeping the underlying request open, return a 202 (Accepted) response immediately as the exchange proceeds. The Initiator client will need to periodically poll a GET request using a URL returned inside the 202 response body in place of waiting for the Issuer service to respond. See section "202 Accepted" for more details.
+As the recipient of this POST request, the Issuer will check the request is valid. If there is an error in the request or the service is unable to handle the request for whatever reason, it should immediately respond with an error with an applicable HTTP response code. The response body should sufficient detail to assist a component developer in diagnosing the underlying issue.
 
-### The TokenIssue POST Request
+The responding service may keep the POST request open while it deals with the request. Alternatively, it may make a 202 response indicating it has accepted the request with a response listing details for retrieving the result later. (See section 202 Response.)
 
-While keeping the initial POST request open, the Issuer's web service (receiving that request) will open a new POST request back to the Initiator, using the URL agreed in advance. This second request is to pass the newly generated Bearer token itself to the Initiator.
+The details of a non-error POST response are discussed in the section "The TokenCall POST Response" below.
 
-The Issuer will generated the token (not yet knowing for sure the initial request was genuine), sign the token using the HMAC key supplied in the initial request and include both in the second POST request.
+### The ConfirmCall GET Request
 
-Because the Issuer is sending the Bearer token to a pre-agreed POST URL over HTTPS, they can be sure no-one else will have eavesdropped on that transaction. Because the request body includes an HMAC signature based on that HMAC key that no-one else knows, the Initiator can be sure the token genuinely came from the Issuer.
+While keeping the initial POST request open (or after a 202 response), the Issuer's web service (receiving that request) will open a new GET request back to the Caller, using the URL agreed in advance. At this point, while the Caller can be certain they are communicating with the Issuer, thanks to TLS, the recipient Issuer can't be certaim who sent that request. 
 
-The JSON request body is made up of the following string value properties, all of which are required.
-- `ExchangeId`
-  - The GUID from the original TokenCall request body that identifies this exchange.
+#### The GET Request
+
+The Issuer will make a GET request to the URL for the Caller they had previously agreed, modifying it to add a query string parameter named `ExchangeId`, with the GUID value from the initial POST request body. The request should also have an `Accept:` header including `application/json`. The request should not use any `Authorization` or `Cookie` headers, unless by private agreement separate to this document.
+
+For example, following on from the example TokenCall request JSON above, the Issuer would make a GET request to:   
+```
+https://caller.example/api/confirm_call?caller_user_id=123456&ExchangeId=C4C61859-0DF3-4A8D-B1E0-DDF25912279B
+```
+
+#### The GET Response
+
+If the suppplied ExchangeId query string parameter is a valid GUID, the Caller will respond to this GET request by returning a JSON response with a 200 status code. If the ExchangeId is unknown, it will return a 404 error. For any other error, the service should return an applicable error response.
+
+The service responding to this GET request does not know if the genuine Issuer is making the call and makes the response despite not knowing the source. The exchange remains secure because the response only demonstrates knowledge of the `OneTimePassword` value, but not enough information to find its value.
+
+The JSON object in the case of a success 200 response will have the following properties, all required.
+- `OneTimePasswordKey`
+  - The result of passing the value of the `OneTimePassword` value through PBKDF2.
+  - 256 bits, encoded as a BASE64 string, including the trailing equals character.
+- `PBKDF2.Rounds`
+  - The number of PBKDF2 rounds used to generate this key as an integer.
+
+The Issuer, in receipt of this PBKDF2 key, can be certain it came from the geneuine Caller, thanks to TLS. By repeating the PBKDF2 process using the value of `OneTimePassword` it received in the initial request, and comparing the result, it can confirm that request must have come from the genuine Caller.
+
+For example:
+```
+Content-Type: application/json
+{
+    "OneTimePasswordKey": "TODO",
+    "PBKDF2.Rounds": 99    
+}
+```
+
+#### Details of the PBKDF2 process.
+
+The PBKDF2 process will use the following parameters:
+- Password
+  - The value of the `OneTimePassword` string using ASCII bytes.
+- Salt
+  - The following fixed string in ASCII bytes:
+    - "TODOSALTGOESHERE"
+- Hash Algorithm
+  - SHA256.
+- Number of Rounds
+  - Chosen by the Caller and included in the GET response.
+  - Must be from one round up to one million rounds.
+- Output
+  - 256 bits.
+
+The Salt value was generated in advance. See (TODO link) for the code that generated this string with commentary on its generation.
+
+### The TokenCall POST Response
+
+Once the Issuer is satisfied that the initial TokenCall request is genuine, it should respond to the POST request with a 200 code and a JSON response body including the requested Bearer token. If there is an error or the Issuer was not able to confirm the Caller's validity, the Issuer should instead return an appropriate HTTP error code with sufficient detail describing the problem.
+
+#### The JSON Response content.
+
+The response JSON will have the following string properties, all required:
 - `BearerToken`
   - This is the requested Bearer token. It must consist only of printable ASCII characters.
 - `ExpiresAt`
   - The UTC expiry time of this Bearer token in ISO format. (yyyy-mm-ddThh:mm:ssZ)
-- `BearerTokenSignature`
-  - The HMAC signature of the BearerToken value's ASCII bytes, signed using HMAC-SHA256 with the `HmacKey` from the original TokenCall request.
-  - The value is the 256 bit HMAC signature encoded in BASE64, including the trailing equals character.
-
-The request must not include any `Authorization` or `Cookie` headers, unless by prior agreement separate to this document.
 
 For example:
 ```
-POST https://initiator.example/api/Issue?issuer_user_id=12345
 Content-Type: application/json
 {
-    "ExchangeId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
     "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0aGVfaW5pdGlhdG9yIiwiaXNzIjoidGhlX2lzc3VlciIsImlhdCI6MTcwNDE2NDY0NX0.xc5LzEZGSCaeHRdzBjZ-NFx-NzK-CGTAQa0BpT5hFeo",
     "ExpiresAt": "2024-01-02T03:04:05Z",
-    "BearerTokenSignature": "HpsheV1lnt22FOssCjDgw02EaVmFsiZOvDBKlZoJPeA=",
 }
 ```
 
-### Initiator, responding to the TokenIssue request
-
-If the Initiator web service finds the Bearer token it has received to be acceptable (including checking the HMAC signature), it may respond to this second request with a 204 code to indicate it accepts the supplied token and that the issuer should (if needed) activate the token.
-
-Any error response indicates to the Issuer caller that the Initiator doesn't accept the supplied token. This could mean that it didn't make the original request or that the HMAC signature verification failed, or simply an internal issue preventing the complete processing of the request. The Issuer, receiving such an error response should discard or otherwise deactivate the token.
-
-Even if accepting the supplied token, the Initiator should not actually use the token until the entire exchange has completed by the Issuer responding to the first TokenCall request with a success response.
-
-### Issuer, responding to the TokenCall request.
-
-Once the Initiator has indicated it accepts the supplied token, the Issuer needs to finally indicate the issued token may now be used by finally closing down the initial TokenCall request that has been kept open with a 204 response. This is a signal from the Issuer that any necessary activation has completed and the token is now ready to be used.
-
-If there is an error when attempting to activate the newly issued token, the Issuer may indicate this by returning an error response to the Initiator. The Initiator should discard the newly issued token in this event. Any error responses should include enough detail in the response body to assist a developer in fixing the problem.
-
-If the Issuer service responded with a 202 response to the initial POST request, the Initiator client will instead need to poll a GET request via the URL included in the 202 response body. See section "202 Accepted" for more details.
-
 ## 202 Accepted
 
-If for whatever reason, an Issuer web service does not (or cannot) keep the TokenCall request open while the TokenIssue request takes place, the service may, in response to a TokenCall request, return a 202 (Accepted) response. This indicates to the Initiator client making the TokenCall request that the request is valid and the service is proceeding with the exchange as normal. This option allows for an exchange to take place without maintaining an open connection.
+If for whatever reason, an Issuer web service does not (or cannot) keep the TokenCall request open while the remainder of the exchange takes place, the service may, in response to a TokenCall request, return a 202 (Accepted) response. This indicates to the Caller making the TokenCall request that the request is valid and the service is proceeding with the exchange as normal. This option allows for an exchange to take place without maintaining an open connection.
 
 If the response to a TokenCall is 202, the response must have a JSON body with the following properties:
 
-- `CompletedUrl`
+- `PeriodicPollUrl`
   - The URL that the client will need to GET periodically to complete the exchange.
+- `RecommendPeriodSeconds`
+  - Recommended waiting period in seconds between attempts. The caller is at liberty to entirely ignore or cap this figure.
+- `Cookie`
+  - The periodic GET requests must include a `Cookie:` header with this value.
 - `ExpiresAt`
   - The time by which the service will have purged knowledge of this exchange.
   - UTC timestamp in ISO `yyyy-mm-ddThh:mm:ssZ` format.
@@ -146,38 +184,34 @@ If the response to a TokenCall is 202, the response must have a JSON body with t
 For example:
 ```
 {
-    "CompletedUrl": "https://issuer.example/api/token_call_completed?initiator_user_id=123456&request_id=C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
+    "PeriodicPollUrl": "https://issuer.example/api/token_call_completed?initiator_user_id=123456&exchange_id=C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
+    "RecommendPeriodSeconds": 10,
+    "Cookie": "Biscuits",
     "ExpiresAt": "2024-01-02T01:04:05Z",
 }
 ```
 
-On receipt of this 202 response to the TokenCall POST request, the Initiator client should pull out the URL and start polling a GET request at this URL. The following response codes are expected:
+On receipt of this 202 response to the TokenCall POST request, the Caller client should pull out the URL from the response and start periodically polling a GET request at this URL. The request should also include a Cookie header using the value returned in the original 202 response.
 
+These periodic GET requests must not include any `Authorization` or `Cookie` headers, other than the one specified above, or unless by agreement separate to this document.
+
+The following response codes are expected:
 - 202
-  - The exchange has not yet completed and the client should poll again after a reasonable delay.
-  - The response body will be a repeat of the JSON included in the original POST response.
-- 204
-  - The exchange has completed successfully.
+  - The exchange has not yet completed and the client should poll again later.
+- 200
+  - The exchange has completed successfully and the POST request body described above is this GET response's body.
 - 4xx/5xx
   - An error occurred.
 
+In the case of a 200 response, the reponse to this last periodic GET request will include the Bearer token along with its expiry time.
+
 ## Version Negotiation
 
-The initial TokenCall request JSON includes a property named `CrossRequestTokenExchange` with a value that specifies the version of this exchange that the Initiator prefers to use. The following values are recognized:
-
-- `CRTE-PUBLIC-DRAFT-1`
-  - [The first public draft of this exchange.](https://github.com/billpg/CrossRequestTokenExchange/blob/22c67ba14d1a2b38c2a8daf1551f065b077bfbb0/README.md)
-  - The Issuer web server must not use the 202 response to the TokenCall POST request.
-- `CRTE-PUBLIC-DRAFT-2`
-  - The version of the exchange described in this version of this document.
-  - The Issuer server may respond with either 204 or 202 to the TokenCall POST request.
-- `CRTE-PUBLIC-DRAFT-2-202ONLY`
-  - The version of the exchange described in this version of this document, with the restriction that the Issuer server must only use 202 responses to the TokenCall POST request.
-  - An Initiator client should use this version if it is not prepared to keep the TokenCall request open and prefers an immediate response with a polling loop making GET requests to find how the TokenCall request would have ben responded to.
+The initial TokenCall request JSON includes a property named `CrossRequestTokenExchange` with a value that specifies the version of this exchange that the Caller prefers to use. The exchange documented in this version is `CRTE-PUBLIC-DRAFT-3`.
 
 If a request arrives with a different and unknown string value to this property, the service should respond with a `400` (bad request) response, but with a JSON body that includes a property named `AcceptVersion`, listing all the supported versions in a JSON array of strings. The response may contain other properties but this property at the top level of the JSON response is set aside for version negotiation.
 
-If there is a future version of this exchange the Initiator prefers to use, it should specify its preferred version in that request and leave it to the Issuer service to respond with the list of versions it understands. At this point, the Initiator should select most preferable version on the list and repeat the TokenCall request with that version.
+If there is a future version of this exchange the Caller prefers to use, it should specify its preferred version in that request and leave it to the Issuer service to respond with the list of versions it understands. At this point, the Caller should select most preferable version on the list and repeat the TokenCall request with that version.
 
 ```
 POST https://bob.example/api/BearerRequest
@@ -186,16 +220,9 @@ POST https://bob.example/api/BearerRequest
 400 Bad Request
 { 
     "Message": "Unknown version.",
-    "AcceptVersion": [ "CRTE-PUBLIC-DRAFT-1", "CRTE-PUBLIC-DRAFT-2", "CRTE-PUBLIC-DRAFT-2-202ONLY" ] 
+    "AcceptVersion": [ "CRTE-PUBLIC-DRAFT-1", "CRTE-PUBLIC-DRAFT-3"] 
 }
 ```
-
-The Initiator client is empowered to indicate which kind of success response it wants to that request.
-- ...`-1` to only respond 204 once the exchange has completed.
-- ...`-2-202ONLY` to only respond 202 immediately.
-- ...`-2` to leave the decision to the Issuer service.
-
-If the service is written to only support one kind of success response to the TokenCall POST and the request indicates the client only supports the other kind, it should respond immediately with 400 and include the version string that indicates which variety of response it does support. The client will either need to abandon the exchange or switch to an alternative client that can handle this response.
 
 # Case Studies
 
