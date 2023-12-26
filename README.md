@@ -21,7 +21,7 @@ No-one needed a pre-shared key nor a shared secret. No-one needed a place to sec
 
 When you make an HTTPS request, thanks to TLS you can be sure who you are connecting to, but the service receiving the request can't be sure who the request is coming from. By using **two separate** HTTPS requests, the two web servers may perform a brief handshake and exchange a *Bearer* token.
 
-### What's a Bearer token?
+## What's a Bearer token?
 
 A Bearer token is string of characters. It could be a signed JWT or a string of randomness. If you know what that string is, you can include it any web request where you want to show who you are. The token itself is generated (or "issued") by the service that will accept that token later on as proof that you are who you say you are, because no-one else would have the token. 
 
@@ -31,126 +31,87 @@ Authorization: Bearer eyIiOiIifQ.eyJuZ2d5dSI6Imh0dHBzOi8vYmlsbHBnLmNvbS9uZ2d5dSJ
 { "Stuff": "Nonsense" }
 ```
 
-That's basically it. It's like a password but very long and issued by the remote service. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Bearer tokens typically (but not always) have short life-times and you'd normally be given an expiry time along with the token itself. Cookies are a common variation of the Bearer token.
+That's basically it. It's like a password but very long and issued by the remote service. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Bearer tokens typically (but not always) have short life-times and you'd normally be given an expiry time along with the token itself. Cookies are a common variation of this.
 
 The exchange in this document describes a mechanism for a server to request a Bearer token from another server in a secure manner.
 
-## The exchange in a nutshell.
+## The Exchange
 
 There are two participants in this exchange:
 - The **Caller** is requesting a Bearer token.
-- The **Issuer** issues that Bearer token back to the Initiator.
+- The **Issuer** issues that Bearer token back to the Caller.
 
-Both participants will have a prior established relationship and be preconfigured with URLs to make their POST requests.
+To request a Bearer token from the Issuer, the Caller will first need to prepare a JSON object for the request body. The Caller will then hash this JSON object according to the rules documented below. Once calculated, that hash value will need to be made available for retrieval by the Issuer by publishing it on a website under a URL that's known to the Issuer as belonging to the Caller. The URL of this hash is included in the JSON request body.
 
-They connect to each other as follows:
-1. The Caller opens a POST request (called the `TokenCall`) to the Issuer's API to trigger the exchange.
-2. The Issuer opens a separate POST request (called the `ConfirmCall`) back to the Caller's API to verify the initial request is genuine.
-3. The Caller responds to the `ConfirmCall` POST request with a Yes or No.
-4. The Issuer responds to the `TokenCall` POST request with either a Bearer token or an error.
+For example. An Issuer might know that a particular Caller is the only user capable of publishing files in the folder `https://caller.example/crte_files/` and will use this knowledge as reassurance the file must have come from the genuine Caller.
 
-We'll now look at each step in detail.
+Once that JSON and the published hash is ready, the Caller will open a POST request to the Issuer using the URL agreed in advance for this purpose, together with the JSON request body written earlier. While handling this POST request, the Issuer will retrive the expected hash published by the Caller earlier. By repeating the hash calculaton on the JSON request body and comparing it against the downloaded expected hash, the Issuer can confirm if the request came from the known Caller or not.
 
-### The TokenCall POST Request
+During this time when the Issuer service retrieves the expected hash from the Caller's own web service, the POST request will be kept open, responding only when the exchange has completed.
 
-The process is started by the Caller, who needs a Bearer token from the Issuer. The Caller will open a new POST request to the URL that the Issuer has documented.
+(I am designing a separate mechanism utilizing the 202 HTTP response that will allow for the request to be closed and reopened later, which I will document separately.)
 
-#### The POST Request
+Once the Issuer is satisfied the POST request came from the genuine Caller, it will create a new Bearer token for that user and include it in the POST response, alongside applicable metadata.
 
-The request body JSON must have the following string properties, all required.
+If the Issuer cannot confirm the POST request came from the genuine Caller or an error occurred during processing, the Issuer must instead respond with an applicable error. Some error responses are documented below.
+
+### The POST Request Body JSON Object
+The request body is a single JSON object with string-valued properties only. All are required. The object must not use other properties except these and all properties must have a string value.
+
 - `CrossRequestTokenExchange`
-  - This indicates the client is attempting to use the CrossRequestTokenExchange process and the version.
-  - The value to this string will be "CRTE-PUBLIC-DRAFT-3". (See section "Version Negotion" for additional discussion.)
-- `ExchangeId`
-  - A GUID value identifying this exchange. The subsequent POST request will include this ID.
-  - The value must be a valid GUID.
-- `OneUsePassword`
-  - A string of 40-1000 printable ASCII characters that the Issuer will use to confirm the Caller's authenticity in the `ConfirmCall` request.
-  - The string should be derived from at least 256 bits of cryptographic quality randomness.
-  
-The request must not use any `Authorization` or `Cookie` headers, unless by private agreement separate to this document.
+  - This indicates which version of this exchange the Caller wishes to use.
+  - This version of this document is specified by the value "CRTE-PUBLIC-DRAFT-3". 
+    - See the error responses below for version negotiation.
+- `IssuerUrl`
+  - A copy of the full POST request URL, including "https://", full domain, port (if not 443), path and query string.
+  - Because load balancers and CDN systems might modify the URL as POSTed to the service, a copy is included here so there's no doubt exactly which string was used in the verification hash.
+  - The Issuer service must reject a request with the wrong URL as this may be an attacker attempting to re-use a request that was made for a different Issuer.
+  - The value may instead be a string supplied by the Issuer service as part of a prior error response, using a value it would accept for this property. (See discussion of error responses below.)
+- `Now`
+  - The current UTC time in ISO format `yyyy-mm-ddThh:mm:ssZ`.
+  - The recipient service may reject this request if timestamp is too far from its current time. This document does not specify a threshold but instead this is left to the service's configuration. (Finger in the air - ten seconds.)
+- `UniusUsusNumerus`
+  - At least 256 bits of cryptographic-quality randomness, encoded in BASE-64 including trailing `=`.
+  - This is to make reversal of the verification hash practically impossible.
+  - The other JSON property values listed here are "predictable". The security of this exchange relies on this one value not being predicatable.
+  - I am English and I would prefer to not to name this property using a particular five letter word starting with N, as it has an unfortunate meaning in my culture.
+- `VerifyUrl`
+  - An `https://` URL belonging to the Caller where the verification hash may be retrieved with a GET request.
+  - The URL must be one that Issuer knows as belonging to a specific Caller user.
 
 For example:
 ```
-POST https://issuer.example/api/token_call?caller_user_id=123456
-Content-Type: application/json
 {
     "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-3",
-    "ExchangeId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
-    "OneUsePassword": "TODO: password goes here"
+    "IssuerUrl": "https://issuer.example/api/generate_bearer_token",
+    "Now": "1066-10-14T16:54:00Z",
+    "UniusUsusNumerus": "TODO - BASE64 256 random bits",
+    "VerifyUrl": "https://caller.example/crte_files/C4C61859.txt"
 }
 ```
 
-#### The POST Response
+### Hash Calculation and Publication
 
-As the recipient of this POST request, the Issuer will check the request is valid. If there is an error in the request or the service is unable to handle the request for whatever reason, it should immediately respond with an error with an applicable HTTP response code. The response body should sufficient detail to assist a component developer in diagnosing the underlying issue.
+Once the Caller has built the request JSON, it will need to find its hash in a particular way, which the issuer will need to repeat in order to verify the request is genuine.
 
-The responding service may keep the POST request open while it deals with the request. Alternatively, it may make a 202 response indicating it has accepted the request with a response listing details for retrieving the result later. (See section 202 Response.)
+The hash calculation takes the following steps.
+1. Convert the remaining JSON into its canonical representation of bytes per RFC 8785.
+2. Append the following salt bytes to the byte array immediately after the `}` byte. (The added bytes are 64 ASCII capital letters.)
+   - "IJSMRNLWPQFVCJMRYXKBWLZHUFGDJEPKWSBXMLDIQUGWSZTPOXVDCIKHRWFOLSTA".
+3. Hash the byte block including salt with a single round of SHA256.
+4. Encode the hash result using BASE-64, including the trailing hash.
 
-The details of a non-error POST response are discussed in the section "The TokenCall POST Response" below.
+As all of the values are strings without control characters and all the JSON property names begin (by design) with a different capital letter, a simplified RFC 8785 generator could be used without needing to implement the full specification.
 
-### The ConfirmCall GET Request
+The fixed salt is used to ensure that a valid hash could only be calculated by reading this document. The salt string is not sent with the request so any hashes resulting could only be used for this exchange. The generation of this string is described at (TODO - Link to generator code).
 
-While keeping the initial POST request open (or after a 202 response), the Issuer's web service (receiving that request) will open a new GET request back to the Caller, using the URL agreed in advance. At this point, while the Caller can be certain they are communicating with the Issuer, thanks to TLS, the recipient Issuer can't be certaim who sent that request. 
+The hash file published under the URL listed in the JSON under `VerifyCallerUrl` is published under the type `text/plain`. The file must be one line with the BASE-64 encoded hash in ASCII as that only line. The file may end with CR, LF or CRLF bytes, or with no end-of-line byte sequence at all.
 
-#### The GET Request
+The expected hash of the above "1066" example is: TODO
 
-The Issuer will make a GET request to the URL for the Caller they had previously agreed, modifying it to add a query string parameter named `ExchangeId`, with the GUID value from the initial POST request body. The request should also have an `Accept:` header including `application/json`. The request should not use any `Authorization` or `Cookie` headers, unless by private agreement separate to this document.
+### 200 "Success" Response
+A 200 response will include the requested Bearer token and other useful details in a JSON response body. The JSON will have the following string properties, all required.
 
-For example, following on from the example TokenCall request JSON above, the Issuer would make a GET request to:   
-```
-https://caller.example/api/confirm_call?caller_user_id=123456&ExchangeId=C4C61859-0DF3-4A8D-B1E0-DDF25912279B
-```
-
-#### The GET Response
-
-If the suppplied ExchangeId query string parameter is a valid GUID, the Caller will respond to this GET request by returning a JSON response with a 200 status code. If the ExchangeId is unknown, it will return a 404 error. For any other error, the service should return an applicable error response.
-
-The service responding to this GET request does not know if the genuine Issuer is making the call and makes the response despite not knowing the source. The exchange remains secure because the response only demonstrates knowledge of the `OneTimePassword` value, but not enough information to find its value.
-
-The JSON object in the case of a success 200 response will have the following properties, all required.
-- `OneTimePasswordKey`
-  - The result of passing the value of the `OneTimePassword` value through PBKDF2.
-  - 256 bits, encoded as a BASE64 string, including the trailing equals character.
-- `PBKDF2.Rounds`
-  - The number of PBKDF2 rounds used to generate this key as an integer.
-
-The Issuer, in receipt of this PBKDF2 key, can be certain it came from the geneuine Caller, thanks to TLS. By repeating the PBKDF2 process using the value of `OneTimePassword` it received in the initial request, and comparing the result, it can confirm that request must have come from the genuine Caller.
-
-For example:
-```
-Content-Type: application/json
-{
-    "OneTimePasswordKey": "TODO",
-    "PBKDF2.Rounds": 99    
-}
-```
-
-#### Details of the PBKDF2 process.
-
-The PBKDF2 process will use the following parameters:
-- Password
-  - The value of the `OneTimePassword` string using ASCII bytes.
-- Salt
-  - The following fixed string in ASCII bytes:
-    - "TODOSALTGOESHERE"
-- Hash Algorithm
-  - SHA256.
-- Number of Rounds
-  - Chosen by the Caller and included in the GET response.
-  - Must be from one round up to one million rounds.
-- Output
-  - 256 bits.
-
-The Salt value was generated in advance. See (TODO link) for the code that generated this string with commentary on its generation.
-
-### The TokenCall POST Response
-
-Once the Issuer is satisfied that the initial TokenCall request is genuine, it should respond to the POST request with a 200 code and a JSON response body including the requested Bearer token. If there is an error or the Issuer was not able to confirm the Caller's validity, the Issuer should instead return an appropriate HTTP error code with sufficient detail describing the problem.
-
-#### The JSON Response content.
-
-The response JSON will have the following string properties, all required:
 - `BearerToken`
   - This is the requested Bearer token. It must consist only of printable ASCII characters.
 - `ExpiresAt`
@@ -165,64 +126,106 @@ Content-Type: application/json
 }
 ```
 
-## 202 Accepted
+### 400 "Bad Request" Response
 
-If for whatever reason, an Issuer web service does not (or cannot) keep the TokenCall request open while the remainder of the exchange takes place, the service may, in response to a TokenCall request, return a 202 (Accepted) response. This indicates to the Caller making the TokenCall request that the request is valid and the service is proceeding with the exchange as normal. This option allows for an exchange to take place without maintaining an open connection.
+As the recipient of this POST request, the Issuer will check the request is valid and conforms to its own requirements. If the request is unacceptable, the Issuer must respond with a 400 "Bad Request" response.
 
-If the response to a TokenCall is 202, the response must have a JSON body with the following properties:
+If the response body is JSON, there are a number of properties that describe how the request was unacceptable in a form that a computer could recognise and automatically resolve.
 
-- `PeriodicPollUrl`
-  - The URL that the client will need to GET periodically to complete the exchange.
-- `RecommendPeriodSeconds`
-  - Recommended waiting period in seconds between attempts. The caller is at liberty to entirely ignore or cap this figure.
-- `Cookie`
-  - The periodic GET requests must include a `Cookie:` header with this value.
-- `ExpiresAt`
-  - The time by which the service will have purged knowledge of this exchange.
-  - UTC timestamp in ISO `yyyy-mm-ddThh:mm:ssZ` format.
+The property `Error` is an array of strings in no particular order that describe how the request was unacceptable. If this property is missing then the response can't be automatically interpreted according to the rules of this document.
+
+The optional property `Message`, if present, is a human-readable version of the reasons for rejecting this request.
+
+Note that the nature of a 400 error is that would be pointless repeating the request without first making a significant change to the request beyond moving the timestamp forward. 
+
+#### `"Error": ["Version"]`
+This item indicates the service does not know about the version of this exchange listed in the request. The Caller should use the latest version of the protocol it knows about, but use this response to automatically retry with an earlier supported version, if there is one listed it understands.
+
+The response JSON property `AcceptVersion` is a JSON array of strings listing all the versions it knows about.
 
 For example:
-```
-{
-    "PeriodicPollUrl": "https://issuer.example/api/token_call_completed?initiator_user_id=123456&exchange_id=C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
-    "RecommendPeriodSeconds": 10,
-    "Cookie": "Biscuits",
-    "ExpiresAt": "2024-01-02T01:04:05Z",
-}
-```
-
-On receipt of this 202 response to the TokenCall POST request, the Caller client should pull out the URL from the response and start periodically polling a GET request at this URL. The request should also include a Cookie header using the value returned in the original 202 response.
-
-These periodic GET requests must not include any `Authorization` or `Cookie` headers, other than the one specified above, or unless by agreement separate to this document.
-
-The following response codes are expected:
-- 202
-  - The exchange has not yet completed and the client should poll again later.
-- 200
-  - The exchange has completed successfully and the POST request body described above is this GET response's body.
-- 4xx/5xx
-  - An error occurred.
-
-In the case of a 200 response, the reponse to this last periodic GET request will include the Bearer token along with its expiry time.
-
-## Version Negotiation
-
-The initial TokenCall request JSON includes a property named `CrossRequestTokenExchange` with a value that specifies the version of this exchange that the Caller prefers to use. The exchange documented in this version is `CRTE-PUBLIC-DRAFT-3`.
-
-If a request arrives with a different and unknown string value to this property, the service should respond with a `400` (bad request) response, but with a JSON body that includes a property named `AcceptVersion`, listing all the supported versions in a JSON array of strings. The response may contain other properties but this property at the top level of the JSON response is set aside for version negotiation.
-
-If there is a future version of this exchange the Caller prefers to use, it should specify its preferred version in that request and leave it to the Issuer service to respond with the list of versions it understands. At this point, the Caller should select most preferable version on the list and repeat the TokenCall request with that version.
-
 ```
 POST https://bob.example/api/BearerRequest
 { "CrossRequestTokenExchange": "NEW-FUTURE-VERSION-THAT-YOU-DONT-KNOW-ABOUT", ... }
 
 400 Bad Request
 { 
-    "Message": "Unknown version.",
+    "Message": "Unknown version. Use CRTE-PUBLIC-DRAFT-1 or CRTE-PUBLIC-DRAFT-3 instead.",
+    "Error": ["Version"],
     "AcceptVersion": [ "CRTE-PUBLIC-DRAFT-1", "CRTE-PUBLIC-DRAFT-3"] 
 }
 ```
+
+#### `"Error": ["Time"]`
+This error indicates that the Issuer is rejecting the `Now` timestamp as too far from its current time. The presence of the timestamp in the request is to prevent use of known keys and hashes by expiring them.
+
+The service may include a JSON property `Now` in the error with the current UTC time on that server, such that if the request is reattempted immediately with this alternate timestamp, the Issuer service would accept it.
+
+For example:
+```
+POST https://bob.example/api/BearerRequest
+{ ..., "Now": "1042-06-08T09:10:11Z", ... }
+
+400 Bad Request
+{ 
+    "Message": "Your clock, or mine, is wrongly set.",
+    "Error": ["Time"],
+    "Now": "1066-01-05T12:13:14Z"
+}
+```
+
+#### `"Error": ["IssuerUrl"]`
+This error indicates the request was rejected becaue the supplied `RequestUrl` property was unacceptable. This check is to prevent requests made for a different issuer being reused. The response JSON must include a property also named `IssuerUrl` with a value that the Issuer service would find acceptable. The Caller may repeat the initial request with this alternate `IssuerUrl` value.
+
+For example:
+```
+POST https://bob.example.myproxy.example/api/BearerRequest
+{ ..., "IssuerUrl": "https://bob.example.myproxy.example/api/BearerRequest", ... }
+
+400 Bad Request
+{ 
+    "Message": "Unknown IssuerUrl.",
+    "Error": ["IssuerUrl"],
+    "IssuerUrl": "https://bob.example/"
+}
+```
+#### `"Error": ["VerifyUrl"]`
+This error indicates the service can't process this request because it doesn't know any user linked to the supplied `VerifyUrl` property. 
+
+#### `"Error": ["Attention"]`
+This error indicate the request was rejected for a reason that requires developer or administrator attention. The response should include the specific reason in sufficient detail for an experienced developer to diagnose and fix the error. The Caller software might use this value to avoid automated retries that might have been possible for other codes listed in the `Error` array.
+
+#### `"Error": ["VerifyHash"]`
+This error indicates the expected hash was successfully retrieved from the URL listed in `VerifyUrl`, but it did not match the hash calculated from the JSON request. 
+
+### 500 "Internal Server Error"
+This error, in addition to indicating errors on the server, may be used to indicate a failure to retrieve the expected hash from the `VerifyUrl` property. The service should use a 400 error if the URL is unknown or if it was successfully retrieved but doesn't match, but a 500 error is used to indicate a failure to retrieve that file.
+
+If the response is JSON, it may contain the following string properties to indicate the error it encountered. None of these are required but if they are used in the response JSON it must have the following meanings.
+
+- "VerifyGetErrorReason"
+  - One of the following values indicating the nature of the error.
+    - "Network"
+      - A network level error, such as a failure to connect to the service.
+    - "TimedOut"
+      - The request took too long to process.
+    - "DNS"
+      - The service could not connect to the verification server due to a DNS lookup failure.
+    - "TLS"
+      - Could not negotiate TLS once connected.
+    - "HTTP"
+      - The response status code was not 200.
+    - "Type"
+      - The response's Content-Type was not `text/plain`.
+    - "Hash"
+      - The text content was not 256 bits encoded using BASE-64.
+- "VerifyGetErrorMessage"
+  - Human readable text describing the error in sufficient detail to diagnose the error.
+
+Note the response should not include content from the response from the verification URL, as this could be abused to turn an Issuer service into a proxy server.
+
+### Other errors.
+The service may response with any standard HTTP error code in the event of an unexpected error. The response body should inclide sufficient detail for an experienced developer to understand the error.
 
 # Case Studies
 
