@@ -1,4 +1,4 @@
-﻿/* Copyright William Godfrey, 2023. 
+﻿/* Copyright William Godfrey, 2024. 
  * 
  * This file, "GenFixedSalt.cs", may be freely copied under the terms of the
  * Creative Commons Attribution-NoDerivs license.
@@ -35,12 +35,15 @@
  * different results too.
  * 
  * PBKDF2 is used to produce sufficient bytes to produce those capital
- * letters. Each byte is MOD-26'd to produce a capital letter. There are a
- * few other rules which are commented below but the result will be a
- * string of 26 ASCII capital letters. This is used instead of an array of
- * bytes to ensure interoperability with SHA256 implementations that might,
- * for example, expect text inputs only. A salt made up of capital letter 
- * ASCII bytes only seemed the most conservative.
+ * letters. Each time the code loops, one of 16 letters is selected as
+ * that letter is moved to the end of the selection of 26. This ensures,
+ * for aesthetic reasons, that no capital is repeated within ten positions
+ * of itself. 
+ * 
+ * This is used instead of an array of bytes to ensure interoperability with
+ * SHA256 implementations that might, for example, expect text inputs only.
+ * A salt made up of capital letter ASCII bytes only seemed the most
+ * conservative.
  * 
  * If you are writing your own implementation of CRTE, please don't include 
  * this file with it. The 64 character string should be all you need. You do
@@ -50,10 +53,16 @@
  * the capital letters it'll produce. If there are, I'll make a small change
  * and run it again. (It didn't.)
  * 
+ * I intend for this exchange to become a public RFC, with this code as an
+ * appendix. In this event, I'd need to re-write this comment, especially the
+ * copyright notice, include the RFC number and remove the "draft" version 
+ * tag. As such, the 64 characters produced by this is good enough for the third
+ * public draft, but future versions will produce a new salt.
+ * 
  * Thank you for reading this. I hope you enjoy the 64 capital letters it
  * generated. Use them wisely.
  *
- * Best wishes, Bill P. Godfrey, December 2023.
+ * Best wishes, Bill P. Godfrey, January 2024.
  * billpg.com
  */
 
@@ -65,18 +74,12 @@ using System.Runtime.CompilerServices;
 static string ThisSourcePath([CallerFilePath] string path = "")
     => path;
 
-/* Function to determine if a byte from this source from should be included 
- * in the bytes that go into PBKDF2. Includes all printable ASCII except
- * spaces and asterisks. */
-static bool IsIncluded(byte by)
-    => (by > 32 && by < 127 && by != 42);
-
-/* Load this source file's bytes and filter out control characters, spaces,
- * asterisks and non-ASCII bytes.*/
-var passwordBytes = 
-    File.ReadAllBytes(ThisSourcePath())
-    .Where(IsIncluded)
-    .ToList();
+/* Loop through each byte of this source file and if it isn't a control, 
+ * non-ASCII or asterisk, save it into a byte collection. */
+List<byte> passwordBytes = new();
+foreach (byte by in File.ReadAllBytes(ThisSourcePath()))
+    if (by > 32 && by < 127 && by != 42)
+        passwordBytes.Add(by);
 
 /* Distance to the moon and back in miles.
  * https://en.wikipedia.org/wiki/Lunar_distance_(astronomy) */
@@ -86,45 +89,39 @@ const int distanceToTheMoonAndBackInMiles = 238854 * 2;
 const string dedication =
     "Dedicated to my Treacle. I love you to the moon and back.";
 
-/* Call PBKDF2 to generate some bytes from this program's source including
- * the long comment at the top. Some bytes will not be included in the 
- * capital letter generation so generate a little more than 64. */
+/* Call PBKDF2 to generate a kilobyte of pseudo-random bytes. */
 var bytes = new Queue<byte>(Rfc2898DeriveBytes.Pbkdf2(
     password: passwordBytes.ToArray(),
     salt: Encoding.ASCII.GetBytes(dedication),
     iterations: distanceToTheMoonAndBackInMiles,
     hashAlgorithm: HashAlgorithmName.SHA512,
-    outputLength: 128));
+    outputLength: 999));
+
+/* The capital letters will be selected from this collection, starting off as
+ * the letters from the famous sentence that includes all letters. */
+List<char> alphabet = new("THEQUICKBROWNFXJMPDVLAZYGS");
 
 /* Output collection. */
 var fixedHash = new StringBuilder();
 
-/* Keep looping until we have 64 capital letters. */
-while (fixedHash.Length < 64)
+/* Keep looping until the bytes queue is exhausted. */
+while (bytes.Any())
 {
-    /* Load a single byte from the queue. */
-    byte curr = bytes.Dequeue();
+    /* Load a single index from the queue, 
+     * discarding the top four bits of each byte. */
+    int index = bytes.Dequeue() % 16;
 
-    /* If the byte is over the highest multiple of 26 under 256, discard as
-     * the MOD operation won't yield a flat range otherwise. */
-    if (curr > (256 / 26 * 26))
-        continue;
+    /* Load the corresponding capital and move it to the end of the alphabet. */
+    char capital = alphabet[index];
+    alphabet.RemoveAt(index);
+    alphabet.Add(capital);
 
-    /* Convert the byte to a capital letter. */
-    char capital = (char)((curr % 26) + 65);
-
-    /* For aesthetics, skip if this character appears in the last ten
-     * letters extracted. */
-    if (Enumerable.Range(fixedHash.Length-10, 10)
-        .Where(i => i>=0)
-        .Any(i => capital == fixedHash[i]))
-        continue;
-
-    /* Otherwise, save the byte as a capital letter. */
-    fixedHash.Append(capital);
+    /* If we're in the last 64 loops, store the extracted capital letter. */
+    if (bytes.Count < 64)
+        fixedHash.Append(capital);
 }
 
-/* Print completed string. */
+/* Print the extracted capitals. */
 Console.WriteLine(fixedHash.ToString());
 
 /* PS. Rutabaga. */
