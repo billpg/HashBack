@@ -79,9 +79,9 @@ The request body is a single JSON object with string-valued properties only. All
   - An `https://` URL belonging to the Caller where the verification hash may be retrieved with a GET request.
   - The URL must be one that Issuer knows as belonging to a specific Caller user.
 
-For example:
+For example:<!--1066_EXAMPLE_JSON-->
 ```
-<!--1066_EXAMPLE_JSON-->{
+{
   "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-3",
   "IssuerUrl": "https://issuer.example/api/generate_bearer_token",
   "Now": "1066-10-14T16:54:00Z",

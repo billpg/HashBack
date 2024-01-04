@@ -41,8 +41,9 @@ readmeLines[fixedSaltIndex] = "   - \"" + fixedSalt + "\"<!--FIXED_SALT-->";
 
 /* Look for the "1066" example JSON. */
 int index1066 = readmeLines.FindIndex(src => src.Contains("<!--1066_EXAMPLE_JSON-->"));
-int endOf1066Index = readmeLines.FindIndex(index1066, src => src == "}");
-readmeLines.RemoveRange(index1066, endOf1066Index - index1066 + 1);
+int startOf1066Index = readmeLines.FindIndex(index1066, src => src == "{");
+int endOf1066Index = readmeLines.FindIndex(startOf1066Index, src => src == "}");
+readmeLines.RemoveRange(startOf1066Index, endOf1066Index - startOf1066Index + 1);
 
 /* Build request JSON. */
 var requestJson = new JObject();
@@ -53,7 +54,7 @@ requestJson["UniusUsusNumerus"] = GenerateKeyFromString("1066");
 requestJson["VerifyUrl"] = "https://caller.example/crte_files/C4C61859.txt";
 
 /* Insert back into code. */
-readmeLines.Insert(index1066, "<!--1066_EXAMPLE_JSON-->" + requestJson.ToString());
+readmeLines.Insert(startOf1066Index, requestJson.ToString());
 
 /* Insert the hash of the above JSON into the readme. */
 string hash1066 = CryptoHelpers.HashRequestBody(requestJson);
