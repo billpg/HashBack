@@ -2,7 +2,29 @@
  * signatures using the crypto-helper functions. */
 using billpg.CrossRequestTokenExchange;
 using Newtonsoft.Json.Linq;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
+
+/* Call the GenFixedSalt EXE to get the fixed salt. */
+var psi = new ProcessStartInfo("./GenFixedSalt.exe");
+psi.RedirectStandardOutput = true;
+var fixedSalt = Process.Start(psi).StandardOutput.ReadLine();
+
+/* Does it match the string in CryptoHelper? */
+if (fixedSalt != CryptoHelpers.FIXED_SALT_AS_STRING)
+{
+    /* Rewrite CryptoHelpers.cs. */
+    string cryptoHelperPath = FindFileByName("CryptoHelpers.cs");
+    var cryptoLines = File.ReadAllLines(cryptoHelperPath).ToList();
+    int sourceIndex = cryptoLines.FindIndex(src => src.Contains("FIXED_SALT_AS_STRING"))+1;
+    var sourceLine = cryptoLines[sourceIndex].Split('"');
+    cryptoLines[sourceIndex] = sourceLine[0] + "\"" + fixedSalt + "\";";
+    File.WriteAllLines(cryptoHelperPath, cryptoLines);
+
+    /* Report update. */
+    Console.WriteLine("Updated CryptoHelper.cs. Rebuild and re-run.");
+    return;
+}
 
 /* Locate and load README.md into memory. */
 string readmePath = FindFileByName("README.md");
@@ -10,15 +32,35 @@ var readmeLines = File.ReadAllLines(readmePath).ToList();
 var readmeOrigText = string.Join("\r\n", readmeLines);
 
 /* Look for the first use of a JWT. */
-for (int i = 0; i < readmeLines.Count; i++)
-{
-    if (readmeLines[i].StartsWith("Authorization: Bearer ey"))
-    {
-        readmeLines[i] = "Authorization: Bearer " + GenerateEasterEggJWT();
-        break;
-    }
-}
+int easterEggIndex = readmeLines.FindIndex(src => src.StartsWith("Authorization: Bearer ey"));
+readmeLines[easterEggIndex] = "Authorization: Bearer " + GenerateEasterEggJWT();
 
+/* Look for the fixed salt. */
+int fixedSaltIndex = readmeLines.FindIndex(src => src.Contains("<!--FIXED_SALT-->"));
+readmeLines[fixedSaltIndex] = "   - \"" + fixedSalt + "\"<!--FIXED_SALT-->";
+
+/* Look for the "1066" example JSON. */
+int index1066 = readmeLines.FindIndex(src => src.Contains("<!--1066_EXAMPLE_JSON-->"));
+int endOf1066Index = readmeLines.FindIndex(index1066, src => src == "}");
+readmeLines.RemoveRange(index1066, endOf1066Index - index1066 + 1);
+
+/* Build request JSON. */
+var requestJson = new JObject();
+requestJson["CrossRequestTokenExchange"] = "CRTE-PUBLIC-DRAFT-3";
+requestJson["IssuerUrl"] = "https://issuer.example/api/generate_bearer_token";
+requestJson["Now"] = "1066-10-14T16:54:00Z";
+requestJson["UniusUsusNumerus"] = GenerateKeyFromString("1066");
+requestJson["VerifyUrl"] = "https://caller.example/crte_files/C4C61859.txt";
+
+/* Insert back into code. */
+readmeLines.Insert(index1066, "<!--1066_EXAMPLE_JSON-->" + requestJson.ToString());
+
+/* Insert the hash of the above JSON into the readme. */
+string hash1066 = CryptoHelpers.HashRequestBody(requestJson);
+int hash1066Index = readmeLines.FindIndex(src => src.Contains("<!--1066_EXAMPLE_HASH-->"));
+readmeLines[hash1066Index] = "- \"" + hash1066 + "\"<!--1066_EXAMPLE_HASH-->";
+
+#if false
 /* Start a dictionary of keys and values. */
 var keyValues = GenerateKeyValues("Main");
 
@@ -53,6 +95,7 @@ foreach (int readmeLineIndex in Enumerable.Range(0, readmeLines.Count))
         readmeLines[readmeLineIndex] = String.Join("\"", currentLine);
     }
 }
+#endif
 
 /* If README has changed, rewrite back. */
 if (readmeOrigText != string.Join("\r\n", readmeLines))
@@ -91,18 +134,24 @@ string FindFileByName(string fileName)
 /* Deterministically generate keys and values for the example JSON objects. */
 Dictionary<string,string> GenerateKeyValues(string realm)
 {
-    /* Start an emopty collection. */
+    /* Start an empty collection. */
     var keyValues = new Dictionary<string, string>();
 
     /* Hash the realm to produce intiator and issuer keys. */
     string hmacKey = GenerateKeyFromString(realm + "HMAC");
     keyValues["HmacKey"] = hmacKey;
 
+    /*
+        "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-3",
+        "IssuerUrl": "https://issuer.example/api/generate_bearer_token",
+        "Now": "1066-10-14T16:54:00Z",
+        "UniusUsusNumerus": "TODO - BASE64 256 random bits",
+        "VerifyUrl": "https://caller.example/crte_files/C4C61859.txt" 
+     */
+
     /* Generate and sign bearer token. */
     string bearerToken = ToBearerToken(realm, out DateTime expiresAt);
-    var tokenSignature = CryptoHelpers.SignBearerToken(hmacKey, bearerToken);
-    keyValues["BearerToken"] = bearerToken;
-    keyValues["BearerTokenSignature"] = tokenSignature;
+    keyValues["UniusUsusNumerus"] = GenerateKeyFromString(hmacKey);
     keyValues["ExpiresAt"] = expiresAt.ToString("s") + "Z";
 
     /* Completed collection. */

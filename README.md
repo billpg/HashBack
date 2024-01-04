@@ -81,12 +81,12 @@ The request body is a single JSON object with string-valued properties only. All
 
 For example:
 ```
-{
-    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-3",
-    "IssuerUrl": "https://issuer.example/api/generate_bearer_token",
-    "Now": "1066-10-14T16:54:00Z",
-    "UniusUsusNumerus": "TODO - BASE64 256 random bits",
-    "VerifyUrl": "https://caller.example/crte_files/C4C61859.txt"
+<!--1066_EXAMPLE_JSON-->{
+  "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-3",
+  "IssuerUrl": "https://issuer.example/api/generate_bearer_token",
+  "Now": "1066-10-14T16:54:00Z",
+  "UniusUsusNumerus": "6rj/EUzGP9irPZ9CJJ4guM5ezORj6DaOmHR/A8UO6rs=",
+  "VerifyUrl": "https://caller.example/crte_files/C4C61859.txt"
 }
 ```
 
@@ -97,17 +97,18 @@ Once the Caller has built the request JSON, it will need to find its hash in a p
 The hash calculation takes the following steps.
 1. Convert the remaining JSON into its canonical representation of bytes per RFC 8785.
 2. Append the following salt bytes to the byte array immediately after the `}` byte. (The added bytes are 64 ASCII capital letters.)
-   - "IJSMRNLWPQFVCJMRYXKBWLZHUFGDJEPKWSBXMLDIQUGWSZTPOXVDCIKHRWFOLSTA".
+   - "EAHMPQJRZDKGNVOFSIBJCZGUQAFWKDBYEGHJRUZMKFYTQPOHADJBFEXTUWLYSZNC"<!--FIXED_SALT-->
 3. Hash the byte block including salt with a single round of SHA256.
 4. Encode the hash result using BASE-64, including the trailing hash.
 
 As all of the values are strings without control characters and all the JSON property names begin (by design) with a different capital letter, a simplified RFC 8785 generator could be used without needing to implement the full specification.
 
-The fixed salt is used to ensure that a valid hash could only be calculated by reading this document. The salt string is not sent with the request so any hashes resulting could only be used for this exchange. The generation of this string is described at (TODO - Link to generator code).
+The fixed salt is used to ensure that a valid hash could only be calculated by reading this document. The salt string is not sent with the request so any hashes resulting could only be used for this exchange. [Generator code with commentary for fixed salt string.](https://github.com/billpg/CrossRequestTokenExchange/blob/486b2825ce6718ac1d458ce27f98501c46badb7e/GenFixedSalt/GenFixedSalt.cs)
 
 The hash file published under the URL listed in the JSON under `VerifyCallerUrl` is published under the type `text/plain`. The file must be one line with the BASE-64 encoded hash in ASCII as that only line. The file may end with CR, LF or CRLF bytes, or with no end-of-line byte sequence at all.
 
-The expected hash of the above "1066" example is: TODO
+The expected hash of the above "1066" example is: 
+- "9oUL6O9QXgZH2ycyqP1BJsCScDt9dYgirGRa/dDdEeI="<!--1066_EXAMPLE_HASH-->
 
 ### 200 "Success" Response
 A 200 response will include the requested Bearer token and other useful details in a JSON response body. The JSON will have the following string properties, all required.
@@ -225,91 +226,49 @@ If the response is JSON, it may contain the following string properties to indic
 Note the response should not include content from the response from the verification URL, as this could be abused to turn an Issuer service into a proxy server.
 
 ### Other errors.
-The service may response with any standard HTTP error code in the event of an unexpected error. The response body should inclide sufficient detail for an experienced developer to understand the error.
+The service may response with any standard HTTP error code in the event of an unexpected error. The response body should include sufficient detail for an experienced developer to understand the error.
 
-# Case Studies
+# An extended example.
 
-## A Saas API.
+**saas.example** is a website with an API designed for their customers to use. When a customer wishes to use this API, their code must first go through this exchange to obtain a Bearer token. The service publishes a document for how their customers cam do this, including that the URL to POST requests to is `https://saas.example/api/login/crte`.
 
-**saas.example** is a website with an API designed for their customers to use. When a customer wishes to use this API, their code must first go through this exchange to obtain a Bearer token. The service publishes a document for how their customers including the URL to POST TokenCall requests to. (`https://saas.example/api/login/crte?userId=id`, filling in their unique user ID.)
+**Carol** is a customer of Saas. She's recently signed up and logged into the Saas customer portal. On her authentication page under the CRTE section, she's configured her account affirming that `https://carol.example/crte/` is a folder under her sole control and where her verification hashes will be saved.
 
-**Carol** is a customer of Saas. She's recently signed up and has been allocated her unique user id, 12. She's logged into the Saas customer portal and browsed to their authentication page. Under the CRTE section, she's configured her account that `https://carol.example/saas/crte-receive-token` is her URL for the Issuer to send the new Bearer token to, where she's implemented a handler.
-
-Time passes and Carol's server needs to make a request to the Saas API. As the server has no Bearer tokens, the code makes a POST request to the documented API:
+Time passes and Carol needs to make a request to the Saas API and needs a Bearer token. Her code builds a JSON request:
 ```
-POST https://saas.example/api/login/crte?userId=12
-Content-Type: application/json
 {
-    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-2",
-    "ExchangeId": "F952D24D-739E-4F1E-8153-C57415CDE59A",
-    "HmacKey": "NZVyqSyBlVoxBN64YA69i9V2TgzAe6cgxt2uN08BZAo="
+    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-3",
+    "IssuerUrl": "https://sass.example/api/login/crte",
+    "Now": "1141-04-08T12:42:00Z",
+    "UniusUsusNumerus": "TODO - BASE64 256 random bits",
+    "VerifyUrl": "https://carol.example/crte/64961859.txt"
 }
 ```
 
-The Saas website code looks up user 12 and finds an active user with CRTE configured. (If CRTE isn't configured, it would immediately respond with an error.) At this point, the Saas service does not yet know if the TokenCall request came from the real Carol, yet. 
+The code calculates the verification hash from this JSON by converting it to its canonical bytes, adding the fixed salt and hashing. The result of  hashing the above example is:
+- HASHGOESHERE <!---CASE_STUDY_HASH-->
 
-The Saas service duly generates a Bearer token and signs the token using HMAC with the key supplied in the initial request. It does not yet save this token to it's own database but holds it in memory until such time the providence of Carol as the Initiator can be confirmed.
+The hash is saved as a text file to her web file server using the random filename selected earlier. With this in place, the POST request can be sent to the SASS API.
 
-Using the URL Carol configured earlier, the Saas web service software opens up a new HTTPS request:
+The Sass website recieves this request and validates the request body, finding it valid. It then examines the value of the `VerifyUrl` property and finds an active user as owner of that URL, Carol.
+
+Not yet knowing for sure if the request came from the real Carol or not, it makes a new GET request to retrieve that text file at the supplied URL. Once it arrives it compares the hash inside that file with the hash it calculated for itself from the request body. As the two hashes match, it concludes the request did genuinely come from Carol.
+
+Satsfied the requyest is genuine, the Saas service generates a Bearer token and returns it to the caller as the response to the POST request, together with its expiry time.
 ```
-POST https://carol.example/saas/crte-receive-token
-Content-Type: application/json
 {
-    "ExchangeId": "F952D24D-739E-4F1E-8153-C57415CDE59A",
-    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMiIsImlzcyI6InNhYXMuZXhhbXBsZSIsImlhdCI6MTcyNDE2NDY0NX0.EvmSc-g9nx7KwXrLS1O4tx8n-JQFxyyRRHRYwIq_PNA",
-    "ExpiresAt": "2024-08-20T14:37:25Z",
-    "BearerTokenSignature": "AwSqgNtqrXtmbQdIJq7NyIxpjJ44le1Q+NMcd9LLwgQ=",
+    "BearerToken": "TODO",
+    "ExpiresAt": "jdjdjdj",
 }
 ```
 
-As Carol really is the Initiator, her web service can look up the supplied ExchangeId and find the TokenCall request it opened earlier. It has a Bearer token but it doesn't yet know if this is the genuinely the Saas service making an TokenIssue request yet. To check this, it performs the same HMAC operation with the HMAC key it supplied in the initial request. Happy that everything is verified, the service stores the Bearer token but it can't use the token just yet.
-
-To confirm that all is well, Carol's web service closes the TokenIssue request by sending a 204 status, indicating that it accepts the Bearer token. The Saas web server writes the token it generated into the database instead of only holding it in memory. The Saas service can finally closes the TokenCall request with a 204, this time signalling that Carol may now use the Bearer token it issued.
+Carol may now delete the verification hash from her web server, or allow a housekeeping process to tidy it away. She may now use the issued Beaer token to call the Saas API until that token expires.
 
 ```
 GET https://saas.example/api/status.json
-Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMiIsImlzcyI6InNhYXMuZXhhbXBsZSIsImlhdCI6MTcyNDE2NDY0NX0.EvmSc-g9nx7KwXrLS1O4tx8n-JQFxyyRRHRYwIq_PNA
+Authorization: Bearer ihihihih
 ```
 
-## Webhooks
-
-The authentication requests don't always go from Carol to Saas. Occasionally, the Saas service will need to call back to Carol's web service to deal with an event. When this happens, Carol's web service needs to be certain the request is coming from Saas and not someone else trying to get privileged information from Carol's Webhook handler.
-
-To deal with this, as well as configuring a Webhook URL, Carol has also configured her own TokenCall end-point, should the Saas service need to authenticate itself.
-
-Time passes and the Saas service needs to call Carol's API to make a decision, but it doesn't have a valid Bearer token yet. It looks up the URL she configured and makes an HTTPS request:
-```
-POST https://carol.example/saas/crte-generate-token-for-webhook
-Content-Type: application/json
-{
-    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-2",
-    "ExchangeId": "B405DE48-36F4-4F42-818C-9BE28D6B3832",
-    "HmacKey": "3og+Au+MkBPQDhd60RT50e2KnVx86xPI1SLUVtlUa+U="
-}
-```
-
-Carol's web service opens a new HTTPS request back to the Saas web site and in a similar way to before, it populates this new request with a Bearer token it had generated and an HMAC signature. The Saas API documents that the webhook CRTE TokenIssue requests should go to `https://saas.example/api/issue-crte?user_id=id` with the user's id added to the query string parameter.
-```
-POST https://saas.example/api/issue-crte?user_id=12
-Content-Type: application/json
-{
-    "ExchangeId": "B405DE48-36F4-4F42-818C-9BE28D6B3832",
-    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzYWFzIiwiaXNzIjoiY2Fyb2wuZXhhbXBsZSIsImlhdCI6MTcyNDE3NDY0NX0.twhcqejxlqhT7JkMEGsEgYiRf5eIOlC9z7Sqrf6cbI8",
-    "ExpiresAt": "2024-08-20T17:24:05Z",
-    "BearerTokenSignature": "jXyGOTurJ9X6tMd9aJAygG08VzV7MgPRoIHECw74eNM=",
-}
-```
-
-The Saas service first acknowledges acceptance of the token by returning 204 to its incoming HTTPS request. Carol's web service handler acknowledges the acknowledgment by also responding to its incomming request with 204.
-
-With a token that's been confirmed valid, the Saas service may now make its Webhook call.
-
-```
-POST https://carol.example/saas/webhook
-Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzYWFzIiwiaXNzIjoiY2Fyb2wuZXhhbXBsZSIsImlhdCI6MTcyNDE3NDY0NX0.twhcqejxlqhT7JkMEGsEgYiRf5eIOlC9z7Sqrf6cbI8
-Content-Type: application/json
-{ "IsThisAWebhook?": true }
-```
 
 ## Answers to Anticipated Questions
 
