@@ -45,7 +45,7 @@ To request a Bearer token from the Issuer, the Caller will first need to prepare
 
 For example. An Issuer might know that a particular Caller is the only user capable of publishing files in the folder `https://caller.example/crte_files/` and will use this knowledge as reassurance the file must have come from the genuine Caller.
 
-Once that JSON and the published hash is ready, the Caller will open a POST request to the Issuer using the URL agreed in advance for this purpose, together with the JSON request body written earlier. While handling this POST request, the Issuer will retrive the expected hash published by the Caller earlier. By repeating the hash calculaton on the JSON request body and comparing it against the downloaded expected hash, the Issuer can confirm if the request came from the known Caller or not.
+Once that JSON and the published hash is ready, the Caller will open a POST request to the Issuer using the URL agreed in advance for this purpose, together with the JSON request body written earlier. While handling this POST request, the Issuer will retrieve the expected hash published by the Caller earlier. By repeating the hash calculation on the JSON request body and comparing it against the downloaded expected hash, the Issuer can confirm if the request came from the known Caller or not.
 
 During this time when the Issuer service retrieves the expected hash from the Caller's own web service, the POST request will be kept open, responding only when the exchange has completed.
 
@@ -73,7 +73,7 @@ The request body is a single JSON object with string-valued properties only. All
 - `UniusUsusNumerus`
   - At least 256 bits of cryptographic-quality randomness, encoded in BASE-64 including trailing `=`.
   - This is to make reversal of the verification hash practically impossible.
-  - The other JSON property values listed here are "predictable". The security of this exchange relies on this one value not being predicatable.
+  - The other JSON property values listed here are "predictable". The security of this exchange relies on this one value not being predictable.
   - I am English and I would prefer to not to name this property using a particular five letter word starting with N, as it has an unfortunate meaning in my culture.
 - `VerifyUrl`
   - An `https://` URL belonging to the Caller where the verification hash may be retrieved with a GET request.
@@ -250,11 +250,11 @@ The code calculates the verification hash from this JSON by converting it to its
 
 The hash is saved as a text file to her web file server using the random filename selected earlier. With this in place, the POST request can be sent to the SASS API.
 
-The Sass website recieves this request and validates the request body, finding it valid. It then examines the value of the `VerifyUrl` property and finds an active user as owner of that URL, Carol.
+The Sass website receives this request and validates the request body, finding it valid. It then examines the value of the `VerifyUrl` property and finds an active user as owner of that URL, Carol.
 
 Not yet knowing for sure if the request came from the real Carol or not, it makes a new GET request to retrieve that text file at the supplied URL. Once it arrives it compares the hash inside that file with the hash it calculated for itself from the request body. As the two hashes match, it concludes the request did genuinely come from Carol.
 
-Satsfied the requyest is genuine, the Saas service generates a Bearer token and returns it to the caller as the response to the POST request, together with its expiry time.
+Satisfied the request is genuine, the Saas service generates a Bearer token and returns it to the caller as the response to the POST request, together with its expiry time.
 ```
 {
     "BearerToken": "TODO",
