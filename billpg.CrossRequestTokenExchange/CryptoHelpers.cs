@@ -60,7 +60,7 @@ namespace billpg.CrossRequestTokenExchange
             return Convert.ToBase64String(hash);
         }
  
-        public static string GenerateUniusUsusNumerus()
+        public static string GenerateUnus()
         {
             /* Generate 256 cryptographic quality random bits into a block of bytes. */
             using var rnd = System.Security.Cryptography.RandomNumberGenerator.Create();

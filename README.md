@@ -70,7 +70,7 @@ The request body is a single JSON object with string-valued properties only. All
 - `Now`
   - The current UTC time in ISO format `yyyy-mm-ddThh:mm:ssZ`.
   - The recipient service may reject this request if timestamp is too far from its current time. This document does not specify a threshold but instead this is left to the service's configuration. (Finger in the air - ten seconds.)
-- `UniusUsusNumerus`
+- `Unus`
   - At least 256 bits of cryptographic-quality randomness, encoded in BASE-64 including trailing `=`.
   - This is to make reversal of the verification hash practically impossible.
   - The other JSON property values listed here are "predictable". The security of this exchange relies on this one value not being predictable.
@@ -79,14 +79,14 @@ The request body is a single JSON object with string-valued properties only. All
   - An `https://` URL belonging to the Caller where the verification hash may be retrieved with a GET request.
   - The URL must be one that Issuer knows as belonging to a specific Caller user.
 
-For example:<!--1066_EXAMPLE_JSON-->
+For example:<!--1066_EXAMPLE_REQUEST-->
 ```
 {
-  "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-3",
-  "IssuerUrl": "https://issuer.example/api/generate_bearer_token",
-  "Now": "1066-10-14T16:54:00Z",
-  "UniusUsusNumerus": "6rj/EUzGP9irPZ9CJJ4guM5ezORj6DaOmHR/A8UO6rs=",
-  "VerifyUrl": "https://caller.example/crte_files/C4C61859.txt"
+    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-3",
+    "IssuerUrl": "https://issuer.example/api/generate_bearer_token",
+    "Now": "1066-10-14T17:54:00Z",
+    "Unus": "L8FhCM4As+5wl6EWXrjlSxTVVB3L+xJ/Ad6khr1sjlI=",
+    "VerifyUrl": "https://caller.example/crte_files/C4C61859.txt"
 }
 ```
 
@@ -99,7 +99,7 @@ The hash calculation takes the following steps.
 2. Append the following salt bytes to the byte array immediately after the `}` byte. (The added bytes are 64 ASCII capital letters.)
    - "EAHMPQJRZDKGNVOFSIBJCZGUQAFWKDBYEGHJRUZMKFYTQPOHADJBFEXTUWLYSZNC"<!--FIXED_SALT-->
 3. Hash the byte block including salt with a single round of SHA256.
-4. Encode the hash result using BASE-64, including the trailing hash.
+4. Encode the hash result using BASE-64, including the trailing equals.
 
 As all of the values are strings without control characters and all the JSON property names begin (by design) with a different capital letter, a simplified RFC 8785 generator could be used without needing to implement the full specification.
 
@@ -108,7 +108,7 @@ The fixed salt is used to ensure that a valid hash could only be calculated by r
 The hash file published under the URL listed in the JSON under `VerifyCallerUrl` is published under the type `text/plain`. The file must be one line with the BASE-64 encoded hash in ASCII as that only line. The file may end with CR, LF or CRLF bytes, or with no end-of-line byte sequence at all.
 
 The expected hash of the above "1066" example is: 
-- "9oUL6O9QXgZH2ycyqP1BJsCScDt9dYgirGRa/dDdEeI="<!--1066_EXAMPLE_HASH-->
+- "Ikf/OavSWtD+1ictClEmYCQvi5nLEmwItE/ZipbmmAs="<!--1066_EXAMPLE_HASH-->
 
 ### 200 "Success" Response
 A 200 response will include the requested Bearer token and other useful details in a JSON response body. The JSON will have the following string properties, all required.
@@ -118,12 +118,12 @@ A 200 response will include the requested Bearer token and other useful details 
 - `ExpiresAt`
   - The UTC expiry time of this Bearer token in ISO format. (yyyy-mm-ddThh:mm:ssZ)
 
-For example:
+For example:<!--1066_EXAMPLE_RESPONSE-->
 ```
 Content-Type: application/json
 {
-    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0aGVfaW5pdGlhdG9yIiwiaXNzIjoidGhlX2lzc3VlciIsImlhdCI6MTcwNDE2NDY0NX0.xc5LzEZGSCaeHRdzBjZ-NFx-NzK-CGTAQa0BpT5hFeo",
-    "ExpiresAt": "2024-01-02T03:04:05Z",
+    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjYWxsZXIuZXhhbXBsZSIsImlzcyI6Imlzc3Vlci5leGFtcGxlIiwiaWF0IjotMjg1MDI2OTA3NjAsImV4cCI6LTI4NTAyNjA3OTYwfQ.sKVdvXN9UmtvnddP4srO6ch65ieeLRG53sse_L_J3A4",
+    "ExpiresAt": "1066-10-15T16:54:00Z"
 }
 ```
 
@@ -234,19 +234,19 @@ The service may response with any standard HTTP error code in the event of an un
 
 **Carol** is a customer of Saas. She's recently signed up and logged into the Saas customer portal. On her authentication page under the CRTE section, she's configured her account affirming that `https://carol.example/crte/` is a folder under her sole control and where her verification hashes will be saved.
 
-Time passes and Carol needs to make a request to the Saas API and needs a Bearer token. Her code builds a JSON request:
+Time passes and Carol needs to make a request to the Saas API and needs a Bearer token. Her code builds a JSON request:<!--CASE_STUDY_REQUEST-->
 ```
 {
     "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-3",
     "IssuerUrl": "https://sass.example/api/login/crte",
-    "Now": "1141-04-08T12:42:00Z",
-    "UniusUsusNumerus": "TODO - BASE64 256 random bits",
+    "Now": "1141-04-08T13:42:00Z",
+    "Unus": "JbfRDbPVV2lb0mQgLPIHP+dCdRBualxlVAXkf1FLV7Q=",
     "VerifyUrl": "https://carol.example/crte/64961859.txt"
 }
 ```
 
 The code calculates the verification hash from this JSON by converting it to its canonical bytes, adding the fixed salt and hashing. The result of  hashing the above example is:
-- HASHGOESHERE <!---CASE_STUDY_HASH-->
+- "f+l7IIDnFW44tz59hJRh9jEyk9Wwp2ohA1ka85FC1fA="<!--CASE_STUDY_HASH-->
 
 The hash is saved as a text file to her web file server using the random filename selected earlier. With this in place, the POST request can be sent to the SASS API.
 
@@ -254,11 +254,11 @@ The Sass website receives this request and validates the request body, finding i
 
 Not yet knowing for sure if the request came from the real Carol or not, it makes a new GET request to retrieve that text file at the supplied URL. Once it arrives it compares the hash inside that file with the hash it calculated for itself from the request body. As the two hashes match, it concludes the request did genuinely come from Carol.
 
-Satisfied the request is genuine, the Saas service generates a Bearer token and returns it to the caller as the response to the POST request, together with its expiry time.
+Satisfied the request is genuine, the Saas service generates a Bearer token and returns it to the caller as the response to the POST request, together with its expiry time.<!--CASE_STUDY_RESPONSE-->
 ```
 {
-    "BearerToken": "TODO",
-    "ExpiresAt": "jdjdjdj",
+    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjYXJvbC5leGFtcGxlIiwiaXNzIjoic2Fzcy5leGFtcGxlIiwiaWF0IjotMjYxNTIyODAyODAsImV4cCI6LTI2MTUyMTk3NDgwfQ.UA9Xinu2aYmyO1jWJ-04weloxsfNDIioOMR7P4QwM9I",
+    "ExpiresAt": "1141-04-09T12:42:00Z"
 }
 ```
 
