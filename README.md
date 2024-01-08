@@ -103,7 +103,7 @@ The hash calculation takes the following steps.
 
 As all of the values are strings without control characters and all the JSON property names begin (by design) with a different capital letter, a simplified RFC 8785 generator could be used without needing to implement the full specification.
 
-The fixed salt is used to ensure that a valid hash could only be calculated by reading this document. The salt string is not sent with the request so any hashes resulting could only be used for this exchange. [Generator code with commentary for fixed salt string.](https://github.com/billpg/CrossRequestTokenExchange/blob/486b2825ce6718ac1d458ce27f98501c46badb7e/GenFixedSalt/GenFixedSalt.cs)
+The fixed salt is used to ensure that a valid hash could only be calculated by reading this document. The salt string is not sent with the request so any hashes resulting could only be used for this exchange. [Generator code with commentary for fixed salt string.](https://github.com/billpg/CrossRequestTokenExchange/blob/898149500b36107f8943ac7024fc73772adfa9c0/GenFixedSalt/GenFixedSalt.cs)
 
 The hash file published under the URL listed in the JSON under `VerifyCallerUrl` is published under the type `text/plain`. The file must be one line with the BASE-64 encoded hash in ASCII as that only line. The file may end with CR, LF or CRLF bytes, or with no end-of-line byte sequence at all.
 
