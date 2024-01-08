@@ -278,29 +278,15 @@ They require management and secure storage and your server-side code will need a
 ### I don't have a web server.
 Then this exchange is not for you. It works by having two web servers make requests to each other.
 
-### My code doesn't run on a web server, but I have one on the other side of the Internet.
-Can you set up that web server to handle requests on your behalf? You would need a secure channel between yourself and the web server to pass POST requests and responses along.
-
-### I don't have my own web server, but could I use an external service to receive the TokenIssue request instead?
-As long as you trust that service and you have a secure channel between you and the service. If you don't trust it, or it's a service that publishes the contents of all incoming POST requests, that would not be a suitable service for this exchange. The body of the TokenIssue request will be secured thanks to TLS, but TLS only secures the traffic between the two end-points, not any additional step beyond the end-points.
-
-### What if I want to use an external service I don't necessarily trust?
-Exactly to support this arrangement, an earlier draft of this exchange included an AES key alongside the HMAC key. I omitted it for this version to simplify it, uncertain of its value. I am open to be persuaded that this would be a useful addition to this exchange.
-
-With this in place, if you (as the Initiator) make a POST request to an Issuer directly, you'd supply an AES key as well as an HMAC key, all freshly generated from a cryptographic-quality random source. The Issuer would send the TokenIssue request as before, but instead of sending it in the clear (albeit inside TLS), the TokenIssue request would be AES encrypted as well as HMAC signed. Only your code would be able to check the signature and decrypt the token inside.
-
-I removed this aspect as the TLS was already securing the token and having to co-ordinate both an AES key and the IV was complicating things.
-
-### Could an untrusted third party also handle being an Issuer?
-Perhaps, but if you can accept Bearer tokens once this exchange has completed, then you must already have a web server so you don't need a third party service to do this bit for you.
-
-If that statement is wrong, open an issue and persuade me.
-
-### Isn't the HmacKey key a pre-shared secret?
-If you like, but the scope is very different. For the Initiator, the bytes can be generated from the system random number generator only when needed and the key needs only to be stored in local memory without needing to store it externally. Once the exchange has completed the HMAC key can be discarded.
+### I have one on the other side of the Internet.
+If your server satisfies all of these properties, it would be useful for this exchange:
+- The server runs TLS with a known URL.
+- You can upload small files into a folder.
+- You control the filename, or you can know the filename before uploading.
+- No-one else can upload files to this folder.
 
 ### TLS supports client-side certificates.
-Indeed, but that would require secure storage of the private key that backs the client-side certificate. The point of this exchange is to use the pre-existing TLS certificates that you'll already have configured to facilitate the exchange to avoid having to securely store long-term secrets.
+To use client-side certificates, the client side would need access to the private key. This would need secure storage for the key, avoidance of which is the main motivation of this idea. 
 
 ### How long should a bearer token last until expiry?
 Up to you but (finger in the air) I'd go for an hour. If the exchange takes too long, remember you can do it in advance and have the Bearer token ready if needed.
@@ -310,68 +296,60 @@ If a connection to an untrusted TLS certificate is found, abandon the request an
 
 Since this exchange relies on a pre-existing relationship, you could perhaps allow for "pinned" TLS certificates to be configured.
 
-### Is the HMAC key needed?
-The risk of ignoring the HMAC signature is that an attacker could supply a bad Bearer token, or one belonging to someone else. If that's not a problem then you could ignore the HMAC signature but why not check it anyway?
-
-### What if generating a token is expensive?
-This is another feature I since removed from an earlier draft of this document and I'm open to be persuaded that it should be put back. The Initiator could, before making the TokenIssue request, send a "Verify" request first. At this step, the Issuer is asking the Initiator to confirm the request is genuine, including a short message signed with the HMAC to confirm the request is itself genuine.
-
-I removed that step in early development to simplify the exchange. Having just two web requests, one in each direction, had a nice symmetry. The main consideration was the realisation that issuing a token is fairly cheap. Both JWT and random strings can be generated without much computing power, especially compared to signing an HMAC and making another POST request.
-
-As the Issuer has a opportunity (in the response to the initial POST request) to withdraw an issued token, the Issuer could defer activating the generated token (perhaps saving it to a database) until after the Initiator has accepted it.
-
-### Why do the two participants have to a pre-existing relationship?
-This is another feature I removed since writing early drafts. 
-
-I wondered if this exchange could work as the only authentication system needed. I imagined signing up for some kind of service and registering by pasting in my own website domain as the only means of authentication. The service would go talk to the website on my domain, exchange tokens and I'm logged in. The TokenCall request would include a URL to return the signed token.
-
-This appealed to me, but there was a problem with that approach. Any doer-of-evil could come along to a website that implemented this exchange and cause that service to make a POST request to any URL they wanted on any domain. You couldn't control the request body but that might be enough to cause a problem. To resolve this, I wrote into the draft specification that the claimed URL should first be confirmed by GET-ing a `/.well-known/` file that lists all the URLs that implement this API.
-
-Wanting to simplify the basic specification, I instead changed this step to requiring a prior relationship and for the URL for the POST request to be pre-configured. Any complexity of establishing a relationship is set aside.
-
-I am open to discussing ways of adding mechanisms to use this method without a prior relationship.
-
 ### What if an attacker attempts to eavesdrop or spoof either request?"
-The attacker can't eavesdrop because TLS is securing the channel.
+The attacker can't eavesdrop or spoof because TLS is securing the channel.
 
-### What if an attacker sends a fake TokenCall request to an Issuer?
-The Issuer will generate a unasked-for Bearer token and send it to the real Initiator, who will reject it because it wasn't expecting one.
+### What if an attacker sends a fake POST request to an Issuer?
+The Issuer will attempt to retrieve a verification hash file from the Caller's website. As the Caller won't have a verification hash that matches the fake POST request, the attempt will fail.
 
-### Does it matter if the GUID is predictable?
-No. The security of the exchange is based on HMAC and TLS.
+### Does it matter if any part of the POST request is predictable?
+Only the value of the `Unus` property needs to be unpredictable. All of the other values may be completely predictable to an attacker because only one unpredictable element is enough to make the verification hash secure.
 
-### What if an attacker sends a fake TokenIssue request?
-If the Initiator isn't expecting an TokenIssue request, they won't have a HMAC key to check the signature, so can reject the request.
+### What if an attacker downloads a verification hash intended for a different issuer?
+To exploit knowing a verification hash, an attacker would need to build a valid JSON request body that resolves to that hash. As the value of the `Unus` property is included in the hash but not revealed to an attacker, the task is computationally unfeasable.
 
-If the Initiator *is* expecting an TokenIssue request, they will be able to test it came from the genuine Issuer by checking the HMAC signature. The attacker won't know how to generate a signature without the unpredictable Initiator's key.
+### What if a Caller sends a POST request to an Issuer, but that Issuer passes the request along to a different Issuer?
+An evil Issuer would first need to perform their replat attack before the `Now` timestamp gets too old, and also before the genuine Caller deletes their verification hash, having completed the transaction it was meant for.
 
-### What if an attacker floods either participants URLs with many fake requests?
-Suppose an attacker pretends to be a genuine Initiator and floods a known Issuer with many fake TokenCall requests. On this situation, the Issuer will generate and sign many tokens and pass them all to the real Initiator. The Initiator will reject them all because none of them will correspond to a known HMAC key.
+If those are not a problem, the second Issuer receiving a replayed request will find the verification hash matches, but will reject the request because it was for a different Issuer. It is for this reason it is important that the Issuer validates the request including rejecting requests with the wrong `IssuerUrl` property value.
 
-While the exchange prevents tokens from leaking to an attacker, the fact that a request will trigger a second request might be used as a denial-of-service attack. For this reason, it may be prudent for an Issuer to track IP address blocks with a history of making TokenCall requests that are not completed and reject subsequent TokenCall requests that originate from these blocks.
+### What if an attacker floods the POST request URL with many fake requests?
+For each attempted fake POST request, the Issuer will attempt to retrieve the verification hash. Since the genuine Caller does not publish hashes for these fake requests, the Issuer will reject these attempts.
 
-Similarly, as IP address tend to be stable, it may be prudent to record the IP addresses that successful exchanges have originated from in the past. Limit the zone of all other addresses to enough for an Initiator to unexpectantly move to a new IP but not so much that a flood opens up.
+The fact that a POST request will trigger a second GET request might be used as a denial-of-service attack. For this reason, it may be prudent for an Issuer to track IP address blocks with a history of making bad POST requests and rejecting subsequent requests that originate from these blocks.
 
-The Initiator's web service might also be flooded with fake TokenIssue requests, but in this case because an TokenIssue request doesn't trigger a second request, normal methods to deflect denial-of-service attackers would be sufficient.
+It may also be prudent to keep the POST URL secret, so attackers can't send in a flood of fake requests if they don't know where to send them. As this would only be a method to mitigate a denial-of-service attack, the secret URL doesn't have to be treated as secret needing secure storage. The URL could be set in a unencrypted config file and if it does leak, be replaced without urgency at the participant's convenience. The security of the exchange relies on TLS and the verification hash, not the secrecy of the URLs.
 
-It may also be prudent to keep the POST URLs secret, so attackers can't send in a flood of fake requests if they don't know where to send them. As this would only be a method to mitigate a denial-of-service attack, the secret URL doesn't have to be treated as secret needing secure storage. The URL could be set in a unencrypted config file and if it does leak, be replaced without urgency at the participant's convenience. The security of the exchange relies on TLS and the HMAC signature, not the secrecy of the URLs.
-
-### What if a malicious Initiator causes the TokenCall connection to stay open?
+### What if a malicious Caller causes the connect to retrieve the verification hash to stay open?
 [I am grateful to "buzer" of Hacker News for asking this question.](https://news.ycombinator.com/item?id=38110536)
 
-An attacker sets themselves up as an Initiator and registers a malicious endpoint that never responds as their URL to receive the TokenIssue POST requests. The attacker then makes a TokenCall request to which the duly Issuer responds by making the TokenIssue POST request to the malicious endpoint. As this never responds, that initial connection is kept open, causing a denial-of-service by the many opened connections.
+An attacker sets themselves up and confiigures their website to host verification hash files. However, instead of responding with veirification hashes, this website keeps the GET request open and never closes it. As a result, the Issuer server is left holding two TCP connections open - the original POST request and the GET request that won't end. If this happens many times it could cause a denial-of-service by the many opened connections being kept alive.
 
 We're used to web services making calls to databases or file systems and waiting for those external systems to respond before responding to its own received request. The difference in this scenario is that the external system we're waiting for is controlled by someone else who may be hostile.
 
-This could be mitigated by the Issuer configuring a low timeout for its inner TokenIssue request. 5 seconds instead of the traditional 30 seconds. The timeout will need to be long enough to reasonably make a round trip, perform a HMAC signature check and store the token.
+This could be mitigated by the Issuer configuring a low timeout for the request that fetches the verification hash. The allowed time only needs to be long enough to perform a single round of SHA256 and the usual roundtrip delay of a request. If the verification hash requests takes too long the overall transaction can be abandoned.
 
-Nonetheless, public draft number 2 introduces an alternative 202 response code that the Issuer web service may return immediately instead of keeping the initial POST request open. As this is still a public draft for comment and discussion, if the consensus is that one style is the only one that should be specified, I will write a new draft that only allows this one style of response instead of a negotiation between the two. 
+Nonetheless, I have a separate proposal that will allow for the POST request to use a 202 "Accepted" response where the underlying connection can be closed and reopened later. Instead of keeping the POST request open, the Issuer can close the request and the Caller may reopen it at a later time.
+
+### Why does the SHA256 operation have a fixed salt?
+The fixed hash only appears in this document and does not go over the wire as a request is made, so any hash produced which passes validation must have been calculated by someone reading this document. Any hashes produced will have no value outside of this documented exchange.
+
+### What are the previous public drafts?
+
+- [Public Draft 1](https://github.com/billpg/CrossRequestTokenExchange/blob/22c67ba14d1a2b38c2a8daf1551f065b077bfbb0/README.md)
+  - Used two POST requests in opposite directions, with the second POST request acting as the response to the first.
+- [Public Draft 2](https://github.com/billpg/CrossRequestTokenExchange/blob/2165a661e093754e038620d3b2be1caeacb9eba0/README.md)
+  - Updated to allow a 202 "Accepted" response to the first POST request, avoiding to need to keep the connection open.
+  - I had a change of heart to this approach shortly after publishing it.
+- Public Draft 3 (This document)
+  - Substantial refactoring after realising the verification hash could be a unauthenticated GET request.
+  - Removed 202 responses after noting the inner GET request could have a very short timeout and deciding it could work as an independent proposal for any POST request.
 
 ## Next Steps
 
-This document is a draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using HMAC-SHA256 correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and HMAC is there to bring the two requests together. If you have any comments or notes, please raise an issue on this project's github.
+This document is a draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using SHA256 correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and SHA256 is there to bring the two requests together. If you have any comments or notes, please raise an issue on this project's github.
 
-In due course I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform the role of an Issuer by sending your API tokens on demand, as well as perform the role of an Initiator by asking your API for a token.
+In due course I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform the role of an Issuer by sending your API tokens on demand, as well as perform the role of a Caller by asking your API for a token.
 
 Ultimately, I hope to publish this as an RFC and establish it as a public standard.
 
