@@ -1,27 +1,27 @@
 # Cross Request Token Exchange
 An authentication exchange between two web services.
 
-This version of the document is a **public draft** for review and discussion and has been tagged as `CRTE-PUBLIC-DRAFT-1`. If you have any comments or notes, please open an issue on this project's public github.
+This version of the document is a **public draft** for review and discussion and has been tagged as `CRTE-PUBLIC-DRAFT-3`. If you have any comments or notes, please open an issue on this project's public github.
 
 This document is Copyright William Godfrey, 2023. You may use its contents under the terms of the Creative-Commons Attribution license.
 
 ## The elevator pitch.
 
-Alice and Bob are both normal web servers.
-- (Alice opens an HTTPs request to Bob.)
-- "Hey Bob. I want to use your API but I need a Bearer token."
-  - (Bob opens a separate HTTPS request to Alice.)
-  - "Hey Alice, have this Bearer token."
-  - "Thanks Bob."
-- "Thanks Alice."
+- (Alice opens an HTTPS request to Bob.)
+  - "Hey Bob. I want to use your API but I need a Bearer token."
+- (Bob opens a separate HTTPS request back to Alice.)
+  - "Hey Alice. I've got this request for a Bearer token from someone claiming to be you."
+  - "That's me."
+- (Bob responds to Alice's original HTTPS request.)
+  - "Here's your Bearer token."
 
 Did you notice what **didn't** happen?
 
-Neither side needed a pre-shared key, a shared secret nor a place to securely store them. Both machines are web servers with TLS already set up and this is what enables the exchange to work.
+No-one needed a pre-shared key nor a shared secret. No-one needed a place to securely store them. The two web servers already have TLS set up and this is what enables the exchange to work.
 
-When you make an HTTPS request, thanks to TLS you can be sure who you are connecting to, but the service receiving the request can't be sure who the request is coming from. By using **two separate** HTTPS requests in opposite directions, the two web servers may perform a brief handshake and exchange a *Bearer* token.
+When you make an HTTPS request, thanks to TLS you can be sure who you are connecting to, but the service receiving the request can't be sure who the request is coming from. By using **two separate** HTTPS requests, the two web servers may perform a brief handshake and exchange a *Bearer* token.
 
-### What's a Bearer token?
+## What's a Bearer token?
 
 A Bearer token is string of characters. It could be a signed JWT or a string of randomness. If you know what that string is, you can include it any web request where you want to show who you are. The token itself is generated (or "issued") by the service that will accept that token later on as proof that you are who you say you are, because no-one else would have the token. 
 
@@ -31,203 +31,244 @@ Authorization: Bearer eyIiOiIifQ.eyJuZ2d5dSI6Imh0dHBzOi8vYmlsbHBnLmNvbS9uZ2d5dSJ
 { "Stuff": "Nonsense" }
 ```
 
-That's basically it. It's like a password but very long and issued by the remote service. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Bearer tokens typically (but not always) have short life-times and you'd normally be given an expiry time along with the token itself. Cookies are a common variation of the Bearer token.
+That's basically it. It's like a password but very long and issued by the remote service. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Bearer tokens typically (but not always) have short life-times and you'd normally be given an expiry time along with the token itself. Cookies are a common variation of this.
 
 The exchange in this document describes a mechanism for a server to request a Bearer token from another server in a secure manner.
 
-## The exchange in a nutshell.
+## The Exchange
 
 There are two participants in this exchange:
-- The **Initiator** is requesting a Bearer token.
-- The **Issuer** issues that Bearer token back to the Initiator.
+- The **Caller** is requesting a Bearer token.
+- The **Issuer** issues that Bearer token back to the Caller.
 
-They connect to each other as follows:
-1. The Initiator opens a POST request (called the `TokenCall`) to the Issuer's API to trigger the exchange, including an HMAC key.
-2. The Issuer, keeping that first request open, opens a separate POST request (called the `TokenIssue`) to the Initiator's API.
-    - This request will contain a new Bearer token for the Initiator, with a signature using the HMAC key from the first request.
-3. The Initiator checks the signature and closes the second POST request with a 204 code, signalling it accepts the supplied token.
-4. The Issuer finally closes the first POST request with a 204 code, signalling the issued token is now ready to be used.
+To request a Bearer token from the Issuer, the Caller will first need to prepare a JSON object for the request body. The Caller will then hash this JSON object according to the rules documented below. Once calculated, that hash value will need to be made available for retrieval by the Issuer by publishing it on a website under a URL that's known to the Issuer as belonging to the Caller. The URL of this hash is included in the JSON request body.
 
-We'll now look at each step in detail.
+For example. An Issuer might know that a particular Caller is the only user capable of publishing files in the folder `https://caller.example/crte_files/` and will use this knowledge as reassurance the file must have come from the genuine Caller.
 
-### The TokenCall POST Request
+Once that JSON and the published hash is ready, the Caller will open a POST request to the Issuer using the URL agreed in advance for this purpose, together with the JSON request body written earlier. While handling this POST request, the Issuer will retrieve the expected hash published by the Caller earlier. By repeating the hash calculation on the JSON request body and comparing it against the downloaded expected hash, the Issuer can confirm if the request came from the known Caller or not.
 
-The process is started by the Initiator, who needs a Bearer token from the Issuer. The Initiator will open a new POST request to the URL that the Issuer documented a URL for the Initiator to use. This POST request includes a JSON request body as described below.
+During this time when the Issuer service retrieves the expected hash from the Caller's own web service, the POST request will be kept open, responding only when the exchange has completed.
 
-The JSON must have the following string properties, all required.
+(I am designing a separate mechanism utilizing the 202 HTTP response that will allow for the request to be closed and reopened later, which I will document separately.)
+
+Once the Issuer is satisfied the POST request came from the genuine Caller, it will create a new Bearer token for that user and include it in the POST response, alongside applicable metadata.
+
+If the Issuer cannot confirm the POST request came from the genuine Caller or an error occurred during processing, the Issuer must instead respond with an applicable error. Some error responses are documented below.
+
+### The POST Request Body JSON Object
+The request body is a single JSON object with string-valued properties only. All are required. The object must not use other properties except these and all properties must have a string value.
+
 - `CrossRequestTokenExchange`
-  - This indicates the client is attempting to use the CrossRequestTokenExchange process and the version. The value "CRTE-PUBLIC-DRAFT-1" refers to the version of this exchange described in this document.
-- `ExchangeId`
-  - A GUID value identifying this exchange. The subsequent POST request will include this ID.
-  - The value must be a valid GUID.
-- `HmacKey`
-  - An HMAC key that the Issuer will later use to sign the Bearer token, confirming that it came from the expected source.
-  - The value must consist of exactly 256 bits of cryptographic quality randomness encoded in BASE64, including the trailing equals character.
-  
-The request must not use any `Authorization` or `Cookie` headers, unless by private agreement separate to this document.
+  - This indicates which version of this exchange the Caller wishes to use.
+  - This version of this document is specified by the value "CRTE-PUBLIC-DRAFT-3". 
+    - See the error responses below for version negotiation.
+- `IssuerUrl`
+  - A copy of the full POST request URL, including "https://", full domain, port (if not 443), path and query string.
+  - Because load balancers and CDN systems might modify the URL as POSTed to the service, a copy is included here so there's no doubt exactly which string was used in the verification hash.
+  - The Issuer service must reject a request with the wrong URL as this may be an attacker attempting to re-use a request that was made for a different Issuer.
+  - The value may instead be a string supplied by the Issuer service as part of a prior error response, using a value it would accept for this property. (See discussion of error responses below.)
+- `Now`
+  - The current UTC time in ISO format `yyyy-mm-ddThh:mm:ssZ`.
+  - The recipient service may reject this request if timestamp is too far from its current time. This document does not specify a threshold but instead this is left to the service's configuration. (Finger in the air - ten seconds.)
+- `Unus`
+  - At least 256 bits of cryptographic-quality randomness, encoded in BASE-64 including trailing `=`.
+  - This is to make reversal of the verification hash practically impossible.
+  - The other JSON property values listed here are "predictable". The security of this exchange relies on this one value not being predictable.
+  - I am English and I would prefer to not to name this property using a particular five letter word starting with N, as it has an unfortunate meaning in my culture.
+- `VerifyUrl`
+  - An `https://` URL belonging to the Caller where the verification hash may be retrieved with a GET request.
+  - The URL must be one that Issuer knows as belonging to a specific Caller user.
 
-For example:
+For example:<!--1066_EXAMPLE_REQUEST-->
 ```
-POST https://issuer.example/api/token_call?initiator_user_id=123456
-Content-Type: application/json
 {
-    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-1",
-    "ExchangeId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
-    "HmacKey": "mj4i5dRcagrBzHOmIb8VryPU0zn8Z65T+tiakAJGOaI="
+    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-3",
+    "IssuerUrl": "https://issuer.example/api/generate_bearer_token",
+    "Now": "1066-10-14T17:54:00Z",
+    "Unus": "L8FhCM4As+5wl6EWXrjlSxTVVB3L+xJ/Ad6khr1sjlI=",
+    "VerifyUrl": "https://caller.example/crte_files/C4C61859.txt"
 }
 ```
 
-The Issuer's web service will receive this request and if there are any problems, will return an immediate error response. If all is well, it will keep this initial request open until the exchange has concluded.
+### Hash Calculation and Publication
 
-### The TokenIssue POST Request
+Once the Caller has built the request JSON, it will need to find its hash in a particular way, which the issuer will need to repeat in order to verify the request is genuine.
 
-While keeping the initial POST request open, the Issuer's web service (receiving that request) will open a new POST request back to the Initiator, using the URL agreed in advance. This second request is to pass the newly generated Bearer token itself to the Initiator.
+The hash calculation takes the following steps.
+1. Convert the remaining JSON into its canonical representation of bytes per RFC 8785.
+2. Append the following salt bytes to the byte array immediately after the `}` byte. (The added bytes are 64 ASCII capital letters.)
+   - "EAHMPQJRZDKGNVOFSIBJCZGUQAFWKDBYEGHJRUZMKFYTQPOHADJBFEXTUWLYSZNC"<!--FIXED_SALT-->
+3. Hash the byte block including salt with a single round of SHA256.
+4. Encode the hash result using BASE-64, including the trailing equals.
 
-The Issuer will generated the token (not yet knowing for sure the initial request was genuine), sign the token using the HMAC key supplied in the initial request and include both in the second POST request.
+As all of the values are strings without control characters and all the JSON property names begin (by design) with a different capital letter, a simplified RFC 8785 generator could be used without needing to implement the full specification.
 
-Because the Issuer is sending the Bearer token to a pre-agreed POST URL over HTTPS, they can be sure no-one else will have eavesdropped on that transaction. Because the request body includes an HMAC signature based on that HMAC key that no-one else knows, the Initiator can be sure the token genuinely came from the Issuer.
+The fixed salt is used to ensure that a valid hash could only be calculated by reading this document. The salt string is not sent with the request so any hashes resulting could only be used for this exchange. [Generator code with commentary for fixed salt string.](https://github.com/billpg/CrossRequestTokenExchange/blob/898149500b36107f8943ac7024fc73772adfa9c0/GenFixedSalt/GenFixedSalt.cs)
 
-The JSON request body is made up of the following string value properties, all of which are required.
-- `ExchangeId`
-  - The GUID from the original TokenCall request body that identifies this exchange.
+The hash file published under the URL listed in the JSON under `VerifyCallerUrl` is published under the type `text/plain`. The file must be one line with the BASE-64 encoded hash in ASCII as that only line. The file may end with CR, LF or CRLF bytes, or with no end-of-line byte sequence at all.
+
+The expected hash of the above "1066" example is: 
+- "Ikf/OavSWtD+1ictClEmYCQvi5nLEmwItE/ZipbmmAs="<!--1066_EXAMPLE_HASH-->
+
+### 200 "Success" Response
+A 200 response will include the requested Bearer token and other useful details in a JSON response body. The JSON will have the following string properties, all required.
+
 - `BearerToken`
   - This is the requested Bearer token. It must consist only of printable ASCII characters.
 - `ExpiresAt`
   - The UTC expiry time of this Bearer token in ISO format. (yyyy-mm-ddThh:mm:ssZ)
-- `BearerTokenSignature`
-  - The HMAC signature of the BearerToken value's ASCII bytes, signed using HMAC-SHA256 with the `HmacKey` from the original TokenCall request.
-  - The value is the 256 bit HMAC signature encoded in BASE64, including the trailing equals character.
 
-The request must not include any `Authorization` or `Cookie` headers, unless by prior agreement separate to this document.
-
-For example:
+For example:<!--1066_EXAMPLE_RESPONSE-->
 ```
-POST https://initiator.example/api/Issue?issuer_user_id=12345
 Content-Type: application/json
 {
-    "ExchangeId": "C4C61859-0DF3-4A8D-B1E0-DDF25912279B",
-    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0aGVfaW5pdGlhdG9yIiwiaXNzIjoidGhlX2lzc3VlciIsImlhdCI6MTcwNDE2NDY0NX0.xc5LzEZGSCaeHRdzBjZ-NFx-NzK-CGTAQa0BpT5hFeo",
-    "ExpiresAt": "2024-01-02T03:04:05Z",
-    "BearerTokenSignature": "HpsheV1lnt22FOssCjDgw02EaVmFsiZOvDBKlZoJPeA=",
+    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjYWxsZXIuZXhhbXBsZSIsImlzcyI6Imlzc3Vlci5leGFtcGxlIiwiaWF0IjotMjg1MDI2OTA3NjAsImV4cCI6LTI4NTAyNjA3OTYwfQ.sKVdvXN9UmtvnddP4srO6ch65ieeLRG53sse_L_J3A4",
+    "ExpiresAt": "1066-10-15T16:54:00Z"
 }
 ```
 
-### Initiator, responding to the TokenIssue request
+### 400 "Bad Request" Response
 
-If the Initiator web service finds the Bearer token it has received to be acceptable (including checking the HMAC signature), it may respond to this second request with a 204 code to indicate it accepts the supplied token and that the issuer should (if needed) activate the token.
+As the recipient of this POST request, the Issuer will check the request is valid and conforms to its own requirements. If the request is unacceptable, the Issuer must respond with a 400 "Bad Request" response.
 
-Any error response indicates to the Issuer caller that the Initiator doesn't accept the supplied token. This could mean that it didn't make the original request or that the HMAC signature verification failed, or simply an internal issue preventing the complete processing of the request. The Issuer, receiving such an error response should discard or otherwise deactivate the token.
+If the response body is JSON, there are a number of properties that describe how the request was unacceptable in a form that a computer could recognise and automatically resolve.
 
-Even if accepting the supplied token, the Initiator should not actually use the token until the entire exchange has completed by the Issuer responding to the first TokenCall request with a success response.
+The property `Error` is an array of strings in no particular order that describe how the request was unacceptable. If this property is missing then the response can't be automatically interpreted according to the rules of this document.
 
-### Issuer, responding to the TokenCall request.
+The optional property `Message`, if present, is a human-readable version of the reasons for rejecting this request.
 
-Once the Initiator has indicated it accepts the supplied token, the Issuer needs to finally indicate the issued token may now be used by finally closing down the initial TokenCall request that has been kept open with a 204 response. This is a signal from the Issuer that any necessary activation has completed and the token is now ready to be used.
+Note that the nature of a 400 error is that would be pointless repeating the request without first making a significant change to the request beyond moving the timestamp forward. 
 
-If there is an error when attempting to activate the newly issued token, the Issuer may indicate this by returning an error response to the Initiator. The Initiator should discard the newly issued token in this event. Any error responses should include enough detail in the response body to assist a developer in fixing the problem.
+#### `"Error": ["Version"]`
+This item indicates the service does not know about the version of this exchange listed in the request. The Caller should use the latest version of the protocol it knows about, but use this response to automatically retry with an earlier supported version, if there is one listed it understands.
 
-## Version Negotiation
+The response JSON property `AcceptVersion` is a JSON array of strings listing all the versions it knows about.
 
-The initial TokenCall request JSON includes a property named `CrossRequestTokenExchange` with a value `CRTE-PUBLIC-DRAFT-1`, specifying the version of this protocol the client is using. As this is the first (and so far, only) version, all requests should use only this string. 
-
-If a request arrives with a different and unknown string value to this property, the service should respond with a `400` (bad request) response, but with a JSON body that includes a property named `AcceptVersion`, listing all the supported versions in a JSON array of strings. The response may contain other properties but this property at the top level of the JSON response is set aside for version negotiation.
-
-If there is a future version of this exchange the Initiator prefers to use, it should specify its preferred version in that request and leave it to the Issuer service to respond with the list of versions it understands. At this point, the Initiator should select most preferable version on the list and repeat the TokenCall request with that version.
-
+For example:
 ```
 POST https://bob.example/api/BearerRequest
 { "CrossRequestTokenExchange": "NEW-FUTURE-VERSION-THAT-YOU-DONT-KNOW-ABOUT", ... }
 
 400 Bad Request
 { 
-    "Message": "Unknown version.",
-    "AcceptVersion": [ "CRTE-PUBLIC-DRAFT-1" ] 
+    "Message": "Unknown version. Use CRTE-PUBLIC-DRAFT-1 or CRTE-PUBLIC-DRAFT-3 instead.",
+    "Error": ["Version"],
+    "AcceptVersion": [ "CRTE-PUBLIC-DRAFT-1", "CRTE-PUBLIC-DRAFT-3"] 
 }
 ```
 
-# Case Studies
+#### `"Error": ["Time"]`
+This error indicates that the Issuer is rejecting the `Now` timestamp as too far from its current time. The presence of the timestamp in the request is to prevent use of known keys and hashes by expiring them.
 
-## A Saas API.
+The service may include a JSON property `Now` in the error with the current UTC time on that server, such that if the request is reattempted immediately with this alternate timestamp, the Issuer service would accept it.
 
-**saas.example** is a website with an API designed for their customers to use. When a customer wishes to use this API, their code must first go through this exchange to obtain a Bearer token. The service publishes a document for how their customers including the URL to POST TokenCall requests to. (`https://saas.example/api/login/crte?userId=id`, filling in their unique user ID.)
-
-**Carol** is a customer of Saas. She's recently signed up and has been allocated her unique user id, 12. She's logged into the Saas customer portal and browsed to their authentication page. Under the CRTE section, she's configured her account that `https://carol.example/saas/crte-receive-token` is her URL for the Issuer to send the new Bearer token to, where she's implemented a handler.
-
-Time passes and Carol's server needs to make a request to the Saas API. As the server has no Bearer tokens, the code makes a POST request to the documented API:
+For example:
 ```
-POST https://saas.example/api/login/crte?userId=12
-Content-Type: application/json
+POST https://bob.example/api/BearerRequest
+{ ..., "Now": "1042-06-08T09:10:11Z", ... }
+
+400 Bad Request
+{ 
+    "Message": "Your clock, or mine, is wrongly set.",
+    "Error": ["Time"],
+    "Now": "1066-01-05T12:13:14Z"
+}
+```
+
+#### `"Error": ["IssuerUrl"]`
+This error indicates the request was rejected becaue the supplied `RequestUrl` property was unacceptable. This check is to prevent requests made for a different issuer being reused. The response JSON must include a property also named `IssuerUrl` with a value that the Issuer service would find acceptable. The Caller may repeat the initial request with this alternate `IssuerUrl` value.
+
+For example:
+```
+POST https://bob.example.myproxy.example/api/BearerRequest
+{ ..., "IssuerUrl": "https://bob.example.myproxy.example/api/BearerRequest", ... }
+
+400 Bad Request
+{ 
+    "Message": "Unknown IssuerUrl.",
+    "Error": ["IssuerUrl"],
+    "IssuerUrl": "https://bob.example/"
+}
+```
+#### `"Error": ["VerifyUrl"]`
+This error indicates the service can't process this request because it doesn't know any user linked to the supplied `VerifyUrl` property. 
+
+#### `"Error": ["Attention"]`
+This error indicate the request was rejected for a reason that requires developer or administrator attention. The response should include the specific reason in sufficient detail for an experienced developer to diagnose and fix the error. The Caller software might use this value to avoid automated retries that might have been possible for other codes listed in the `Error` array.
+
+#### `"Error": ["VerifyHash"]`
+This error indicates the expected hash was successfully retrieved from the URL listed in `VerifyUrl`, but it did not match the hash calculated from the JSON request. 
+
+### 500 "Internal Server Error"
+This error, in addition to indicating errors on the server, may be used to indicate a failure to retrieve the expected hash from the `VerifyUrl` property. The service should use a 400 error if the URL is unknown or if it was successfully retrieved but doesn't match, but a 500 error is used to indicate a failure to retrieve that file.
+
+If the response is JSON, it may contain the following string properties to indicate the error it encountered. None of these are required but if they are used in the response JSON it must have the following meanings.
+
+- "VerifyGetErrorReason"
+  - One of the following values indicating the nature of the error.
+    - "Network"
+      - A network level error, such as a failure to connect to the service.
+    - "TimedOut"
+      - The request took too long to process.
+    - "DNS"
+      - The service could not connect to the verification server due to a DNS lookup failure.
+    - "TLS"
+      - Could not negotiate TLS once connected.
+    - "HTTP"
+      - The response status code was not 200.
+    - "Type"
+      - The response's Content-Type was not `text/plain`.
+    - "Hash"
+      - The text content was not 256 bits encoded using BASE-64.
+- "VerifyGetErrorMessage"
+  - Human readable text describing the error in sufficient detail to diagnose the error.
+
+Note the response should not include content from the response from the verification URL, as this could be abused to turn an Issuer service into a proxy server.
+
+### Other errors.
+The service may response with any standard HTTP error code in the event of an unexpected error. The response body should include sufficient detail for an experienced developer to understand the error.
+
+# An extended example.
+
+**saas.example** is a website with an API designed for their customers to use. When a customer wishes to use this API, their code must first go through this exchange to obtain a Bearer token. The service publishes a document for how their customers cam do this, including that the URL to POST requests to is `https://saas.example/api/login/crte`.
+
+**Carol** is a customer of Saas. She's recently signed up and logged into the Saas customer portal. On her authentication page under the CRTE section, she's configured her account affirming that `https://carol.example/crte/` is a folder under her sole control and where her verification hashes will be saved.
+
+Time passes and Carol needs to make a request to the Saas API and needs a Bearer token. Her code builds a JSON request:<!--CASE_STUDY_REQUEST-->
+```
 {
-    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-1",
-    "ExchangeId": "F952D24D-739E-4F1E-8153-C57415CDE59A",
-    "HmacKey": "NZVyqSyBlVoxBN64YA69i9V2TgzAe6cgxt2uN08BZAo="
+    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-3",
+    "IssuerUrl": "https://sass.example/api/login/crte",
+    "Now": "1141-04-08T13:42:00Z",
+    "Unus": "JbfRDbPVV2lb0mQgLPIHP+dCdRBualxlVAXkf1FLV7Q=",
+    "VerifyUrl": "https://carol.example/crte/64961859.txt"
 }
 ```
 
-The Saas website code looks up user 12 and finds an active user with CRTE configured. (If CRTE isn't configured, it would immediately respond with an error.) At this point, the Saas service does not yet know if the TokenCall request came from the real Carol, yet. 
+The code calculates the verification hash from this JSON by converting it to its canonical bytes, adding the fixed salt and hashing. The result of  hashing the above example is:
+- "f+l7IIDnFW44tz59hJRh9jEyk9Wwp2ohA1ka85FC1fA="<!--CASE_STUDY_HASH-->
 
-The Saas service duly generates a Bearer token and signs the token using HMAC with the key supplied in the initial request. It does not yet save this token to it's own database but holds it in memory until such time the providence of Carol as the Initiator can be confirmed.
+The hash is saved as a text file to her web file server using the random filename selected earlier. With this in place, the POST request can be sent to the SASS API.
 
-Using the URL Carol configured earlier, the Saas web service software opens up a new HTTPS request:
+The Sass website receives this request and validates the request body, finding it valid. It then examines the value of the `VerifyUrl` property and finds an active user as owner of that URL, Carol.
+
+Not yet knowing for sure if the request came from the real Carol or not, it makes a new GET request to retrieve that text file at the supplied URL. Once it arrives it compares the hash inside that file with the hash it calculated for itself from the request body. As the two hashes match, it concludes the request did genuinely come from Carol.
+
+Satisfied the request is genuine, the Saas service generates a Bearer token and returns it to the caller as the response to the POST request, together with its expiry time.<!--CASE_STUDY_RESPONSE-->
 ```
-POST https://carol.example/saas/crte-receive-token
-Content-Type: application/json
 {
-    "ExchangeId": "F952D24D-739E-4F1E-8153-C57415CDE59A",
-    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMiIsImlzcyI6InNhYXMuZXhhbXBsZSIsImlhdCI6MTcyNDE2NDY0NX0.EvmSc-g9nx7KwXrLS1O4tx8n-JQFxyyRRHRYwIq_PNA",
-    "ExpiresAt": "2024-08-20T14:37:25Z",
-    "BearerTokenSignature": "AwSqgNtqrXtmbQdIJq7NyIxpjJ44le1Q+NMcd9LLwgQ=",
+    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjYXJvbC5leGFtcGxlIiwiaXNzIjoic2Fzcy5leGFtcGxlIiwiaWF0IjotMjYxNTIyODAyODAsImV4cCI6LTI2MTUyMTk3NDgwfQ.UA9Xinu2aYmyO1jWJ-04weloxsfNDIioOMR7P4QwM9I",
+    "ExpiresAt": "1141-04-09T12:42:00Z"
 }
 ```
 
-As Carol really is the Initiator, her web service can look up the supplied ExchangeId and find the TokenCall request it opened earlier. It has a Bearer token but it doesn't yet know if this is the genuinely the Saas service making an TokenIssue request yet. To check this, it performs the same HMAC operation with the HMAC key it supplied in the initial request. Happy that everything is verified, the service stores the Bearer token but it can't use the token just yet.
-
-To confirm that all is well, Carol's web service closes the TokenIssue request by sending a 204 status, indicating that it accepts the Bearer token. The Saas web server writes the token it generated into the database instead of only holding it in memory. The Saas service can finally closes the TokenCall request with a 204, this time signalling that Carol may now use the Bearer token it issued.
+Carol may now delete the verification hash from her web server, or allow a housekeeping process to tidy it away. She may now use the issued Beaer token to call the Saas API until that token expires.
 
 ```
 GET https://saas.example/api/status.json
-Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMiIsImlzcyI6InNhYXMuZXhhbXBsZSIsImlhdCI6MTcyNDE2NDY0NX0.EvmSc-g9nx7KwXrLS1O4tx8n-JQFxyyRRHRYwIq_PNA
+Authorization: Bearer ihihihih
 ```
 
-## Webhooks
-
-The authentication requests don't always go from Carol to Saas. Occasionally, the Saas service will need to call back to Carol's web service to deal with an event. When this happens, Carol's web service needs to be certain the request is coming from Saas and not someone else trying to get privileged information from Carol's Webhook handler.
-
-To deal with this, as well as configuring a Webhook URL, Carol has also configured her own TokenCall end-point, should the Saas service need to authenticate itself.
-
-Time passes and the Saas service needs to call Carol's API to make a decision, but it doesn't have a valid Bearer token yet. It looks up the URL she configured and makes an HTTPS request:
-```
-POST https://carol.example/saas/crte-generate-token-for-webhook
-Content-Type: application/json
-{
-    "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-1",
-    "ExchangeId": "B405DE48-36F4-4F42-818C-9BE28D6B3832",
-    "HmacKey": "3og+Au+MkBPQDhd60RT50e2KnVx86xPI1SLUVtlUa+U="
-}
-```
-
-Carol's web service opens a new HTTPS request back to the Saas web site and in a similar way to before, it populates this new request with a Bearer token it had generated and an HMAC signature. The Saas API documents that the webhook CRTE TokenIssue requests should go to `https://saas.example/api/issue-crte?user_id=id` with the user's id added to the query string parameter.
-```
-POST https://saas.example/api/issue-crte?user_id=12
-Content-Type: application/json
-{
-    "ExchangeId": "B405DE48-36F4-4F42-818C-9BE28D6B3832",
-    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzYWFzIiwiaXNzIjoiY2Fyb2wuZXhhbXBsZSIsImlhdCI6MTcyNDE3NDY0NX0.twhcqejxlqhT7JkMEGsEgYiRf5eIOlC9z7Sqrf6cbI8",
-    "ExpiresAt": "2024-08-20T17:24:05Z",
-    "BearerTokenSignature": "jXyGOTurJ9X6tMd9aJAygG08VzV7MgPRoIHECw74eNM=",
-}
-```
-
-The Saas service first acknowledges acceptance of the token by returning 204 to its incoming HTTPS request. Carol's web service handler acknowledges the acknowledgment by also responding to its incomming request with 204.
-
-With a token that's been confirmed valid, the Saas service may now make its Webhook call.
-
-```
-POST https://carol.example/saas/webhook
-Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzYWFzIiwiaXNzIjoiY2Fyb2wuZXhhbXBsZSIsImlhdCI6MTcyNDE3NDY0NX0.twhcqejxlqhT7JkMEGsEgYiRf5eIOlC9z7Sqrf6cbI8
-Content-Type: application/json
-{ "IsThisAWebhook?": true }
-```
 
 ## Answers to Anticipated Questions
 
@@ -237,29 +278,15 @@ They require management and secure storage and your server-side code will need a
 ### I don't have a web server.
 Then this exchange is not for you. It works by having two web servers make requests to each other.
 
-### My code doesn't run on a web server, but I have one on the other side of the Internet.
-Can you set up that web server to handle requests on your behalf? You would need a secure channel between yourself and the web server to pass POST requests and responses along.
-
-### I don't have my own web server, but could I use an external service to receive the TokenIssue request instead?
-As long as you trust that service and you have a secure channel between you and the service. If you don't trust it, or it's a service that publishes the contents of all incoming POST requests, that would not be a suitable service for this exchange. The body of the TokenIssue request will be secured thanks to TLS, but TLS only secures the traffic between the two end-points, not any additional step beyond the end-points.
-
-### What if I want to use an external service I don't necessarily trust?
-Exactly to support this arrangement, an earlier draft of this exchange included an AES key alongside the HMAC key. I omitted it for this version to simplify it, uncertain of its value. I am open to be persuaded that this would be a useful addition to this exchange.
-
-With this in place, if you (as the Initiator) make a POST request to an Issuer directly, you'd supply an AES key as well as an HMAC key, all freshly generated from a cryptographic-quality random source. The Issuer would send the TokenIssue request as before, but instead of sending it in the clear (albeit inside TLS), the TokenIssue request would be AES encrypted as well as HMAC signed. Only your code would be able to check the signature and decrypt the token inside.
-
-I removed this aspect as the TLS was already securing the token and having to co-ordinate both an AES key and the IV was complicating things.
-
-### Could an untrusted third party also handle being an Issuer?
-Perhaps, but if you can accept Bearer tokens once this exchange has completed, then you must already have a web server so you don't need a third party service to do this bit for you.
-
-If that statement is wrong, open an issue and persuade me.
-
-### Isn't the HmacKey key a pre-shared secret?
-If you like, but the scope is very different. For the Initiator, the bytes can be generated from the system random number generator only when needed and the key needs only to be stored in local memory without needing to store it externally. Once the exchange has completed the HMAC key can be discarded.
+### I have one on the other side of the Internet.
+If your server satisfies all of these properties, it would be useful for this exchange:
+- The server runs TLS with a known URL.
+- You can upload small files into a folder.
+- You control the filename, or you can know the filename before uploading.
+- No-one else can upload files to this folder.
 
 ### TLS supports client-side certificates.
-Indeed, but that would require secure storage of the private key that backs the client-side certificate. The point of this exchange is to use the pre-existing TLS certificates that you'll already have configured to facilitate the exchange to avoid having to securely store long-term secrets.
+To use client-side certificates, the client side would need access to the private key. This would need secure storage for the key, avoidance of which is the main motivation of this idea. 
 
 ### How long should a bearer token last until expiry?
 Up to you but (finger in the air) I'd go for an hour. If the exchange takes too long, remember you can do it in advance and have the Bearer token ready if needed.
@@ -269,57 +296,60 @@ If a connection to an untrusted TLS certificate is found, abandon the request an
 
 Since this exchange relies on a pre-existing relationship, you could perhaps allow for "pinned" TLS certificates to be configured.
 
-### Is the HMAC key needed?
-The risk of ignoring the HMAC signature is that an attacker could supply a bad Bearer token, or one belonging to someone else. If that's not a problem then you could ignore the HMAC signature but why not check it anyway?
-
-### What if generating a token is expensive?
-This is another feature I since removed from an earlier draft of this document and I'm open to be persuaded that it should be put back. The Initiator could, before making the TokenIssue request, send a "Verify" request first. At this step, the Issuer is asking the Initiator to confirm the request is genuine, including a short message signed with the HMAC to confirm the request is itself genuine.
-
-I removed that step in early development to simplify the exchange. Having just two web requests, one in each direction, had a nice symmetry. The main consideration was the realisation that issuing a token is fairly cheap. Both JWT and random strings can be generated without much computing power, especially compared to signing an HMAC and making another POST request.
-
-As the Issuer has a opportunity (in the response to the initial POST request) to withdraw an issued token, the Issuer could defer activating the generated token (perhaps saving it to a database) until after the Initiator has accepted it.
-
-### Why do the two participants have to a pre-existing relationship?
-This is another feature I removed since writing early drafts. 
-
-I wondered if this exchange could work as the only authentication system needed. I imagined signing up for some kind of service and registering by pasting in my own website domain as the only means of authentication. The service would go talk to the website on my domain, exchange tokens and I'm logged in. The TokenCall request would include a URL to return the signed token.
-
-This appealed to me, but there was a problem with that approach. Any doer-of-evil could come along to a website that implemented this exchange and cause that service to make a POST request to any URL they wanted on any domain. You couldn't control the request body but that might be enough to cause a problem. To resolve this, I wrote into the draft specification that the claimed URL should first be confirmed by GET-ing a `/.well-known/` file that lists all the URLs that implement this API.
-
-Wanting to simplify the basic specification, I instead changed this step to requiring a prior relationship and for the URL for the POST request to be pre-configured. Any complexity of establishing a relationship is set aside.
-
-I am open to discussing ways of adding mechanisms to use this method without a prior relationship.
-
 ### What if an attacker attempts to eavesdrop or spoof either request?"
-The attacker can't eavesdrop because TLS is securing the channel.
+The attacker can't eavesdrop or spoof because TLS is securing the channel.
 
-### What if an attacker sends a fake TokenCall request to an Issuer?
-The Issuer will generate a unasked-for Bearer token and send it to the real Initiator, who will reject it because it wasn't expecting one.
+### What if an attacker sends a fake POST request to an Issuer?
+The Issuer will attempt to retrieve a verification hash file from the Caller's website. As the Caller won't have a verification hash that matches the fake POST request, the attempt will fail.
 
-### Does it matter if the GUID is predictable?
-No. The security of the exchange is based on HMAC and TLS.
+### Does it matter if any part of the POST request is predictable?
+Only the value of the `Unus` property needs to be unpredictable. All of the other values may be completely predictable to an attacker because only one unpredictable element is enough to make the verification hash secure.
 
-### What if an attacker sends a fake TokenIssue request?
-If the Initiator isn't expecting an TokenIssue request, they won't have a HMAC key to check the signature, so can reject the request.
+### What if an attacker downloads a verification hash intended for a different issuer?
+To exploit knowing a verification hash, an attacker would need to build a valid JSON request body that resolves to that hash. As the value of the `Unus` property is included in the hash but not revealed to an attacker, the task is computationally unfeasable.
 
-If the Initiator *is* expecting an TokenIssue request, they will be able to test it came from the genuine Issuer by checking the HMAC signature. The attacker won't know how to generate a signature without the unpredictable Initiator's key.
+### What if a Caller sends a POST request to an Issuer, but that Issuer passes the request along to a different Issuer?
+An evil Issuer would first need to perform their replat attack before the `Now` timestamp gets too old, and also before the genuine Caller deletes their verification hash, having completed the transaction it was meant for.
 
-### What if an attacker floods either participants URLs with many fake requests?
-Suppose an attacker pretends to be a genuine Initiator and floods a known Issuer with many fake TokenCall requests. On this situation, the Issuer will generate and sign many tokens and pass them all to the real Initiator. The Initiator will reject them all because none of them will correspond to a known HMAC key.
+If those are not a problem, the second Issuer receiving a replayed request will find the verification hash matches, but will reject the request because it was for a different Issuer. It is for this reason it is important that the Issuer validates the request including rejecting requests with the wrong `IssuerUrl` property value.
 
-While the exchange prevents tokens from leaking to an attacker, the fact that a request will trigger a second request might be used as a denial-of-service attack. For this reason, it may be prudent for an Issuer to track IP address blocks with a history of making TokenCall requests that are not completed and reject subsequent TokenCall requests that originate from these blocks.
+### What if an attacker floods the POST request URL with many fake requests?
+For each attempted fake POST request, the Issuer will attempt to retrieve the verification hash. Since the genuine Caller does not publish hashes for these fake requests, the Issuer will reject these attempts.
 
-Similarly, as IP address tend to be stable, it may be prudent to record the IP addresses that successful exchanges have originated from in the past. Limit the zone of all other addresses to enough for an Initiator to unexpectantly move to a new IP but not so much that a flood opens up.
+The fact that a POST request will trigger a second GET request might be used as a denial-of-service attack. For this reason, it may be prudent for an Issuer to track IP address blocks with a history of making bad POST requests and rejecting subsequent requests that originate from these blocks.
 
-The Initiator's web service might also be flooded with fake TokenIssue requests, but in this case because an TokenIssue request doesn't trigger a second request, normal methods to deflect denial-of-service attackers would be sufficient.
+It may also be prudent to keep the POST URL secret, so attackers can't send in a flood of fake requests if they don't know where to send them. As this would only be a method to mitigate a denial-of-service attack, the secret URL doesn't have to be treated as secret needing secure storage. The URL could be set in a unencrypted config file and if it does leak, be replaced without urgency at the participant's convenience. The security of the exchange relies on TLS and the verification hash, not the secrecy of the URLs.
 
-It may also be prudent to keep the POST URLs secret, so attackers can't send in a flood of fake requests if they don't know where to send them. As this would only be a method to mitigate a denial-of-service attack, the secret URL doesn't have to be treated as secret needing secure storage. The URL could be set in a unencrypted config file and if it does leak, be replaced without urgency at the participant's convenience. The security of the exchange relies on TLS and the HMAC signature, not the secrecy of the URLs.
+### What if a malicious Caller causes the connect to retrieve the verification hash to stay open?
+[I am grateful to "buzer" of Hacker News for asking this question.](https://news.ycombinator.com/item?id=38110536)
+
+An attacker sets themselves up and confiigures their website to host verification hash files. However, instead of responding with veirification hashes, this website keeps the GET request open and never closes it. As a result, the Issuer server is left holding two TCP connections open - the original POST request and the GET request that won't end. If this happens many times it could cause a denial-of-service by the many opened connections being kept alive.
+
+We're used to web services making calls to databases or file systems and waiting for those external systems to respond before responding to its own received request. The difference in this scenario is that the external system we're waiting for is controlled by someone else who may be hostile.
+
+This could be mitigated by the Issuer configuring a low timeout for the request that fetches the verification hash. The allowed time only needs to be long enough to perform a single round of SHA256 and the usual roundtrip delay of a request. If the verification hash requests takes too long the overall transaction can be abandoned.
+
+Nonetheless, I have a separate proposal that will allow for the POST request to use a 202 "Accepted" response where the underlying connection can be closed and reopened later. Instead of keeping the POST request open, the Issuer can close the request and the Caller may reopen it at a later time.
+
+### Why does the SHA256 operation have a fixed salt?
+The fixed hash only appears in this document and does not go over the wire as a request is made, so any hash produced which passes validation must have been calculated by someone reading this document. Any hashes produced will have no value outside of this documented exchange.
+
+### What are the previous public drafts?
+
+- [Public Draft 1](https://github.com/billpg/CrossRequestTokenExchange/blob/22c67ba14d1a2b38c2a8daf1551f065b077bfbb0/README.md)
+  - Used two POST requests in opposite directions, with the second POST request acting as the response to the first.
+- [Public Draft 2](https://github.com/billpg/CrossRequestTokenExchange/blob/2165a661e093754e038620d3b2be1caeacb9eba0/README.md)
+  - Updated to allow a 202 "Accepted" response to the first POST request, avoiding to need to keep the connection open.
+  - I had a change of heart to this approach shortly after publishing it.
+- Public Draft 3 (This document)
+  - Substantial refactoring after realising the verification hash could be a unauthenticated GET request.
+  - Removed 202 responses after noting the inner GET request could have a very short timeout and deciding it could work as an independent proposal for any POST request.
 
 ## Next Steps
 
-This document is a draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using HMAC-SHA256 correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and HMAC is there to bring the two requests together. If you have any comments or notes, please raise an issue on this project's github.
+This document is a draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using SHA256 correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and SHA256 is there to bring the two requests together. If you have any comments or notes, please raise an issue on this project's github.
 
-In due course I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform the role of an Issuer by sending your API tokens on demand, as well as perform the role of an Initiator by asking your API for a token.
+In due course I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform the role of an Issuer by sending your API tokens on demand, as well as perform the role of a Caller by asking your API for a token.
 
 Ultimately, I hope to publish this as an RFC and establish it as a public standard.
 

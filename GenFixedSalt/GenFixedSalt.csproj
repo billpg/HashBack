@@ -7,9 +7,4 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\billpg.CrossRequestTokenExchange\billpg.CrossRequestTokenExchange.csproj" />
-    <ProjectReference Include="..\GenFixedSalt\GenFixedSalt.csproj" />
-  </ItemGroup>
-
 </Project>

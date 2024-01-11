@@ -1,3 +1,7 @@
+using Newtonsoft.Json.Linq;
+using System.Text;
+using System.Security.Cryptography;
+
 namespace billpg.CrossRequestTokenExchange
 {
     /// <summary>
@@ -7,10 +11,56 @@ namespace billpg.CrossRequestTokenExchange
     public static class CryptoHelpers
     {
         /// <summary>
-        /// Generate an HMAC key suitable for the CRTE process.
+        /// The fixed salt that will be prefixed to the JSON request body.
         /// </summary>
-        /// <returns>Generated HMAC key in BASE64.</returns>
-        public static string GenerateHmacKey()
+        public const string FIXED_SALT_AS_STRING 
+            = "EAHMPQJRZDKGNVOFSIBJCZGUQAFWKDBYEGHJRUZMKFYTQPOHADJBFEXTUWLYSZNC";
+
+        /// <summary>
+        /// Copy of the fixed salt in byte form.
+        /// </summary>
+        public static readonly IList<byte> FIXED_SALT =
+            System.Text.Encoding.ASCII.GetBytes(FIXED_SALT_AS_STRING)
+            .ToList().AsReadOnly();
+
+        /// <summary>
+        /// UTF-8's GetBytes, without returning a BOM..
+        /// </summary>
+        private static readonly Func<string,byte[]> GetUtf8Bytes
+            = new UTF8Encoding(false).GetBytes;
+
+        /// <summary>
+        /// Find the hash of the supplied JSON request body.
+        /// </summary>
+        /// <param name="requestBody"></param>
+        /// <returns></returns>
+        public static string HashRequestBody(JObject requestBody)
+        {
+            /* Rebuild JSON with properties in order, per RFC 8785. */
+            JObject sortedRequestBody = 
+                new JObject(
+                    requestBody
+                    .Properties()
+                    .OrderBy(prop => prop.Name));
+
+            /* Convert to string. (NewtonSoft does the right thing per RFC.) */
+            string requestBodyAsString = 
+                sortedRequestBody.ToString(Newtonsoft.Json.Formatting.None);
+
+            /* Convert string to UTF-8 bytes. */
+            var serializedBytes = GetUtf8Bytes(requestBodyAsString).ToList();
+
+            /* Append the fixed salt bytes. */
+            serializedBytes.AddRange(FIXED_SALT);
+
+            /* SHA256 the completed JSON+SALT. */
+            var hash = SHA256.HashData(serializedBytes.ToArray());
+
+            /* Return as a base-64 string. */
+            return Convert.ToBase64String(hash);
+        }
+ 
+        public static string GenerateUnus()
         {
             /* Generate 256 cryptographic quality random bits into a block of bytes. */
             using var rnd = System.Security.Cryptography.RandomNumberGenerator.Create();
@@ -19,28 +69,6 @@ namespace billpg.CrossRequestTokenExchange
 
             /* Encode those bytes as BASE64, including the trailing equals. */
             return Convert.ToBase64String(randomBytes);
-        }
-
-        /// <summary>
-        /// Sign a bearer token string using an HMAC key.
-        /// </summary>
-        /// <param name="hmacKey">Intiator's HMAC key encoded as BASE64.</param>
-        /// <param name="bearerToken">ASCII Bearer token to sign.</param>
-        /// <returns>Signature of bearer token signed using HMAC key and BASE64 encoded.</returns>
-        public static string SignBearerToken(string hmacKey, string bearerToken)
-        {
-            /* Convert the supplied key from BASE64 to bytes. */
-            var hmacKeyBytes = Convert.FromBase64String(hmacKey);
-
-            /* Convert the token into an array of ASCII bytes. */
-            var bearerTokenAsBytes = System.Text.Encoding.ASCII.GetBytes(bearerToken);
-
-            /* Sign the token. */
-            using var hmac = new System.Security.Cryptography.HMACSHA256(hmacKeyBytes);
-            var signature = hmac.ComputeHash(bearerTokenAsBytes);
-
-            /* Return the signature bytes in BASE64, including trailing =. */
-            return Convert.ToBase64String(signature);
         }
     }
 }
