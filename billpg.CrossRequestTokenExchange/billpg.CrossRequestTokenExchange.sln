@@ -12,6 +12,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UpdateReadme", "..\UpdateReadme\UpdateReadme.csproj", "{9865C97E-4D28-42C8-AB2D-62D6D3580BE7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "billpg.CrteDemo", "..\billpg.CrteDemo\billpg.CrteDemo.csproj", "{EAB450EB-F845-4C05-A5CB-90F5B60F1EC9}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GenFixedSalt", "..\GenFixedSalt\GenFixedSalt.csproj", "{1956C5B2-A7D2-452F-B86C-7B4FD34D1A61}"
 EndProject
 Global
@@ -28,6 +30,10 @@ Global
 		{9865C97E-4D28-42C8-AB2D-62D6D3580BE7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9865C97E-4D28-42C8-AB2D-62D6D3580BE7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9865C97E-4D28-42C8-AB2D-62D6D3580BE7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EAB450EB-F845-4C05-A5CB-90F5B60F1EC9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EAB450EB-F845-4C05-A5CB-90F5B60F1EC9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EAB450EB-F845-4C05-A5CB-90F5B60F1EC9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EAB450EB-F845-4C05-A5CB-90F5B60F1EC9}.Release|Any CPU.Build.0 = Release|Any CPU
 		{1956C5B2-A7D2-452F-B86C-7B4FD34D1A61}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{1956C5B2-A7D2-452F-B86C-7B4FD34D1A61}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1956C5B2-A7D2-452F-B86C-7B4FD34D1A61}.Release|Any CPU.ActiveCfg = Release|Any CPU

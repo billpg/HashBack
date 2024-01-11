@@ -1,0 +1,20 @@
+﻿<html>
+	<head>
+		<title>CrossRequestTokenExchange DEMO - Issuer.</title>
+	</head>
+	<body>
+		<h1>Issuer Demo.</h1>
+		<p>This is the issuer demo. This server will act as the <i>Issuer</i> while yours will act as the <i>Initiator</i>.</p>
+
+		<p>CRTE normally requires a pre-existing relationship between the two participants. As that won't be possible for this demo, please set up a <a href="/GrantPermission/"><tt>billpg-com-crte.json</tt></a> file on your website before starting.
+
+		<p>Once that file is in place, we need to know the URL to send the <i>TokenIssue</i> POST requests to. Fill this in here and click the Start button. The next page will return the URL on this server for you to send your POST request to.</p>
+	
+		<form method="POST" action="/Issue/Start/">
+			<table border="0" width="90%">
+				<tr><td>POST URL:</td><td><input name="TokenIssuePostUrl" width="80%" /></td></tr>
+				<tr><td>&nbsp;</td><td align="right"><input type="submit" value="Start"></td></tr>
+			</table>
+		</form>
+	</body>
+</html>
