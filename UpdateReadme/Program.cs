@@ -37,7 +37,13 @@ readmeLines[easterEggIndex] = "Authorization: Bearer " + GenerateEasterEggJWT();
 
 /* Look for the fixed salt. */
 int fixedSaltIndex = readmeLines.FindIndex(src => src.Contains("<!--FIXED_SALT-->"));
-readmeLines[fixedSaltIndex] = "   - \"" + fixedSalt + "\"<!--FIXED_SALT-->";
+readmeLines[fixedSaltIndex] = "     - `" + fixedSalt + "`<!--FIXED_SALT-->";
+
+/* Return the number of seconds since 1970 for the supplied timestamp. */
+long UnixTime(DateTime utc)
+{
+    return (long)(utc.ToUniversalTime() - DateTime.Parse("1970-01-01T00:00:00Z")).TotalSeconds;
+}
 
 void PopulateExample(string keyBase, DateTime issuedAt, string issuerUrl, string verifyUrl)
 {
@@ -45,8 +51,9 @@ void PopulateExample(string keyBase, DateTime issuedAt, string issuerUrl, string
     var requestJson = new JObject();
     requestJson["CrossRequestTokenExchange"] = "CRTE-PUBLIC-DRAFT-3";
     requestJson["IssuerUrl"] = issuerUrl;
-    requestJson["Now"] = issuedAt.ToString("s") + "Z";
-    requestJson["Unus"] = GenerateKeyFromString(keyBase);
+    requestJson["Now"] = UnixTime(issuedAt);
+    requestJson["Unus"] = GenerateUnus(keyBase);
+    requestJson["Rounds"] = 1;
     requestJson["VerifyUrl"] = verifyUrl;
     ReplaceJson($"<!--{keyBase}_REQUEST-->", requestJson);
 
@@ -58,7 +65,7 @@ void PopulateExample(string keyBase, DateTime issuedAt, string issuerUrl, string
     /* Build response JSON. */
     var responseJson = new JObject();
     responseJson["BearerToken"] = ToBearerToken(new Uri(verifyUrl).Host, new Uri(issuerUrl).Host, issuedAt, out DateTime expiresAt);
-    responseJson["ExpiresAt"] = $"{expiresAt:s}Z";
+    responseJson["ExpiresAt"] = UnixTime(expiresAt);
     ReplaceJson($"<!--{keyBase}_RESPONSE-->", responseJson);
 }
 
@@ -76,13 +83,13 @@ void ReplaceJson(string tag, JObject insert)
 
 PopulateExample(
     "1066_EXAMPLE", 
-    DateTime.Parse("1066-10-14T16:54:00Z"), 
+    DateTime.Parse("1986-10-09T23:00:00-04:00"), 
     "https://issuer.example/api/generate_bearer_token", 
     "https://caller.example/crte_files/C4C61859.txt");
 
 PopulateExample(
     "CASE_STUDY",
-    DateTime.Parse("1141-04-08T12:42:00Z"),
+    DateTime.Parse("2005-03-26T19:00:00Z"),
     "https://sass.example/api/login/crte",
     "https://carol.example/crte/64961859.txt");
 
@@ -120,12 +127,12 @@ string FindFileByName(string fileName)
     throw new Exception("Could not find " + fileName);
 }
 
-/* Create a random-looking string from a starting string. */
-string GenerateKeyFromString(string v)
+/* Create a random-looking 256-bit Base64 encoded string from a starting string. */
+string GenerateUnus(string v)
 {
     /* Hash the input string and return in hex. */
     using var sha = System.Security.Cryptography.SHA256.Create();
-    byte[] hash = sha.ComputeHash(System.Text.Encoding.ASCII.GetBytes(v));
+    byte[] hash = sha.ComputeHash(System.Text.Encoding.ASCII.GetBytes(v + "Unus"));
     return Convert.ToBase64String(hash);
 }
 
@@ -136,7 +143,7 @@ string ToBearerToken(string caller, string issuer, DateTime issuedAt, out DateTi
     long iat = As1970Seconds(issuedAt);
     long exp = As1970Seconds(expiresAt);
 
-    string jwtHeader = JWT64Encode(new JObject { ["typ"] = "JWT", ["alg"] = "HS256" });
+    string jwtHeader = JWT64Encode(new JObject { ["typ"] = "JWT", ["alg"] = "HS256", [""] = "billpg.com/nggyu" });
     string jwtBody = JWT64Encode(new JObject { ["sub"] = caller, ["iss"] = issuer, ["iat"] = iat, ["exp"] = exp });
     string jwtHeaderDotBody = jwtHeader + "." + jwtBody;
 

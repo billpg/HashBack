@@ -1,19 +1,16 @@
 # Cross Request Token Exchange
 An authentication exchange between two web services.
 
-This version of the document is a **public draft** for review and discussion and has been tagged as `CRTE-PUBLIC-DRAFT-3`. If you have any comments or notes, please open an issue on this project's public github.
+This version of the document is a **public draft** for review and discussion and when it ready will be tagged as `CRTE-PUBLIC-DRAFT-3`. If you have any comments or notes, please open an issue on this project's public github.
 
-This document is Copyright William Godfrey, 2023. You may use its contents under the terms of the Creative-Commons Attribution license.
+This document is Copyright William Godfrey, 2024. You may use its contents under the terms of the Creative-Commons Attribution license.
 
 ## The elevator pitch.
 
-- (Alice opens an HTTPS request to Bob.)
-  - "Hey Bob. I want to use your API but I need a Bearer token."
-- (Bob opens a separate HTTPS request back to Alice.)
-  - "Hey Alice. I've got this request for a Bearer token from someone claiming to be you."
-  - "That's me."
-- (Bob responds to Alice's original HTTPS request.)
-  - "Here's your Bearer token."
+- "Hey Bob. I want to use your API but I need a Bearer token."
+- "Hey Alice. I've got this request for a Bearer token from someone claiming to be you."
+- "Bob, that was me. Here's proof."
+- "Thank you Alice. Here's your Bearer token."
 
 Did you notice what **didn't** happen?
 
@@ -56,25 +53,28 @@ Once the Issuer is satisfied the POST request came from the genuine Caller, it w
 If the Issuer cannot confirm the POST request came from the genuine Caller or an error occurred during processing, the Issuer must instead respond with an applicable error. Some error responses are documented below.
 
 ### The POST Request Body JSON Object
-The request body is a single JSON object with string-valued properties only. All are required. The object must not use other properties except these and all properties must have a string value.
+The request body is a single JSON object. All properties are of string type except `Now` and `Rounds` which are integers. All properties are required and `null` is not an acceptable value for any. The object must not include other properties except these.
 
 - `CrossRequestTokenExchange`
   - This indicates which version of this exchange the Caller wishes to use.
   - This version of this document is specified by the value "CRTE-PUBLIC-DRAFT-3". 
     - See the error responses below for version negotiation.
 - `IssuerUrl`
-  - A copy of the full POST request URL, including "https://", full domain, port (if not 443), path and query string.
+  - A copy of the full POST request URL.
   - Because load balancers and CDN systems might modify the URL as POSTed to the service, a copy is included here so there's no doubt exactly which string was used in the verification hash.
   - The Issuer service must reject a request with the wrong URL as this may be an attacker attempting to re-use a request that was made for a different Issuer.
   - The value may instead be a string supplied by the Issuer service as part of a prior error response, using a value it would accept for this property. (See discussion of error responses below.)
 - `Now`
-  - The current UTC time in ISO format `yyyy-mm-ddThh:mm:ssZ`.
+  - The current UTC time, expressed as an integer of the number of seconds since the start of 1970.
   - The recipient service may reject this request if timestamp is too far from its current time. This document does not specify a threshold but instead this is left to the service's configuration. (Finger in the air - ten seconds.)
 - `Unus`
   - At least 256 bits of cryptographic-quality randomness, encoded in BASE-64 including trailing `=`.
   - This is to make reversal of the verification hash practically impossible.
   - The other JSON property values listed here are "predictable". The security of this exchange relies on this one value not being predictable.
   - I am English and I would prefer to not to name this property using a particular five letter word starting with N, as it has an unfortunate meaning in my culture.
+- 'Rounds'
+  - An integer specifying the number of PBKDF2 rounds used to produce the verification hash. 
+  - Must be a positive integer, at least 1.
 - `VerifyUrl`
   - An `https://` URL belonging to the Caller where the verification hash may be retrieved with a GET request.
   - The URL must be one that Issuer knows as belonging to a specific Caller user.
@@ -84,8 +84,9 @@ For example:<!--1066_EXAMPLE_REQUEST-->
 {
     "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-3",
     "IssuerUrl": "https://issuer.example/api/generate_bearer_token",
-    "Now": "1066-10-14T17:54:00Z",
-    "Unus": "L8FhCM4As+5wl6EWXrjlSxTVVB3L+xJ/Ad6khr1sjlI=",
+    "Now": 529297200,
+    "Unus": "iZ5kWQaBRd3EaMtJpC4AS40JzfFgSepLpvPxMTAbt6w=",
+    "Rounds": 1,
     "VerifyUrl": "https://caller.example/crte_files/C4C61859.txt"
 }
 ```
@@ -95,35 +96,39 @@ For example:<!--1066_EXAMPLE_REQUEST-->
 Once the Caller has built the request JSON, it will need to find its hash in a particular way, which the issuer will need to repeat in order to verify the request is genuine.
 
 The hash calculation takes the following steps.
-1. Convert the remaining JSON into its canonical representation of bytes per RFC 8785.
-2. Append the following salt bytes to the byte array immediately after the `}` byte. (The added bytes are 64 ASCII capital letters.)
-   - "EAHMPQJRZDKGNVOFSIBJCZGUQAFWKDBYEGHJRUZMKFYTQPOHADJBFEXTUWLYSZNC"<!--FIXED_SALT-->
-3. Hash the byte block including salt with a single round of SHA256.
-4. Encode the hash result using BASE-64, including the trailing equals.
+1. Convert the JSON request into its canonical representation of bytes per RFC 8785.
+2. Call PBKDF2 with the following parameters:
+   - Password: The JSON request's canonical representation.
+   - Salt: The following 64 ASCII bytes. (All ASCII capital letters.)
+     - `EAHMPQJRZDKGNVOFSIBJCZGUQAFWKDBYEGHJRUZMKFYTQPOHADJBFEXTUWLYSZNC`<!--FIXED_SALT-->
+   - Hash Algorithm: SHA256
+   - Rounds: The value specified in the JSON request under `Rounds`.
+   - Output: 256 bits.
+3. Encode the hash result using BASE-64, including the trailing `=` character.
 
-As all of the values are strings without control characters and all the JSON property names begin (by design) with a different capital letter, a simplified RFC 8785 generator could be used without needing to implement the full specification.
+(As all of the values are either integers or strings and all the JSON property names begin (by design) with a different capital letter, a simplified RFC 8785 generator could be used without needing to implement the full specification.)
 
 The fixed salt is used to ensure that a valid hash could only be calculated by reading this document. The salt string is not sent with the request so any hashes resulting could only be used for this exchange. [Generator code with commentary for fixed salt string.](https://github.com/billpg/CrossRequestTokenExchange/blob/898149500b36107f8943ac7024fc73772adfa9c0/GenFixedSalt/GenFixedSalt.cs)
 
 The hash file published under the URL listed in the JSON under `VerifyCallerUrl` is published under the type `text/plain`. The file must be one line with the BASE-64 encoded hash in ASCII as that only line. The file may end with CR, LF or CRLF bytes, or with no end-of-line byte sequence at all.
 
-The expected hash of the above "1066" example is: 
-- "Ikf/OavSWtD+1ictClEmYCQvi5nLEmwItE/ZipbmmAs="<!--1066_EXAMPLE_HASH-->
+The expected hash of the above example is: 
+- `BKG55yKpOGkdyMVVo5BgNpH64DiuIQ5KmhlLAeXYC7Y=`<!--1066_EXAMPLE_HASH-->
 
 ### 200 "Success" Response
-A 200 response will include the requested Bearer token and other useful details in a JSON response body. The JSON will have the following string properties, all required.
+A 200 response will include the requested Bearer token and other useful details in a JSON response body. The JSON will have the following  properties, both required.
 
 - `BearerToken`
   - This is the requested Bearer token. It must consist only of printable ASCII characters.
 - `ExpiresAt`
-  - The UTC expiry time of this Bearer token in ISO format. (yyyy-mm-ddThh:mm:ssZ)
+  - The UTC expiry time of this Bearer token, expressed as the number of seconds since the start of 1970.
 
 For example:<!--1066_EXAMPLE_RESPONSE-->
 ```
 Content-Type: application/json
 {
-    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjYWxsZXIuZXhhbXBsZSIsImlzcyI6Imlzc3Vlci5leGFtcGxlIiwiaWF0IjotMjg1MDI2OTA3NjAsImV4cCI6LTI4NTAyNjA3OTYwfQ.sKVdvXN9UmtvnddP4srO6ch65ieeLRG53sse_L_J3A4",
-    "ExpiresAt": "1066-10-15T16:54:00Z"
+    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIiI6ImJpbGxwZy5jb20vbmdneXUifQ.eyJzdWIiOiJjYWxsZXIuZXhhbXBsZSIsImlzcyI6Imlzc3Vlci5leGFtcGxlIiwiaWF0Ijo1MjkzMDA4MDAsImV4cCI6NTI5MzgzNjAwfQ.l9_tKGUcZxJJgSLOA_uvHKDCSocDMQX2yUC5mDzu7R0",
+    "ExpiresAt": 529383600
 }
 ```
 
@@ -133,16 +138,19 @@ As the recipient of this POST request, the Issuer will check the request is vali
 
 If the response body is JSON, there are a number of properties that describe how the request was unacceptable in a form that a computer could recognise and automatically resolve.
 
-The property `Error` is an array of strings in no particular order that describe how the request was unacceptable. If this property is missing then the response can't be automatically interpreted according to the rules of this document.
+The response property `Errors`, if present, must be a JSON object where the properties are named after the properties of the request JSON that the service does not accept. The value of each of these properties will be either:
+- `null` indicating the service has nothing to add other than that it finds that request property unacceptable.
+- A single string or integer, indicating the service would have accepted this value for that request property.
+- A JSON array of strings or integers, indicating the service would have accepted any one of these values for that request property.
 
-The optional property `Message`, if present, is a human-readable version of the reasons for rejecting this request.
+For example, the response `{"Errors": {"Now": null, "Rounds": [10,100]}}` indicates that the service does not accept the values of the `Now` and `Rounds` request properties, but also that it would have accepted 10 or 100 as possible values for `Rounds`.
 
-Note that the nature of a 400 error is that would be pointless repeating the request without first making a significant change to the request beyond moving the timestamp forward. 
+Note that the nature of a 400 error is that would be pointless repeating the request without first making a significant change to the request beyond moving the timestamp forward.
 
-#### `"Error": ["Version"]`
-This item indicates the service does not know about the version of this exchange listed in the request. The Caller should use the latest version of the protocol it knows about, but use this response to automatically retry with an earlier supported version, if there is one listed it understands.
+The response might indicate other issues with the request other than a simple complaint about a single request. In this case, the issue couldn't  be resolved by automatically repeating the request with new acceptable values. As such, the response should instead indicate what the problem is with enough detail for a human developer to resolve the issue. Cases such as rejecting because the verification hash doesn't match the expected hash would fall into this category.
 
-The response JSON property `AcceptVersion` is a JSON array of strings listing all the versions it knows about.
+#### `{"Errors": {"CrossRequestTokenExchange": ...}}`
+If the service complains about this particular request property, it is reporting that is doesn't know about that version of this exchange listed in the request. If the service returns a list of acceptable versions, the Caller should then select from that list the latest version of the protocol it knows about and try again.
 
 For example:
 ```
@@ -151,32 +159,32 @@ POST https://bob.example/api/BearerRequest
 
 400 Bad Request
 { 
-    "Message": "Unknown version. Use CRTE-PUBLIC-DRAFT-1 or CRTE-PUBLIC-DRAFT-3 instead.",
-    "Error": ["Version"],
-    "AcceptVersion": [ "CRTE-PUBLIC-DRAFT-1", "CRTE-PUBLIC-DRAFT-3"] 
+    "Message": "Unknown version. Use CRTE-PUBLIC-DRAFT-3 instead.",
+    "Errors": { "CrossRequestTokenExchange": [ "CRTE-PUBLIC-DRAFT-3" ] }
 }
 ```
 
-#### `"Error": ["Time"]`
+#### `"{Errors": {"Now": ...}}`
 This error indicates that the Issuer is rejecting the `Now` timestamp as too far from its current time. The presence of the timestamp in the request is to prevent use of known keys and hashes by expiring them.
 
-The service may include a JSON property `Now` in the error with the current UTC time on that server, such that if the request is reattempted immediately with this alternate timestamp, the Issuer service would accept it.
+If response offers an acceptable value, it likely reflects the server's own clock. If the request is reattempted immediately with this alternate timestamp, the Issuer service would accept it.
 
 For example:
 ```
 POST https://bob.example/api/BearerRequest
-{ ..., "Now": "1042-06-08T09:10:11Z", ... }
+{ ..., "Now": 1000000000, ... }
 
 400 Bad Request
 { 
     "Message": "Your clock, or mine, is wrongly set.",
-    "Error": ["Time"],
-    "Now": "1066-01-05T12:13:14Z"
+    "Errors": { "Now": 2000000000 }
 }
 ```
 
-#### `"Error": ["IssuerUrl"]`
-This error indicates the request was rejected becaue the supplied `RequestUrl` property was unacceptable. This check is to prevent requests made for a different issuer being reused. The response JSON must include a property also named `IssuerUrl` with a value that the Issuer service would find acceptable. The Caller may repeat the initial request with this alternate `IssuerUrl` value.
+#### `{"Errors": {"IssuerUrl": ...}}`
+This error indicates the request was rejected because the supplied `RequestUrl` property was unacceptable. The caller must supply the same URL that the POST request was made to and the receiving service must reject it if that URL is different from the one used.
+
+This check is to prevent requests made for a different issuer being reused. If the response JSON includes a not-null property value, it will be the value that the service would have accepted. The Caller may repeat the initial request with this alternate `IssuerUrl` value.
 
 For example:
 ```
@@ -185,19 +193,18 @@ POST https://bob.example.myproxy.example/api/BearerRequest
 
 400 Bad Request
 { 
-    "Message": "Unknown IssuerUrl.",
-    "Error": ["IssuerUrl"],
-    "IssuerUrl": "https://bob.example/"
+    "Message": "Wrong IssuerUrl value.",
+    "Errors": {"IssuerUrl": "https://bob.example/"}
 }
 ```
-#### `"Error": ["VerifyUrl"]`
-This error indicates the service can't process this request because it doesn't know any user linked to the supplied `VerifyUrl` property. 
 
-#### `"Error": ["Attention"]`
-This error indicate the request was rejected for a reason that requires developer or administrator attention. The response should include the specific reason in sufficient detail for an experienced developer to diagnose and fix the error. The Caller software might use this value to avoid automated retries that might have been possible for other codes listed in the `Error` array.
+#### `{"Errors": {"Rounds": ...}}`
+This response indicates the service doesn't accept the number of PBKDF2 rounds the caller has selected. A too-high value would represent a significant load on hardware while a too-low value might need to be rejected as enabling an attacker.
 
-#### `"Error": ["VerifyHash"]`
-This error indicates the expected hash was successfully retrieved from the URL listed in `VerifyUrl`, but it did not match the hash calculated from the JSON request. 
+If a service has an acceptable range and the caller selected a value outside this range, the acceptable values returned could be the highest and lowest values in that range, allowing the caller to select the one that's nearest their ideal. (The response could list every value in that range, but that would be a waste.)
+
+#### `{"Errors": {"VerifyUrl": null}}`
+This error indicates the service can't process this request because it doesn't know any user linked to the supplied `VerifyUrl` property. As it would be impossible to suggest an acceptable value without knowing who the caller is, `null` is the only reasonable value for this response property.
 
 ### 500 "Internal Server Error"
 This error, in addition to indicating errors on the server, may be used to indicate a failure to retrieve the expected hash from the `VerifyUrl` property. The service should use a 400 error if the URL is unknown or if it was successfully retrieved but doesn't match, but a 500 error is used to indicate a failure to retrieve that file.
@@ -239,14 +246,15 @@ Time passes and Carol needs to make a request to the Saas API and needs a Bearer
 {
     "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-3",
     "IssuerUrl": "https://sass.example/api/login/crte",
-    "Now": "1141-04-08T13:42:00Z",
-    "Unus": "JbfRDbPVV2lb0mQgLPIHP+dCdRBualxlVAXkf1FLV7Q=",
+    "Now": 1111863600,
+    "Unus": "TmDFGekvQ+CRgANj9QPZQtBnF077gAc4AeRASFSDXo8=",
+    "Rounds": 1,
     "VerifyUrl": "https://carol.example/crte/64961859.txt"
 }
 ```
 
 The code calculates the verification hash from this JSON by converting it to its canonical bytes, adding the fixed salt and hashing. The result of  hashing the above example is:
-- "f+l7IIDnFW44tz59hJRh9jEyk9Wwp2ohA1ka85FC1fA="<!--CASE_STUDY_HASH-->
+- "26edlsJM9WD9c/j49EaGXbFmSqMClGU0g6AnitR32Ys="<!--CASE_STUDY_HASH-->
 
 The hash is saved as a text file to her web file server using the random filename selected earlier. With this in place, the POST request can be sent to the SASS API.
 
@@ -257,12 +265,12 @@ Not yet knowing for sure if the request came from the real Carol or not, it make
 Satisfied the request is genuine, the Saas service generates a Bearer token and returns it to the caller as the response to the POST request, together with its expiry time.<!--CASE_STUDY_RESPONSE-->
 ```
 {
-    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjYXJvbC5leGFtcGxlIiwiaXNzIjoic2Fzcy5leGFtcGxlIiwiaWF0IjotMjYxNTIyODAyODAsImV4cCI6LTI2MTUyMTk3NDgwfQ.UA9Xinu2aYmyO1jWJ-04weloxsfNDIioOMR7P4QwM9I",
-    "ExpiresAt": "1141-04-09T12:42:00Z"
+    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIiI6ImJpbGxwZy5jb20vbmdneXUifQ.eyJzdWIiOiJjYXJvbC5leGFtcGxlIiwiaXNzIjoic2Fzcy5leGFtcGxlIiwiaWF0IjoxMTExODYzNjAwLCJleHAiOjExMTE5NDY0MDB9.D-4kaxZNAlX_xwexDKIhFYy0FiuLEc864zJUNSjHX2A",
+    "ExpiresAt": 1111946400
 }
 ```
 
-Carol may now delete the verification hash from her web server, or allow a housekeeping process to tidy it away. She may now use the issued Beaer token to call the Saas API until that token expires.
+Carol may now delete the verification hash from her web server, or allow a housekeeping process to tidy it away. She may now use the issued Bearer token to call the Saas API until that token expires.
 
 ```
 GET https://saas.example/api/status.json
@@ -306,7 +314,7 @@ The Issuer will attempt to retrieve a verification hash file from the Caller's w
 Only the value of the `Unus` property needs to be unpredictable. All of the other values may be completely predictable to an attacker because only one unpredictable element is enough to make the verification hash secure.
 
 ### What if an attacker downloads a verification hash intended for a different issuer?
-To exploit knowing a verification hash, an attacker would need to build a valid JSON request body that resolves to that hash. As the value of the `Unus` property is included in the hash but not revealed to an attacker, the task is computationally unfeasable.
+To exploit knowing a verification hash, an attacker would need to build a valid JSON request body that resolves to that hash. As the value of the `Unus` property is included in the hash but not revealed to an attacker, the task is computationally unfeasible.
 
 ### What if a Caller sends a POST request to an Issuer, but that Issuer passes the request along to a different Issuer?
 An evil Issuer would first need to perform their replat attack before the `Now` timestamp gets too old, and also before the genuine Caller deletes their verification hash, having completed the transaction it was meant for.
@@ -323,7 +331,7 @@ It may also be prudent to keep the POST URL secret, so attackers can't send in a
 ### What if a malicious Caller causes the connect to retrieve the verification hash to stay open?
 [I am grateful to "buzer" of Hacker News for asking this question.](https://news.ycombinator.com/item?id=38110536)
 
-An attacker sets themselves up and confiigures their website to host verification hash files. However, instead of responding with veirification hashes, this website keeps the GET request open and never closes it. As a result, the Issuer server is left holding two TCP connections open - the original POST request and the GET request that won't end. If this happens many times it could cause a denial-of-service by the many opened connections being kept alive.
+An attacker sets themselves up and configures their website to host verification hash files. However, instead of responding with verification hashes, this website keeps the GET request open and never closes it. As a result, the Issuer server is left holding two TCP connections open - the original POST request and the GET request that won't end. If this happens many times it could cause a denial-of-service by the many opened connections being kept alive.
 
 We're used to web services making calls to databases or file systems and waiting for those external systems to respond before responding to its own received request. The difference in this scenario is that the external system we're waiting for is controlled by someone else who may be hostile.
 
