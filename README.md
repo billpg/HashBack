@@ -58,15 +58,14 @@ The request body is a single JSON object. All properties are of string type exce
 - `CrossRequestTokenExchange`
   - This indicates which version of this exchange the Caller wishes to use.
   - This version of this document is specified by the value "CRTE-PUBLIC-DRAFT-3". 
-    - See the error responses below for version negotiation.
+  - See the section describing 400 error responses below for version negotiation.
 - `IssuerUrl`
   - A copy of the full POST request URL.
   - Because load balancers and CDN systems might modify the URL as POSTed to the service, a copy is included here so there's no doubt exactly which string was used in the verification hash.
   - The Issuer service must reject a request with the wrong URL as this may be an attacker attempting to re-use a request that was made for a different Issuer.
-  - The value may instead be a string supplied by the Issuer service as part of a prior error response, using a value it would accept for this property. (See discussion of error responses below.)
 - `Now`
   - The current UTC time, expressed as an integer of the number of seconds since the start of 1970.
-  - The recipient service may reject this request if timestamp is too far from its current time. This document does not specify a threshold but instead this is left to the service's configuration. (Finger in the air - ten seconds.)
+  - The recipient service should reject this request if timestamp is too far from its current time. This document does not specify a threshold but instead this is left to the service's configuration. (Finger in the air - ten seconds.)
 - `Unus`
   - At least 256 bits of cryptographic-quality randomness, encoded in BASE-64 including trailing `=`.
   - This is to make reversal of the verification hash practically impossible.
@@ -75,6 +74,7 @@ The request body is a single JSON object. All properties are of string type exce
 - 'Rounds'
   - An integer specifying the number of PBKDF2 rounds used to produce the verification hash. 
   - Must be a positive integer, at least 1.
+  - The Issuer service may request a different number of rounds if this value is too low or too high. See section describing 400 error responses below for negotiation of this number.
 - `VerifyUrl`
   - An `https://` URL belonging to the Caller where the verification hash may be retrieved with a GET request.
   - The URL must be one that Issuer knows as belonging to a specific Caller user.
@@ -110,7 +110,7 @@ The hash calculation takes the following steps.
 
 The fixed salt is used to ensure that a valid hash could only be calculated by reading this document. The salt string is not sent with the request so any hashes resulting could only be used for this exchange. [Generator code with commentary for fixed salt string.](https://github.com/billpg/CrossRequestTokenExchange/blob/898149500b36107f8943ac7024fc73772adfa9c0/GenFixedSalt/GenFixedSalt.cs)
 
-The hash file published under the URL listed in the JSON under `VerifyCallerUrl` is published under the type `text/plain`. The file must be one line with the BASE-64 encoded hash in ASCII as that only line. The file may end with CR, LF or CRLF bytes, or with no end-of-line byte sequence at all.
+The Caller must then publish this verification hash under the URL listed in the JSON with the type `text/plain`. The file itself must be one line with the BASE-64 encoded hash in ASCII as that only line. The file may end with CR, LF or CRLF bytes, or with no end-of-line byte sequence at all.
 
 The expected hash of the above example is: 
 - `BKG55yKpOGkdyMVVo5BgNpH64DiuIQ5KmhlLAeXYC7Y=`<!--1066_EXAMPLE_HASH-->
@@ -152,7 +152,7 @@ For example:
 ```
 
 #### 400 Response property `AcceptVersions`
-If the response includes this particular property, it is reporting that is doesn't know about that version of this exchange listed in the request. The property value will be a JSON array of version strings it does understand. If the requesting code understands many versions of this protocol, the Caller should make an initial request with its preferred version. If the recipient service doesn't know that version, the response should respond listing all the version is does know about. The Caller should finally select the most preferred version of the protocol it does know about from that list and start the initial request again.
+If the response includes this particular property, it is reporting that is doesn't know about that version of this exchange listed in the request. The property value will be a JSON array of version strings it does understand. If the requesting code understands many versions of this protocol, the Caller should make an initial request with its preferred version. If the recipient service doesn't know that version, the response should respond listing all the version is does know about. The Caller should finally select its most preferred version of the protocol it does know about from that list and start the initial request again.
 
 For example:
 ```
@@ -186,18 +186,20 @@ POST https://bob.example/api/BearerRequest
 ```
 
 ### Other errors.
-The service may response with any applicable standard HTTP error code in the event of an unexpected error. 
+The service may respond with any applicable standard HTTP error code in the event of an unexpected error. 
 
 # An extended example.
-**saas.example** is a website with an API designed for their customers to use. When a customer wishes to use this API, their code must first go through this exchange to obtain a Bearer token. The service publishes a document for how their customers cam do this, including that the URL to POST requests to is `https://saas.example/api/login/crte`.
+**SAAS** is a website with an API designed for their customers to use. When a customer wishes to use this API, their code must first go through this exchange to obtain a Bearer token. The service publishes a document for how their customers cam do this, including that the URL to POST requests to is `https://saas.example/api/login/crte`.
 
 **Carol** is a customer of Saas. She's recently signed up and logged into the Saas customer portal. On her authentication page under the CRTE section, she's configured her account affirming that `https://carol.example/crte/` is a folder under her sole control and where her verification hashes will be saved.
+
+## Making the request.
 
 Time passes and Carol needs to make a request to the Saas API and needs a Bearer token. Her code builds a JSON request:<!--CASE_STUDY_REQUEST-->
 ```
 {
     "CrossRequestTokenExchange": "CRTE-PUBLIC-DRAFT-3",
-    "IssuerUrl": "https://sass.example/api/login/crte",
+    "IssuerUrl": "https://saas.example/api/login/crte",
     "Now": 1111863600,
     "Unus": "TmDFGekvQ+CRgANj9QPZQtBnF077gAc4AeRASFSDXo8=",
     "Rounds": 1,
@@ -205,14 +207,39 @@ Time passes and Carol needs to make a request to the Saas API and needs a Bearer
 }
 ```
 
-The code calculates the verification hash from this JSON by converting it to its canonical bytes, adding the fixed salt and hashing. The result of  hashing the above example is:
-- "26edlsJM9WD9c/j49EaGXbFmSqMClGU0g6AnitR32Ys="<!--CASE_STUDY_HASH-->
+The code calculates the verification hash from this JSON using the process outlined above. The result of hashing the above example request is:
+- `26edlsJM9WD9c/j49EaGXbFmSqMClGU0g6AnitR32Ys=`<!--CASE_STUDY_HASH-->
 
-The hash is saved as a text file to her web file server using the random filename selected earlier. With this in place, the POST request can be sent to the SASS API.
+The hash is saved as a text file to her web file server using the random filename selected earlier. With this in place, the POST request can be sent to the SAAS API. The HTTP client library used to make the POST request will perform the necessary TLS handshake as part of making the connection.
 
-The Sass website receives this request and validates the request body, finding it valid. It then examines the value of the `VerifyUrl` property and finds an active user as owner of that URL, Carol.
+## Checking the request
+The SAAS website receives this request and validates the request body, performing the following checks:
+- The request arrived via HTTPS.  :heavy_check_mark:
+- The version string `CRTE-PUBLIC-DRAFT-3` is known.  :heavy_check_mark:
+- The `IssuerUrl` value is a URL belonging to itself - `saas.example`.  :heavy_check_mark:
+- The `Now` time-stamp is reasonably close to the server's internal clock.  :heavy_check_mark:
+- The `Unus` value represents 256 bits encoded in base-64.  :heavy_check_mark:
+- The `Rounds` value is within its acceptable 1-99 rounds.  :heavy_check_mark:
+- The `VerifyUrl` value is an HTTPS URL belonging to a known user - Carol.  :heavy_check_mark:
 
-Not yet knowing for sure if the request came from the real Carol or not, it makes a new GET request to retrieve that text file at the supplied URL. Once it arrives it compares the hash inside that file with the hash it calculated for itself from the request body. As the two hashes match, it concludes the request did genuinely come from Carol.
+(If the version or `Rounds` property was unacceptable, a 400 response might be used to negotaiate acceptable values. In this case, that won't be neccessary.)
+
+The service has passed the request for basic validity, but it still doesn't know if the request has genuinely come from Carol's service or not. To perform this step, it proceeds to check the verification hash.
+
+## Retrieval of the verification hash
+Having the URL to get the Caller's verification hash, the Issuer service performs a GET request for that URL. As part of the request, it makes the following checks:
+- The URL lists a valid domain name.  :heavy_check_mark:
+- The TLS handshake completes with a valid certificate.  :heavy_check_mark:
+- The GET response code is 200.  :heavy_check_mark:
+- The response's `Content-Type` is `text/plain`.  :heavy_check_mark:
+- The text, once CRLF endings have been trimmed, is 256 bits encoded in BASE-64.  :heavy_check_mark:
+
+(If any of these tests had failed, the specific error would be indicated in a 400 error response to the initial POST request. As the download was successful, that isn't needed.)
+
+Having sucessfully retrieved a verification hash, it must now find the expected hash from the original POST request body.
+
+## Checking the verification hash
+The Issuer service performs the same PBKDF2 operation on the JSON request that the Caller performed earlier. With both the retrieved verification hash and the internally calculated expected hash, the Issuer service may compare the two strings. If they don't match, the Issuer service would make a 400 response to the original POST request complaiming that the verification hash doesn't match the request body. In this case, they do indeed match and the Issuer is reassured that the Caller is actually Carol.
 
 Satisfied the request is genuine, the Saas service generates a Bearer token and returns it to the caller as the response to the POST request, together with its expiry time.<!--CASE_STUDY_RESPONSE-->
 ```
@@ -223,12 +250,6 @@ Satisfied the request is genuine, the Saas service generates a Bearer token and 
 ```
 
 Carol may now delete the verification hash from her web server, or allow a housekeeping process to tidy it away. She may now use the issued Bearer token to call the Saas API until that token expires.
-
-```
-GET https://saas.example/api/status.json
-Authorization: Bearer ihihihih
-```
-
 
 ## Answers to Anticipated Questions
 
