@@ -134,23 +134,25 @@ Content-Type: application/json
 
 ### 400 "Bad Request" Response
 
-As the recipient of this POST request, the Issuer will check the request is valid and conforms to its own requirements. If the request is unacceptable, the Issuer must respond with a 400 "Bad Request" response.
+As the recipient of this POST request, the Issuer will check the request is valid and conforms to its own requirements. If the request is unacceptable, the Issuer must respond with a 400 "Bad Request" response. The response body should include suffcient detail to assist an experienced developer to fix the problem. 
 
-If the response body is JSON, there are a number of properties that describe how the request was unacceptable in a form that a computer could recognise and automatically resolve.
+If the response body is JSON, some of the 400 response properties have particular documented meanings that Caller software might detect and automatically cause a reattempt of the initial POST request. This mechanism allows negotiation of version and the number of PBKDF2 rounds. (Note that any re-attempted request must use a fresh `Unus` value.)
 
-The response property `Errors`, if present, must be a JSON object where the properties are named after the properties of the request JSON that the service does not accept. The value of each of these properties will be either:
-- `null` indicating the service has nothing to add other than that it finds that request property unacceptable.
-- A single string or integer, indicating the service would have accepted this value for that request property.
-- A JSON array of strings or integers, indicating the service would have accepted any one of these values for that request property.
+Any problem with downloading or verifying the verification hash (referenced by the `VerifyUrl` property), should be reported back to the Caller in a 400 response. This includes on the successful download of the verification hash but it doesn't match the expected hash.
 
-For example, the response `{"Errors": {"Now": null, "Rounds": [10,100]}}` indicates that the service does not accept the values of the `Now` and `Rounds` request properties, but also that it would have accepted 10 or 100 as possible values for `Rounds`.
+#### 400 Response property `Message`.
+If the response is JSON and the response body includes a property named "Message", the value will be a string of human-readable text describing the problem in a form suitable for logging. The intent of the presence of this property is that the remainder of the response need not be logged or may be deemed as only intended for machine use. (The Caller software is of course free to log the entire response if the developer wishes.)
 
-Note that the nature of a 400 error is that would be pointless repeating the request without first making a significant change to the request beyond moving the timestamp forward.
+For example:
+```
+400 Bad Request
+{
+    "Message": "Your service at alice.example returned a 404 error."
+}
+```
 
-The response might indicate other issues with the request other than a simple complaint about a single request. In this case, the issue couldn't  be resolved by automatically repeating the request with new acceptable values. As such, the response should instead indicate what the problem is with enough detail for a human developer to resolve the issue. Cases such as rejecting because the verification hash doesn't match the expected hash would fall into this category.
-
-#### `{"Errors": {"CrossRequestTokenExchange": ...}}`
-If the service complains about this particular request property, it is reporting that is doesn't know about that version of this exchange listed in the request. If the service returns a list of acceptable versions, the Caller should then select from that list the latest version of the protocol it knows about and try again.
+#### 400 Response property `AcceptVersions`
+If the response includes this particular property, it is reporting that is doesn't know about that version of this exchange listed in the request. The property value will be a JSON array of version strings it does understand. If the requesting code understands many versions of this protocol, the Caller should make an initial request with its preferred version. If the recipient service doesn't know that version, the response should respond listing all the version is does know about. The Caller should finally select the most preferred version of the protocol it does know about from that list and start the initial request again.
 
 For example:
 ```
@@ -160,83 +162,33 @@ POST https://bob.example/api/BearerRequest
 400 Bad Request
 { 
     "Message": "Unknown version. Use CRTE-PUBLIC-DRAFT-3 instead.",
-    "Errors": { "CrossRequestTokenExchange": [ "CRTE-PUBLIC-DRAFT-3" ] }
+    "AcceptVersions": [ "CRTE-PUBLIC-DRAFT-3" ]
 }
 ```
 
-#### `"{Errors": {"Now": ...}}`
-This error indicates that the Issuer is rejecting the `Now` timestamp as too far from its current time. The presence of the timestamp in the request is to prevent use of known keys and hashes by expiring them.
+#### 400 Response Property `AcceptRounds`
+This response property indicates the service doesn't accept the number of PBKDF2 rounds the caller has selected. A too-high value would represent a significant load on hardware while a too-low value might need to be rejected as enabling an attacker.
 
-If response offers an acceptable value, it likely reflects the server's own clock. If the request is reattempted immediately with this alternate timestamp, the Issuer service would accept it.
+The property value is a number of rounds the service would accept. If the Caller accepts the responded number of rounds, it may repeat the request with the new number of rounds and a corresponding updated verification hash with the requested number of rounds.
+
+If a service has an acceptable range and the caller selected a value outside this range, the acceptable value returned could be the higher or lower thresholds, depending on which side of the acceptable range was requested.
 
 For example:
 ```
 POST https://bob.example/api/BearerRequest
-{ ..., "Now": 1000000000, ... }
+{ ..., "Rounds": 1, ... }
 
 400 Bad Request
 { 
-    "Message": "Your clock, or mine, is wrongly set.",
-    "Errors": { "Now": 2000000000 }
+    "Message": "We require the verification hash to have 99 to 999 rounds of PBKDF2.",
+    "AcceptRounds": 99
 }
 ```
-
-#### `{"Errors": {"IssuerUrl": ...}}`
-This error indicates the request was rejected because the supplied `RequestUrl` property was unacceptable. The caller must supply the same URL that the POST request was made to and the receiving service must reject it if that URL is different from the one used.
-
-This check is to prevent requests made for a different issuer being reused. If the response JSON includes a not-null property value, it will be the value that the service would have accepted. The Caller may repeat the initial request with this alternate `IssuerUrl` value.
-
-For example:
-```
-POST https://bob.example.myproxy.example/api/BearerRequest
-{ ..., "IssuerUrl": "https://bob.example.myproxy.example/api/BearerRequest", ... }
-
-400 Bad Request
-{ 
-    "Message": "Wrong IssuerUrl value.",
-    "Errors": {"IssuerUrl": "https://bob.example/"}
-}
-```
-
-#### `{"Errors": {"Rounds": ...}}`
-This response indicates the service doesn't accept the number of PBKDF2 rounds the caller has selected. A too-high value would represent a significant load on hardware while a too-low value might need to be rejected as enabling an attacker.
-
-If a service has an acceptable range and the caller selected a value outside this range, the acceptable values returned could be the highest and lowest values in that range, allowing the caller to select the one that's nearest their ideal. (The response could list every value in that range, but that would be a waste.)
-
-#### `{"Errors": {"VerifyUrl": null}}`
-This error indicates the service can't process this request because it doesn't know any user linked to the supplied `VerifyUrl` property. As it would be impossible to suggest an acceptable value without knowing who the caller is, `null` is the only reasonable value for this response property.
-
-### 500 "Internal Server Error"
-This error, in addition to indicating errors on the server, may be used to indicate a failure to retrieve the expected hash from the `VerifyUrl` property. The service should use a 400 error if the URL is unknown or if it was successfully retrieved but doesn't match, but a 500 error is used to indicate a failure to retrieve that file.
-
-If the response is JSON, it may contain the following string properties to indicate the error it encountered. None of these are required but if they are used in the response JSON it must have the following meanings.
-
-- "VerifyGetErrorReason"
-  - One of the following values indicating the nature of the error.
-    - "Network"
-      - A network level error, such as a failure to connect to the service.
-    - "TimedOut"
-      - The request took too long to process.
-    - "DNS"
-      - The service could not connect to the verification server due to a DNS lookup failure.
-    - "TLS"
-      - Could not negotiate TLS once connected.
-    - "HTTP"
-      - The response status code was not 200.
-    - "Type"
-      - The response's Content-Type was not `text/plain`.
-    - "Hash"
-      - The text content was not 256 bits encoded using BASE-64.
-- "VerifyGetErrorMessage"
-  - Human readable text describing the error in sufficient detail to diagnose the error.
-
-Note the response should not include content from the response from the verification URL, as this could be abused to turn an Issuer service into a proxy server.
 
 ### Other errors.
-The service may response with any standard HTTP error code in the event of an unexpected error. The response body should include sufficient detail for an experienced developer to understand the error.
+The service may response with any applicable standard HTTP error code in the event of an unexpected error. 
 
 # An extended example.
-
 **saas.example** is a website with an API designed for their customers to use. When a customer wishes to use this API, their code must first go through this exchange to obtain a Bearer token. The service publishes a document for how their customers cam do this, including that the URL to POST requests to is `https://saas.example/api/login/crte`.
 
 **Carol** is a customer of Saas. She's recently signed up and logged into the Saas customer portal. On her authentication page under the CRTE section, she's configured her account affirming that `https://carol.example/crte/` is a folder under her sole control and where her verification hashes will be saved.
