@@ -74,7 +74,7 @@ The request body is a single JSON object. All properties are of string type exce
   - This is to make reversal of the verification hash practically impossible.
   - The other JSON property values listed here are "predictable". The security of this exchange relies on this one value not being predictable.
   - I am English and I would prefer to not to name this property using a particular five letter word starting with N, as it has an unfortunate meaning in my culture.
-- 'Rounds'
+- `Rounds`
   - An integer specifying the number of PBKDF2 rounds used to produce the verification hash. 
   - Must be a positive integer, at least 1.
   - The Issuer service may request a different number of rounds if this value is too low or too high. See section describing 400 error responses below for negotiation of this number.
@@ -137,7 +137,7 @@ Content-Type: application/json
 
 ### 400 "Bad Request" Response
 
-As the recipient of this POST request, the Issuer will check the request is valid and conforms to its own requirements. If the request is unacceptable, the Issuer must respond with a 400 "Bad Request" response. The response body should include suffcient detail to assist an experienced developer to fix the problem. 
+As the recipient of this POST request, the Issuer will check the request is valid and conforms to its own requirements. If the request is unacceptable, the Issuer must respond with a 400 "Bad Request" response. The response body should include sufficient detail to assist an experienced developer to fix the problem. 
 
 If the response body is JSON, some of the 400 response properties have particular documented meanings that Caller software might detect and automatically cause a reattempt of the initial POST request. This mechanism allows negotiation of version and the number of PBKDF2 rounds. (Note that any re-attempted request must use a fresh `Unus` value.)
 
@@ -225,7 +225,7 @@ The SAAS website receives this request and validates the request body, performin
 - The `Rounds` value is within its acceptable 1-99 rounds.  :heavy_check_mark:
 - The `VerifyUrl` value is an HTTPS URL belonging to a known user - Carol.  :heavy_check_mark:
 
-(If the version or `Rounds` property was unacceptable, a 400 response might be used to negotaiate acceptable values. In this case, that won't be neccessary.)
+(If the version or `Rounds` property was unacceptable, a 400 response might be used to negotiate acceptable values. In this case, that won't be necessary.)
 
 The service has passed the request for basic validity, but it still doesn't know if the request has genuinely come from Carol's service or not. To perform this step, it proceeds to check the verification hash.
 
@@ -239,10 +239,10 @@ Having the URL to get the Caller's verification hash, the Issuer service perform
 
 (If any of these tests had failed, the specific error would be indicated in a 400 error response to the initial POST request. As the download was successful, that isn't needed.)
 
-Having sucessfully retrieved a verification hash, it must now find the expected hash from the original POST request body.
+Having successfully retrieved a verification hash, it must now find the expected hash from the original POST request body.
 
 ## Checking the verification hash
-The Issuer service performs the same PBKDF2 operation on the JSON request that the Caller performed earlier. With both the retrieved verification hash and the internally calculated expected hash, the Issuer service may compare the two strings. If they don't match, the Issuer service would make a 400 response to the original POST request complaiming that the verification hash doesn't match the request body. In this case, they do indeed match and the Issuer is reassured that the Caller is actually Carol.
+The Issuer service performs the same PBKDF2 operation on the JSON request that the Caller performed earlier. With both the retrieved verification hash and the internally calculated expected hash, the Issuer service may compare the two strings. If they don't match, the Issuer service would make a 400 response to the original POST request complaining that the verification hash doesn't match the request body. In this case, they do indeed match and the Issuer is reassured that the Caller is actually Carol.
 
 Satisfied the request is genuine, the Saas service generates a Bearer token and returns it to the caller as the response to the POST request, together with its expiry time.<!--CASE_STUDY_RESPONSE-->
 ```
@@ -263,7 +263,7 @@ They require management and secure storage. Your server-side code will need a wa
 Then this exchange is not for you. It works by having two web servers make requests to each other.
 
 ### I have a web server on the other side of the Internet but not the same machine.
-Your web site needs to be covered by TLS, and for your code to be able to publish a small static file to a folder on it. If you can be reasonably certain that no-one else can poublish files on that folder, it'll be suitable fpr this exchange.
+Your web site needs to be covered by TLS, and for your code to be able to publish a small static file to a folder on it. If you can be reasonably certain that no-one else can publish files on that folder, it'll be suitable for this exchange.
 
 ### TLS supports client-side certificates.
 To use client-side certificates, the client side would need access to the private key. This would need secure storage for the key, avoidance of which is the main motivation of this idea. 
@@ -280,7 +280,7 @@ If you want to allow for self-signed TLS certificates, wince this exchange relie
 The attacker can't eavesdrop or spoof because TLS is securing the channel.
 
 ### What if an attacker can predict the verification hash URL?"
-Let them. For an attacker to exploit knowing a current verification hash, they would need to be able to reverse that hash back into the original JSON request, including the unpredicatable `Unus` property. Reversing SHA256 (as part of PBKDF2) is considered practically impossible.
+Let them. For an attacker to exploit knowing a current verification hash, they would need to be able to reverse that hash back into the original JSON request, including the unpredictable `Unus` property. Reversing SHA256 (as part of PBKDF2) is considered practically impossible.
 
 ### What if an attacker sends a fake POST request to an Issuer?
 The Issuer will attempt to retrieve a verification hash file from the Verifier website. As there won't have a verification hash that matches the fake POST request, the attempt will fail.
@@ -292,7 +292,7 @@ Only the value of the `Unus` property needs to be unpredictable. All of the othe
 To exploit knowing a verification hash, an attacker would need to build a valid JSON request body that resolves to that hash. As the value of the `Unus` property is included in the hash but not revealed to an attacker, the task is practically impossible.
 
 ### What if a Caller sends a POST request to an Issuer, but that Issuer copies that the request along to a different Issuer?
-The second Issuer will reject the request becuase they will observe the `IssuerUrl` property of the request is for the first Issuer, not itself.
+The second Issuer will reject the request because they will observe the `IssuerUrl` property of the request is for the first Issuer, not itself.
 
 ### What if an attacker floods the POST request URL with many fake requests?
 Any number of fake requests will all be rejected by the Issuer because there will be no verification hash that matches the expected hash and the Issuer will not respond with a Bearer token without one.
