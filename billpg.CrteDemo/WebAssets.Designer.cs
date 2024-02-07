@@ -61,8 +61,15 @@ namespace billpg.CrteDemo {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to &quot;xxxx&quot; 
-        ///.
+        ///   Looks up a localized string similar to &lt;html&gt;
+        ///    &lt;head&gt;
+        ///        &lt;title&gt;Cross Request Token Exchange - Granting Permission.&lt;/title&gt;
+        ///    &lt;/head&gt;
+        ///    &lt;body&gt;
+        ///        &lt;h1&gt;Granting Permission.&lt;/h1&gt;
+        ///        &lt;p&gt;The CRTE protocol requires a pre-existing relationship between the two participants. As this demo needs to allow for passers-by to use it, this implemention requires a small JSON file to be added that effectively grants permission to this service to make POST requests to yours.&lt;/p&gt;
+        ///
+        ///        &lt;p&gt;This JSON file must be placed so that it can [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string GrantPermission {
             get {
@@ -79,9 +86,9 @@ namespace billpg.CrteDemo {
         ///		&lt;h1&gt;Issuer Demo.&lt;/h1&gt;
         ///		&lt;p&gt;This is the issuer demo. This server will act as the &lt;i&gt;Issuer&lt;/i&gt; while yours will act as the &lt;i&gt;Initiator&lt;/i&gt;.&lt;/p&gt;
         ///
-        ///		&lt;p&gt;CRTE normally requires a pre-existing relationship between the two participants. As that won&apos;t be possible for this demo, please set up a &lt;a href=&quot;/GrantPermission&quot;&gt;&lt;tt&gt;billpg-com-crte.json&lt;/tt&gt;&lt;/a&gt; file on your website before starting.
+        ///		&lt;p&gt;CRTE normally requires a pre-existing relationship between the two participants. As that won&apos;t be possible for this demo, please set up a &lt;a href=&quot;/GrantPermission/&quot;&gt;&lt;tt&gt;billpg-com-crte.json&lt;/tt&gt;&lt;/a&gt; file on your website before starting.
         ///
-        ///		&lt;p&gt;Once that file is [rest of string was truncated]&quot;;.
+        ///		&lt;p&gt;Once that file i [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string IssuerIndex {
             get {
@@ -90,19 +97,49 @@ namespace billpg.CrteDemo {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to /* CRTE DEMO CSS */
+        ///
+        ///.button {
+        ///    font: bold 20px Arial;
+        ///    text-decoration: none;
+        ///    background-color: #EEEEEE;
+        ///    color: #333333;
+        ///    padding: 2px 6px 2px 6px;
+        ///    border-top: 1px solid #CCCCCC;
+        ///    border-right: 1px solid #333333;
+        ///    border-bottom: 1px solid #333333;
+        ///    border-left: 1px solid #CCCCCC;
+        ///}
+        ///
+        ///.button:hover {
+        ///    background-color: #c2c7c7
+        ///}
+        ///.
+        /// </summary>
+        internal static string my_css {
+            get {
+                return ResourceManager.GetString("my_css", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to &lt;html&gt;
         ///&lt;head&gt;
         ///    &lt;title&gt;CrossRequestTokenExchange DEMO&lt;/title&gt;
-        ///&lt;/head&gt;
-        ///&lt;body&gt;
-        ///    &lt;h1&gt;Cross Request Token Exchange&lt;/h1&gt;
-        ///    &lt;p&gt;This website implements each side of the exchange, in a way that you can test against your own web service.&lt;/p&gt;
-        ///
-        ///    &lt;p&gt;See &lt;a href=&quot;https://github.com/billpg/CrossRequestTokenExchange&quot;&gt;this project&apos;s github&lt;/a&gt; for a full description of the exchange.&lt;/p&gt;
-        ///
-        ///    &lt;h2&gt;Issuer&lt;/h2&gt;
-        ///
-        ///    &lt;p&gt;This section is for your service to act as the &lt;b&gt;Initiator&lt;/b&gt; and this service will a [rest of string was truncated]&quot;;.
+        ///    &lt;style&gt;
+        ///        .button {
+        ///            font: bold 20px Arial;
+        ///            text-decoration: none;
+        ///            background-color: #EEEEEE;
+        ///            color: #333333;
+        ///            padding: 2px 6px 2px 6px;
+        ///            border-top: 1px solid #CCCCCC;
+        ///            border-right: 1px solid #333333;
+        ///            border-bottom: 1px solid #333333;
+        ///            border-left: 1px solid #CCCCCC;
+        ///        }
+        ///        .button:hover {
+        ///            bac [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string RootIndex {
             get {

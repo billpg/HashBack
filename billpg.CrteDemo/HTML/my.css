@@ -1,0 +1,24 @@
+/* CRTE DEMO CSS */
+
+.button {
+    font: bold 20px Arial;
+    text-decoration: none;
+    background-color: #EEEEEE;
+    color: #000000;
+    padding: 2px 6px 2px 6px;
+    border-top: 1px solid #CCCCCC;
+    border-right: 1px solid #333333;
+    border-bottom: 1px solid #333333;
+    border-left: 1px solid #CCCCCC;
+}
+
+.button:hover {
+    background-color: #c2c7c7
+}
+
+.apiurl {
+    font-size: large;
+    font-family: monospace;
+    background-color: #7777EE;
+    color: #000000;
+}

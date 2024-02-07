@@ -10,6 +10,8 @@ app.Urls.Add("http://localhost:3000");
 app.MapGetHtml("/", WebAssets.RootIndex);
 app.MapGetHtml("/Issuer/", WebAssets.IssuerIndex);
 app.MapGetHtml("/GrantPermission/", WebAssets.GrantPermission);
+app.MapResources("/Assets", typeof(WebAssets));
+app.MapPost("/Issuer/TokenCall", IssuerDemo.TokenCall);
 
 Console.WriteLine("Running.");
 app.Run();

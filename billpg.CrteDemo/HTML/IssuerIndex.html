@@ -1,20 +1,22 @@
 ﻿<html>
-	<head>
-		<title>CrossRequestTokenExchange DEMO - Issuer.</title>
-	</head>
+<head>
+	<title>CrossRequestTokenExchange DEMO - Issuer.</title>
+	<link rel="stylesheet" href="/Assets/my.css" />
+</head>
 	<body>
 		<h1>Issuer Demo.</h1>
-		<p>This is the issuer demo. This server will act as the <i>Issuer</i> while yours will act as the <i>Initiator</i>.</p>
+		<p>This is the issuer demo. This service will act as the <i>Issuer</i> while yours will act as the <i>Initiator</i>.</p>
 
-		<p>CRTE normally requires a pre-existing relationship between the two participants. As that won't be possible for this demo, please set up a <a href="/GrantPermission/"><tt>billpg-com-crte.json</tt></a> file on your website before starting.
+		<p>Have your service make a POST request according to <a href="https://github.com/billpg/CrossRequestTokenExchange/blob/main/README.md">the description in the project's github</a> to this URL:
 
-		<p>Once that file is in place, we need to know the URL to send the <i>TokenIssue</i> POST requests to. Fill this in here and click the Start button. The next page will return the URL on this server for you to send your POST request to.</p>
-	
-		<form method="POST" action="/Issue/Start/">
-			<table border="0" width="90%">
-				<tr><td>POST URL:</td><td><input name="TokenIssuePostUrl" width="80%" /></td></tr>
-				<tr><td>&nbsp;</td><td align="right"><input type="submit" value="Start"></td></tr>
-			</table>
-		</form>
+        <p class="apiurl">https://<Host />/Issuer/TokenCall</p>
+
+		<p>This request will include your URL to a hash of your JSON request. Please note that if this service detects a large number of failed requests, it will return a 429 error indicating its refusal to participate.</p>
+
+		<p>If the request is successful, the response will include a Bearer token. You may validate this token by using it with a GET request tp this URL:</p>
+
+		<p class="apiurl">https://<Host/>/Issuer/TokenTest</p>
+
+		<p>If you have any issues, please open a ticket in <a href="https://github.com/billpg/CrossRequestTokenExchange/">this project's github.</a></p>
 	</body>
 </html>
