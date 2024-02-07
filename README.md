@@ -5,8 +5,6 @@ This version of the document is a **public draft** for review and discussion and
 
 This document is Copyright William Godfrey, 2024. You may use its contents under the terms of the Creative-Commons Attribution license.
 
-I am currenty working on a substantial revision. Please read the draft in branch [public-draft-3](https://github.com/billpg/CrossRequestTokenExchange/tree/public-draft-3).
-
 ## The elevator pitch.
 
 - "Hey Bob. I want to use your API but I need a Bearer token."
