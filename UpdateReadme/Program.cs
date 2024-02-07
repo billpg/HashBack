@@ -6,7 +6,8 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 /* Call the GenFixedSalt EXE to get the fixed salt. */
-var psi = new ProcessStartInfo("./GenFixedSalt.exe");
+var fixedSaltExePath = FindFileByName("GenFixedSalt.exe");
+var psi = new ProcessStartInfo(fixedSaltExePath);
 psi.RedirectStandardOutput = true;
 var fixedSalt = Process.Start(psi).StandardOutput.ReadLine();
 
