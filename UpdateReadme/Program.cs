@@ -85,7 +85,7 @@ PopulateExample(
     "1066_EXAMPLE", 
     DateTime.Parse("1986-10-09T23:00:00-04:00"), 
     "https://issuer.example/api/generate_bearer_token", 
-    "https://caller.example/crte_files/C4C61859.txt");
+    "https://verifier.example/crte_files/C4C61859.txt");
 
 PopulateExample(
     "CASE_STUDY",
@@ -139,9 +139,9 @@ string GenerateUnus(string v)
 /* Convert a string into an example JWT. */
 string ToBearerToken(string caller, string issuer, DateTime issuedAt, out DateTime expiresAt)
 {
-    expiresAt = issuedAt.AddDays(1).ToUniversalTime();
-    long iat = As1970Seconds(issuedAt);
-    long exp = As1970Seconds(expiresAt);
+    expiresAt = issuedAt.ToUniversalTime().AddHours(1).ToUniversalTime();
+    long iat = UnixTime(issuedAt);
+    long exp = UnixTime(expiresAt);
 
     string jwtHeader = JWT64Encode(new JObject { ["typ"] = "JWT", ["alg"] = "HS256", [""] = "billpg.com/nggyu" });
     string jwtBody = JWT64Encode(new JObject { ["sub"] = caller, ["iss"] = issuer, ["iat"] = iat, ["exp"] = exp });
@@ -154,9 +154,6 @@ string ToBearerToken(string caller, string issuer, DateTime issuedAt, out DateTi
     string jwtFull = jwtHeaderDotBody + "." + jwtSig;
     return jwtFull;
 }
-
-long As1970Seconds(DateTime dt)
-    => (long)(dt - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
 
 string JWT64Encode(JObject j)
 {

@@ -24,7 +24,7 @@ namespace billpg.CrossRequestTokenExchange
             .ToList().AsReadOnly();
 
         /// <summary>
-        /// UTF-8's GetBytes, without returning a BOM..
+        /// UTF-8's GetBytes, without returning a BOM.
         /// </summary>
         private static readonly Func<string,byte[]> GetUtf8Bytes
             = new UTF8Encoding(false).GetBytes;
@@ -36,6 +36,9 @@ namespace billpg.CrossRequestTokenExchange
         /// <returns></returns>
         public static string HashRequestBody(JObject requestBody)
         {
+            /* Pull out the number of rounds from the JSON. */
+            int rounds = requestBody["Rounds"].Value<int>();
+
             /* Rebuild JSON with properties in order, per RFC 8785. */
             JObject sortedRequestBody = 
                 new JObject(
@@ -48,13 +51,16 @@ namespace billpg.CrossRequestTokenExchange
                 sortedRequestBody.ToString(Newtonsoft.Json.Formatting.None);
 
             /* Convert string to UTF-8 bytes. */
-            var serializedBytes = GetUtf8Bytes(requestBodyAsString).ToList();
+            var passwordBytes = GetUtf8Bytes(requestBodyAsString);
 
-            /* Append the fixed salt bytes. */
-            serializedBytes.AddRange(FIXED_SALT);
+            /* Run PBKDF2 over the JSON in byte form. */
+            var hash = Rfc2898DeriveBytes.Pbkdf2(
+                password: passwordBytes,
+                salt: FIXED_SALT.ToArray(),
+                hashAlgorithm: HashAlgorithmName.SHA256,
+                iterations: rounds,
+                outputLength: 256 / 8);
 
-            /* SHA256 the completed JSON+SALT. */
-            var hash = SHA256.HashData(serializedBytes.ToArray());
 
             /* Return as a base-64 string. */
             return Convert.ToBase64String(hash);
