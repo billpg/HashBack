@@ -12,16 +12,15 @@ var readmeOrigText = string.Join("\r\n", readmeLines);
 
 /* Call the GenFixedSalt EXE and its last-modified. */
 var fixedSaltExePath = FindFileByName("GenFixedSalt.exe");
-var exeLastModified = UnixTime(new FileInfo(fixedSaltExePath).LastWriteTimeUtc);
+var exeLastModified = UnixTime(new FileInfo(fixedSaltExePath).LastWriteTimeUtc).ToString();
 
 /* Pull out the last-modified from the readme. If they differ,
  * re-run the salt generator. */
-var lastModIndex = readmeLines.FindIndex(src => src.Contains("<!--SALT_GEN_LAST_MOD:"));
-var expectedLastMod = readmeLines[lastModIndex].Split(':')[1];
-if (expectedLastMod != exeLastModified.ToString())
+var expectedLastMod = File.ReadAllText("ExeExpectedLastMod.txt");
+if (expectedLastMod != exeLastModified)
 {
-    /* Replace the last-mod line in the README. */
-    readmeLines[lastModIndex] = "<!--SALT_GEN_LAST_MOD:" + exeLastModified + ":-->";
+    /* Replace the last-mod record. */
+    File.WriteAllText("ExeExpectedLastMod.txt", exeLastModified);
 
     /* Run the fixed salt generator. */
     var psi = new ProcessStartInfo(fixedSaltExePath);

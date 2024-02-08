@@ -4,7 +4,7 @@ An authentication exchange between two web services.
 This version of the document is a **public draft** for review and discussion and when it ready will be tagged as `CRTE-PUBLIC-DRAFT-3`. If you have any comments or notes, please open an issue on this project's public github.
 
 This document is Copyright William Godfrey, 2024. You may use its contents under the terms of the Creative-Commons Attribution license.
-<!--SALT_GEN_LAST_MOD:1707340887:-->
+
 ## The elevator pitch.
 
 - "Hey Bob. I want to use your API but I need a Bearer token."
@@ -86,7 +86,7 @@ The hash calculation takes the following steps.
 2. Call PBKDF2 with the following parameters:
    - Password: The JSON request's canonical representation.
    - Salt: The following 64 ASCII bytes. (All are ASCII capital letter bytes.)
-     - `EAHMPQJRZDKGNVOFSIBJCZGUQAFWKDBYEGHJRUZMKFYTQPOHADJBFEXTUWLYSZNC`<!--FIXED_SALT-->
+     - `LUGAXNWPDSFLHKCRBAJZQSGYWVDNBAECKFRMXTSUVHZKCEOQYGUDAVKXMICEQTGL`<!--FIXED_SALT-->
    - Hash Algorithm: SHA256
    - Rounds: The value specified in the JSON request under `Rounds`.
    - Output: 256 bits.
@@ -101,7 +101,7 @@ The fixed salt is used to ensure that a valid hash could only be calculated by r
 The Caller must then publish this verification hash under the URL listed in the JSON with the type `text/plain`. The file itself must be one line with the BASE-64 encoded hash in ASCII as that only line. The file may end with CR, LF or CRLF bytes, or with no end-of-line byte sequence at all.
 
 The expected hash of the above example is: 
-- "hrOMF+LDoBFw0e1WONlva7512zwTn6iDOQgrUVPIvKE="<!--1066_EXAMPLE_HASH-->
+- "mbE66RNmlr7X91xqmoYPdo5eGewLIZpAjZbay2dxyxg="<!--1066_EXAMPLE_HASH-->
 
 ### 200 "Success" Response
 A 200 response will include the requested Bearer token and other useful details in a JSON response body. The JSON will have the following  properties, both required.
@@ -212,7 +212,7 @@ Time passes and Carol needs to make a request to the Saas API and needs a Bearer
 ```
 
 The code calculates the verification hash from this JSON using the process outlined above. The result of hashing the above example request is:
-- "26edlsJM9WD9c/j49EaGXbFmSqMClGU0g6AnitR32Ys="<!--CASE_STUDY_HASH-->
+- "S0a3Err/82sKhCcRcHrM1JKeKYKqw43psPc4zFvfh+0="<!--CASE_STUDY_HASH-->
 
 The hash is saved as a text file to her web file server using the random filename selected earlier. With this in place, the POST request can be sent to the SAAS API. The HTTP client library used to make the POST request will perform the necessary TLS handshake as part of making the connection.
 
