@@ -14,7 +14,7 @@ namespace billpg.CrossRequestTokenExchange
         /// The fixed salt that will be prefixed to the JSON request body.
         /// </summary>
         public const string FIXED_SALT_AS_STRING 
-            = "LUGAXNWPDSFLHKCRBAJZQSGYWVDNBAECKFRMXTSUVHZKCEOQYGUDAVKXMICEQTGL";
+            = "UIGLMFVQXRDBTICYOVNZPXHLTAERDSCPWBUXMEIOARZPLBYVUITMNHWESQYJAZFU";
 
         /// <summary>
         /// Copy of the fixed salt in byte form.
