@@ -16,21 +16,14 @@ foreach (byte by in File.ReadAllBytes(ThisSourcePath()))
     if (by > 32 && by < 127 && by != 42)
         passwordBytes.Add(by);
 
-/* Distance to the moon and back in miles.
- * https://en.wikipedia.org/wiki/Lunar_distance_(astronomy) */
-const int distanceToTheMoonAndBackInMiles = 238854 * 2;
-
-/* A dedication. */
-const string dedication =
-    "Dedicated to my Treacle. I love you to the moon and back.";
-
 /* Call PBKDF2 for some deterministic yet random looking bytes. 
  * The first half is used to shuffle the alphabet while the second half is to
  * select letters from the shuffled alphabet to use in the fixed salt. */
 var bytes = new Queue<byte>(Rfc2898DeriveBytes.Pbkdf2(
     password: passwordBytes.ToArray(),
-    salt: Encoding.ASCII.GetBytes(dedication),
-    iterations: distanceToTheMoonAndBackInMiles,
+    salt: Encoding.ASCII.GetBytes(
+        "Dedicated to my Treacle. I love you to the moon and back."),
+    iterations: 238854 * 2,
     hashAlgorithm: HashAlgorithmName.SHA512,
     outputLength: 128));
 
@@ -41,13 +34,11 @@ var bytes = new Queue<byte>(Rfc2898DeriveBytes.Pbkdf2(
  * another copy of itself. */
 List<char> alphabet = new("THEQUICKBROWNFXJMPDVLAZYGS");
 
-/* Output collection. */
-var fixedHash = new StringBuilder();
-
 /* Keep looping until the bytes queue is exhausted. */
+var fixedHash = new StringBuilder();
 while (bytes.Any())
 {
-    /* Load a single index from the queue, 
+    /* Load a single index (0-15) from the queue, 
      * discarding the top four bits of each byte. */
     int index = bytes.Dequeue() % 16;
 
