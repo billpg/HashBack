@@ -4,7 +4,7 @@ An authentication exchange between two web services.
 This version of the document is a **public draft** for review and discussion and when it ready will be tagged as `CRTE-PUBLIC-DRAFT-3`. If you have any comments or notes, please open an issue on this project's public github.
 
 This document is Copyright William Godfrey, 2024. You may use its contents under the terms of the Creative-Commons Attribution license.
-
+<!--SALT_GEN_LAST_MOD:1707340887:-->
 ## The elevator pitch.
 
 - "Hey Bob. I want to use your API but I need a Bearer token."
@@ -23,7 +23,7 @@ A Bearer token is string of characters. It could be a signed JWT or a string of 
 
 ```
 POST /api/some/secure/api/
-Authorization: Bearer eyIiOiIifQ.eyJuZ2d5dSI6Imh0dHBzOi8vYmlsbHBnLmNvbS9uZ2d5dSJ9.nggyu
+Authorization: Bearer eyIiOiIifQ.eyIiOiJodHRwczovL2JpbGxwZy5jb20vbmdneXUifQ.nggyu
 { "Stuff": "Nonsense" }
 ```
 
@@ -36,7 +36,7 @@ There are two participants in this exchange:
 
 To request a Bearer token, the Caller will make a POST request to the Issuer requesting a Bearer token. Thanks to TLS, the Caller can be reassured they are talking to the genuine Issuer, but the Issuer doesn't yet know if the request came from the genuine Caller. To complete the loop, the JSON request will include a URL on the Caller's website which will contain a hash of the request JSON. Thanks again to TLS, the Issuer is reassured that the request came from the genuine Caller. The Issuer will now be able to respond to the initial POST request with an issued Bearer token.
 
-(Note that the initial POST request is kept open while the Issuer service retrieves the verifiation hash from the Caller's website. I am working on a separate proposal utilizing the HTTP status code 202 to allow an open request to be closed and reopened later.)
+(Note that the initial POST request is kept open while the Issuer service retrieves the verification hash from the Caller's website. I am working on a separate proposal utilizing the HTTP status code 202 to allow an open request to be closed and reopened later.)
 
 ### The POST Request Body JSON Object
 The request body is a single JSON object. All properties are of string type except `Now` and `Rounds` which are integers. (`Now` will need to be larger than 32 bits.) All properties are required and `null` is not an acceptable value for any of them. The object must not include other properties except these listed here.
@@ -73,7 +73,7 @@ For example:<!--1066_EXAMPLE_REQUEST-->
     "Now": 529297200,
     "Unus": "iZ5kWQaBRd3EaMtJpC4AS40JzfFgSepLpvPxMTAbt6w=",
     "Rounds": 1,
-    "VerifyUrl": "https://verifier.example/crte_files/C4C61859.txt"
+    "VerifyUrl": "https://caller.example/crte_files/my_json_hash.txt"
 }
 ```
 
@@ -92,7 +92,7 @@ The hash calculation takes the following steps.
    - Output: 256 bits.
 3. Encode the hash result using BASE-64, including the trailing `=` character.
 
-(A simplified RFC 8785 generator could be used, thanks to all of the values being simples integers or strings and all the JSON property names begining (by design) with a different capital letter.)
+(A simplified RFC 8785 generator could be used, thanks to all of the values being simples integers or strings and all the JSON property names beginning (by design) with a different capital letter.)
 
 The fixed salt is used to ensure that a valid hash could only be calculated by reading this document. The salt string is not sent with the request so any hashes resulting are only meaningful in light of this document.
 
@@ -101,7 +101,7 @@ The fixed salt is used to ensure that a valid hash could only be calculated by r
 The Caller must then publish this verification hash under the URL listed in the JSON with the type `text/plain`. The file itself must be one line with the BASE-64 encoded hash in ASCII as that only line. The file may end with CR, LF or CRLF bytes, or with no end-of-line byte sequence at all.
 
 The expected hash of the above example is: 
-- "JwcmBjyVvg/OfCgnwrI2MPZw4qNcHCEqHu4s30bT6OU="<!--1066_EXAMPLE_HASH-->
+- "hrOMF+LDoBFw0e1WONlva7512zwTn6iDOQgrUVPIvKE="<!--1066_EXAMPLE_HASH-->
 
 ### 200 "Success" Response
 A 200 response will include the requested Bearer token and other useful details in a JSON response body. The JSON will have the following  properties, both required.
@@ -115,7 +115,7 @@ For example:<!--1066_EXAMPLE_RESPONSE-->
 ```
 Content-Type: application/json
 {
-    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIiI6ImJpbGxwZy5jb20vbmdneXUifQ.eyJzdWIiOiJ2ZXJpZmllci5leGFtcGxlIiwiaXNzIjoiaXNzdWVyLmV4YW1wbGUiLCJpYXQiOjUyOTI5NzIwMCwiZXhwIjo1MjkzMDA4MDB9.pdHFOK66Ny50jz6LeGFrqdzmkbfDp9oUOk1PpSfo6RA",
+    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIiI6ImJpbGxwZy5jb20vbmdneXUifQ.eyJzdWIiOiJjYWxsZXIuZXhhbXBsZSIsImlzcyI6Imlzc3Vlci5leGFtcGxlIiwiaWF0Ijo1MjkyOTcyMDAsImV4cCI6NTI5MzAwODAwfQ.iHyEKvhvZBChSesrn4rdw-J1q6SimEfKZeBoYgfy87s",
     "ExpiresAt": 529300800
 }
 ```
@@ -143,7 +143,7 @@ For example:
 
 #### 400 Response property `IncidentID`
 
-If the response includes this property, the value will be a UUID that the service used to record the error. This may be used for an administrator to retrive logging from the request in order to investigate issues without including information that might constitute revealing privileged information to an unauthenticated agent.
+If the response includes this property, the value will be a UUID that the service used to record the error. This may be used for an administrator to retrieve logging from the request in order to investigate issues without including information that might constitute revealing privileged information to an unauthenticated agent.
 
 If used, the value must be a valid UUID using ASCII hex digits (capitals or lower case) and hyphen separators in their standard location. The UUID value must not use any delimiters other than those used by JSON.
 
@@ -154,6 +154,7 @@ For example:
     "Message": "There was a problem downloading the verification hash.",
     "IncidentID": "db8e215c-a7ee-5104-a3cd-5fc715dec19f"
 }
+```
 
 #### 400 Response property `AcceptVersions`
 If the response includes this particular property, it is reporting that is doesn't know about that version of this exchange listed in the request. The property value will be a JSON array of version strings it does understand. If the requesting code understands many versions of this protocol, the Caller should make an initial request with its preferred version. If the recipient service doesn't know that version, the response should respond listing all the version is does know about. The Caller should finally select its most preferred version of the protocol it does know about from that list and start the initial request again.

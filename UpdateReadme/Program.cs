@@ -5,40 +5,53 @@ using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
-/* Call the GenFixedSalt EXE to get the fixed salt. */
-var fixedSaltExePath = FindFileByName("GenFixedSalt.exe");
-var psi = new ProcessStartInfo(fixedSaltExePath);
-psi.RedirectStandardOutput = true;
-var fixedSalt = Process.Start(psi).StandardOutput.ReadLine();
-
-/* Does it match the string in CryptoHelper? */
-if (fixedSalt != CryptoHelpers.FIXED_SALT_AS_STRING)
-{
-    /* Rewrite CryptoHelpers.cs. */
-    string cryptoHelperPath = FindFileByName("CryptoHelpers.cs");
-    var cryptoLines = File.ReadAllLines(cryptoHelperPath).ToList();
-    int sourceIndex = cryptoLines.FindIndex(src => src.Contains("FIXED_SALT_AS_STRING"))+1;
-    var sourceLine = cryptoLines[sourceIndex].Split('"');
-    cryptoLines[sourceIndex] = sourceLine[0] + "\"" + fixedSalt + "\";";
-    File.WriteAllLines(cryptoHelperPath, cryptoLines);
-
-    /* Report update. */
-    Console.WriteLine("Updated CryptoHelper.cs. Rebuild and re-run.");
-    return;
-}
-
 /* Locate and load README.md into memory. */
 string readmePath = FindFileByName("README.md");
 var readmeLines = File.ReadAllLines(readmePath).ToList();
 var readmeOrigText = string.Join("\r\n", readmeLines);
 
+/* Call the GenFixedSalt EXE and its last-modified. */
+var fixedSaltExePath = FindFileByName("GenFixedSalt.exe");
+var exeLastModified = UnixTime(new FileInfo(fixedSaltExePath).LastWriteTimeUtc);
+
+/* Pull out the last-modified from the readme. If they differ,
+ * re-run the salt generator. */
+var lastModIndex = readmeLines.FindIndex(src => src.Contains("<!--SALT_GEN_LAST_MOD:"));
+var expectedLastMod = readmeLines[lastModIndex].Split(':')[1];
+if (expectedLastMod != exeLastModified.ToString())
+{
+    /* Replace the last-mod line in the README. */
+    readmeLines[lastModIndex] = "<!--SALT_GEN_LAST_MOD:" + exeLastModified + ":-->";
+
+    /* Run the fixed salt generator. */
+    var psi = new ProcessStartInfo(fixedSaltExePath);
+    psi.RedirectStandardOutput = true;
+    var fixedSalt = Process.Start(psi).StandardOutput.ReadLine();
+
+    /* Look for the fixed salt in the README. */
+    int fixedSaltIndex = readmeLines.FindIndex(src => src.Contains("<!--FIXED_SALT-->"));
+    readmeLines[fixedSaltIndex] = "     - `" + fixedSalt + "`<!--FIXED_SALT-->";
+
+    /* Does it match the string in CryptoHelper? */
+    if (fixedSalt != CryptoHelpers.FIXED_SALT_AS_STRING)
+    {
+        /* Rewrite CryptoHelpers.cs. */
+        string cryptoHelperPath = FindFileByName("CryptoHelpers.cs");
+        var cryptoLines = File.ReadAllLines(cryptoHelperPath).ToList();
+        int sourceIndex = cryptoLines.FindIndex(src => src.Contains("FIXED_SALT_AS_STRING")) + 1;
+        var sourceLine = cryptoLines[sourceIndex].Split('"');
+        cryptoLines[sourceIndex] = sourceLine[0] + "\"" + fixedSalt + "\";";
+        File.WriteAllLines(cryptoHelperPath, cryptoLines);
+
+        /* Report update. */
+        Console.WriteLine("Updated CryptoHelper.cs. Rebuild and re-run.");
+        return;
+    }
+}
+
 /* Look for the first use of a JWT. */
 int easterEggIndex = readmeLines.FindIndex(src => src.StartsWith("Authorization: Bearer ey"));
 readmeLines[easterEggIndex] = "Authorization: Bearer " + GenerateEasterEggJWT();
-
-/* Look for the fixed salt. */
-int fixedSaltIndex = readmeLines.FindIndex(src => src.Contains("<!--FIXED_SALT-->"));
-readmeLines[fixedSaltIndex] = "     - `" + fixedSalt + "`<!--FIXED_SALT-->";
 
 /* Return the number of seconds since 1970 for the supplied timestamp. */
 long UnixTime(DateTime utc)
@@ -86,7 +99,7 @@ PopulateExample(
     "1066_EXAMPLE", 
     DateTime.Parse("1986-10-09T23:00:00-04:00"), 
     "https://issuer.example/api/generate_bearer_token", 
-    "https://verifier.example/crte_files/C4C61859.txt");
+    "https://caller.example/crte_files/my_json_hash.txt");
 
 PopulateExample(
     "CASE_STUDY",
@@ -151,32 +164,26 @@ string ToBearerToken(string caller, string issuer, DateTime issuedAt, out DateTi
     using var hmac = System.Security.Cryptography.HMAC.Create("HMACSHA256");
     hmac.Key = System.Text.Encoding.ASCII.GetBytes("your-256-bit-secret");
     var hash = hmac.ComputeHash(System.Text.Encoding.ASCII.GetBytes(jwtHeaderDotBody));
-    string jwtSig = Convert.ToBase64String(hash).Replace('+','-').Replace('/','_').TrimEnd('=');
+    string jwtSig = JWT64EncodeBytes(hash);
     string jwtFull = jwtHeaderDotBody + "." + jwtSig;
     return jwtFull;
 }
 
 string JWT64Encode(JObject j)
-{
-    string jwtAsJson = j.ToString(Newtonsoft.Json.Formatting.None);
-    var jwtAsBytes = System.Text.Encoding.ASCII.GetBytes(jwtAsJson);
-    var jwtAs64 = Convert.ToBase64String(jwtAsBytes);
-    return jwtAs64.TrimEnd('=');
-}
+    => JWT64EncodeString(j.ToString(Newtonsoft.Json.Formatting.None));
+
+string JWT64EncodeBytes(byte[] bytes)
+    => Convert.ToBase64String(bytes).Replace('+', '-').Replace('/', '_').TrimEnd('=');
+
+string JWT64EncodeString(string jsonAsString)
+    => JWT64EncodeBytes(System.Text.Encoding.ASCII.GetBytes(jsonAsString));
 
 /* Generate a fake JWT with an easter egg. */
 string GenerateEasterEggJWT()
 {
-    string Encode(string s)
-    {
-        s = s.Replace('\'', '\"');
-        s = s.Replace('[', '{');
-        s = s.Replace(']', '}');
-
-        string base64 = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes(s)).TrimEnd('=');
-        return base64;
-    }
-
-    return Encode("['':'']") + "." + Encode($"['nggyu':'https://billpg.com/nggyu']") + ".nggyu";
-
+    return
+        JWT64Encode(new JObject { [""] = "" })
+        + "."
+        + JWT64Encode(new JObject { [""] = "https://billpg.com/nggyu" })
+        + ".nggyu";
 }
