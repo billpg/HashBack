@@ -6,14 +6,18 @@ This version of the document is a **public draft** for review and discussion and
 This document is Copyright William Godfrey, 2024. You may use its contents under the terms of the Creative-Commons Attribution license.
 
 ## The elevator pitch.
+(Alice calls Bob.)
 - "Hi Bob. I'm Alice."
 - "Prove it."
 - "You know my number. Call me back."
-
+               
+(Bob calls Alice.)
 - "Hi Alice. I'm Bob. Did you call me just now?"
 - "That was me."
 
-Did you notice what **didn't** happen? No-one needed a pre-shared key nor a shared secret.  While a recipient of a call *can't* be certain who a caller is, the caller *can* be certain of who they are calling. By both parties calling each other, both can be reassured of each other's identity.
+Did you notice what **didn't** happen? No-one needed a password, cryptographic tokens, or even recognizing each other's voice.
+
+While a recipient of a call *can't* be certain who a caller is, the caller *can* be certain of who they are calling. By both parties calling each other, both can be reassured of each other's identity.
 
 Now apply that thought to web authentication. The client can be sure (thanks to TLS) who the server is, but the server can't be sure who the client is, much like the analogy with phone calls. To perform a similar exchange for every single web request would be expensive, so this document specifies a one-off "call me back" exchange to supply the caller with a Bearer token, which the caller may use until it expires.
 
