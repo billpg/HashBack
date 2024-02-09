@@ -1,23 +1,25 @@
 # Cross Request Token Exchange
-An authentication exchange between two web services.
+A web authentication exchange where a caller proves their identity by publishing a hash value on their website.
 
 This version of the document is a **public draft** for review and discussion and when it ready will be tagged as `CRTE-PUBLIC-DRAFT-3`. If you have any comments or notes, please open an issue on this project's public github.
 
 This document is Copyright William Godfrey, 2024. You may use its contents under the terms of the Creative-Commons Attribution license.
 
 ## The elevator pitch.
-- "Hey Bob. I want to use your API but I need a Bearer token."
-- "Hey Alice. I've got this request for a Bearer token from someone claiming to be you."
-- "Bob, that was me. Here's proof."
-- "Thank you Alice. Here's your Bearer token."
+- "Hi Bob. I'm Alice."
+- "Prove it."
+- "You know my number. Call me back."
 
-Did you notice what **didn't** happen?
+- "Hi Alice. I'm Bob. Did you call me just now?"
+- "That was me."
 
-No-one needed a pre-shared key nor a shared secret. No-one needed a place to securely store them. The two web servers already have TLS set up and this is what enables the exchange to work.
+Did you notice what **didn't** happen? No-one needed a pre-shared key nor a shared secret.  While a recipient of a call *can't* be certain who a caller is, the caller *can* be certain of who they are calling. By both parties calling each other, both can be reassured of each other's identity.
 
-When you make an HTTPS request, thanks to TLS you can be sure who you are connecting to, but the service receiving the request can't be sure who the request is coming from. By using **two separate** HTTPS requests, the two web servers may perform a brief handshake and return a *Bearer* token.
+Now apply that thought to web authentication. The client can be sure (thanks to TLS) who the server is, but the server can't be sure who the client is, much like the analogy with phone calls. To perform a similar exchange for every single web request would be expensive, so this document specifies a one-off "call me back" exchange to supply the caller with a Bearer token, which the caller may use until it expires.
 
 ## What's a Bearer token?
+(You may skip this section if you are already familiar with this concept.)
+
 A Bearer token is string of characters. It could be a signed JWT or a string of randomness. If you know what that string is, you can include it any web request where you want to show who you are. The token itself is generated (or "issued") by the service that will accept that token later on as proof that you are who you say you are, because no-one else would have the token. 
 
 ```
@@ -26,9 +28,14 @@ Authorization: Bearer eyIiOiIifQ.eyIiOiJodHRwczovL2JpbGxwZy5jb20vbmdneXUifQ.nggy
 { "Stuff": "Nonsense" }
 ```
 
-That's basically it. It's like a password but very long and issued by the remote service. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Bearer tokens typically (but not always) have short life-times and you'd normally be given an expiry time along with the token itself. Cookies are a common variation of this.
+That's basically it. It's like a password but very long and issued by the remote service. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Bearer tokens typically (but not always) have short life-times and you'd normally be given an expiry time along with the token itself. Cookies are a common variation of this method.
 
 ## The Exchange
+- "Hey Bob. I want to use your API but I need a Bearer token."
+- "Hey Alice. I've got this request for a Bearer token from someone claiming to be you."
+- "Bob, that was me. Here's proof."
+- "Thank you Alice. Here's your Bearer token."
+
 There are two participants in this exchange:
 - The **Caller** is requesting a Bearer token and publishes proof it made that request.
 - The **Issuer** checks the proof and issues that Bearer token back to the Caller.
@@ -37,8 +44,8 @@ To request a Bearer token, the Caller will make a POST request to the Issuer req
 
 (Note that the initial POST request is kept open while the Issuer service retrieves the verification hash from the Caller's website. I am working on a separate proposal utilizing the HTTP status code 202 to allow an open request to be closed and reopened later.)
 
-### The POST Request Body JSON Object
-The request body is a single JSON object. All properties are of string type except `Now` and `Rounds` which are integers. (`Now` will need to be larger than 32 bits.) All properties are required and `null` is not an acceptable value for any of them. The object must not include other properties except these listed here.
+### The POST Request Body
+The request body is a single JSON object. All properties are of string type except `Now` and `Rounds` which are integers. (`Now` will need to be larger than 32 bits to continue working after 2038.) All properties are required and `null` is not an acceptable value for any of them. The object must not include other properties except these listed here.
 
 - `CrossRequestTokenExchange`
   - Confirms this is a request for a Bearer token and indicates which version of this exchange the Caller wishes to use.
@@ -76,14 +83,14 @@ For example:<!--1066_EXAMPLE_REQUEST-->
 }
 ```
 
-### Hash Calculation and Publication
+### Verification Hash Calculation and Publication
 
 Once the Caller has built the request JSON, it will need to find its hash in order to publish it on the Caller's website. The Issuer will also need to repeat this hashing process in order to verify the request is genuine.
 
 The hash calculation takes the following steps.
-1. Convert the JSON request into its canonical representation of bytes per RFC 8785.
+1. Convert the JSON request body into its canonical representation of bytes per RFC 8785.
 2. Call PBKDF2 with the following parameters:
-   - Password: The JSON request's canonical representation.
+   - Password: The JSON request body's canonical representation.
    - Salt: The following 64 ASCII bytes. (All are ASCII capital letter bytes.)
      - `LUGAXNWPDSFLHKCRBAJZQSGYWVDNBAECKFRMXTSUVHZKCEOQYGUDAVKXMICEQTGL`<!--FIXED_SALT-->
    - Hash Algorithm: SHA256
@@ -91,33 +98,45 @@ The hash calculation takes the following steps.
    - Output: 256 bits.
 3. Encode the hash result using BASE-64, including the trailing `=` character.
 
-(A simplified RFC 8785 generator could be used, thanks to all of the values being simples integers or strings and all the JSON property names beginning (by design) with a different capital letter.)
+(A simplified RFC 8785 generator could be used, thanks to all of the values being simple integers or strings and all the JSON property names beginning (by design) with a different capital letter.)
 
 The fixed salt is used to ensure that a valid hash could only be calculated by reading this document. The salt string is not sent with the request so any hashes resulting are only meaningful in light of this document.
 
-The salt string itself was generated by an attached C# program. This calls PBKDF2 but using its own source code as the password, together with a very high iteration count. After a little processing, the program outputs a string of 64 capital letters that was deterministicly derived.
+The salt string itself was generated by the attached C# program. This calls PBKDF2 but using its own source code as the password, together with a very high iteration count. After a little processing, the program outputs a string of 64 capital letters that was deterministically derived.
 
 [Please see the source code used to generate the fixed salt which includes commentary for how it works.](https://github.com/billpg/CrossRequestTokenExchange/blob/c263795f3251bda7372bd9cadbe5c6dc08ed41b5/UpdateReadme/GenFixedSalt/GenFixedSalt.cs)
 
-The Caller must then publish this verification hash under the URL listed in the JSON with the type `text/plain`. The file itself must be one line with the BASE-64 encoded hash in ASCII as that only line. The file may end with CR, LF or CRLF bytes, or with no end-of-line byte sequence at all.
+Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The text file itself must be one line with the BASE-64 encoded hash in ASCII as that only line. The file must either be exactly 44 bytes long with no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence.
 
 The expected hash of the above example is: 
-- "lf+wFoDDVQWs0y/RI1sorARXY12Ien9OXp5VrzSy8DQ="<!--1066_EXAMPLE_HASH-->
+- `lf+wFoDDVQWs0y/RI1sorARXY12Ien9OXp5VrzSy8DQ=`<!--1066_EXAMPLE_HASH-->
 
 ### 200 "Success" Response
-A 200 response will include the requested Bearer token and other useful details in a JSON response body. The JSON will have the following  properties, both required.
+A 200 response indicates the Issuer service is satisfied the POST request came from the genuine Caller. The response body includes the requested Bearer token and when that token expires. The JSON will have the following properties.
 
 - `BearerToken`
-  - This is the requested Bearer token. It must consist only of printable ASCII characters.
+  - Required not-nullable string.
+  - This is the requested Bearer token.
+  - Because Bearer tokens are sent in ASCII-only HTTP headers, it must consist only of printable ASCII characters.
+  - Note that while the examples in this document all use JWT, the token might use any format, including a string of random characters. The recipient should treat the token as an opaque string of characters unless agreed to separately from this document.
+- `IssuedAt`
+  - Optional or nullable integer.
+  - The UTC time this token was issued, expressed as an integer of the number of seconds since the start of 1970.
+  - If `null` or missing, the Issuer has chosen not to supply this information.
+  - This value is supplied for documentation and auditing purposes only. The recipient is not expected to make decisions based on the value of this token.
 - `ExpiresAt`
-  - The UTC expiry time of this Bearer token, expressed as the number of seconds since the start of 1970.
+  - Optional or nullable integer.
+  - The UTC expiry time of this Bearer token, expressed as an integer of the number of seconds since the start of 1970.
+  - If `null` or missing, the Issuer is not declaring a particular expiry. The token will last until a request is made that actively rejects it.
+  - A non-null value is advisory only. The issuer is neither guaranteeing the token will continue to work until it expires, nor that it will stop working once this expiry time has passed. 
 
 For example:<!--1066_EXAMPLE_RESPONSE-->
 ```
 Content-Type: application/json
 {
-    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIiI6ImJpbGxwZy5jb20vbmdneXUifQ.eyJzdWIiOiJjYWxsZXIuZXhhbXBsZSIsImlzcyI6Imlzc3Vlci5leGFtcGxlIiwiaWF0Ijo1MjkyOTcyMDAsImV4cCI6NTI5MzAwODAwfQ.iHyEKvhvZBChSesrn4rdw-J1q6SimEfKZeBoYgfy87s",
-    "ExpiresAt": 529300800
+    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIiI6ImJpbGxwZy5jb20vbmdneXUifQ.eyJzdWIiOiJjYWxsZXIuZXhhbXBsZSIsImlzcyI6Imlzc3Vlci5leGFtcGxlIiwiaWF0Ijo1MjkyOTcyMDEsImV4cCI6NTI5MzAwODAxfQ.ZuzMUxY1_Zv8duc5kvj5LVTd2B4A9oj4m8qPCMGi7os",
+    "IssuedAt": 529297201,
+    "ExpiresAt": 529300801
 }
 ```
 
@@ -138,15 +157,15 @@ For example:
 ```
 400 Bad Request
 {
-    "Message": "Your service at alice.example returned a 404 error."
+    "Message": "The service at alice.example returned a 404 error."
 }
 ```
 
 #### 400 Response property `IncidentID`
 
-If the response includes this property, the value will be a UUID that the service used to record the error. This may be used for an administrator to retrieve logging from the request in order to investigate issues without including information that might constitute revealing privileged information to an unauthenticated agent.
+If the response includes this property, the value will be a UUID that the service used to record the error. This may be used for an administrator to retrieve logging from the request in order to investigate issues without including information in the response that might constitute revealing privileged information to an unauthenticated agent.
 
-If used, the value must be a valid UUID using ASCII hex digits (capitals or lower case) and hyphen separators in their standard location. The UUID value must not use any delimiters other than those used by JSON.
+If used, the value must be a valid UUID using ASCII hex digits (capitals or lower case) and hyphens in their standard location.
 
 For example:
 ```
@@ -158,7 +177,7 @@ For example:
 ```
 
 #### 400 Response property `AcceptVersions`
-If the response includes this particular property, it is reporting that is doesn't know about that version of this exchange listed in the request. The property value will be a JSON array of version strings it does understand. If the requesting code understands many versions of this protocol, the Caller should make an initial request with its preferred version. If the recipient service doesn't know that version, the response should respond listing all the version is does know about. The Caller should finally select its most preferred version of the protocol it does know about from that list and start the initial request again.
+If the response includes this particular property, it is reporting that is doesn't know about that version of this exchange listed in the request. The property value will be a JSON array of version strings it does understand. If the requesting code understands many versions of this protocol, the Caller should make an initial request with its preferred version. If the recipient service doesn't know that version, the response should respond listing all the version is does know about. The Caller, if it knows versions other the one it initially selected, should finally select its most preferred version of the protocol it does know about from that list and start the initial request again.
 
 For example:
 ```
@@ -167,7 +186,7 @@ POST https://bob.example/api/BearerRequest
 
 400 Bad Request
 { 
-    "Message": "Unknown version. Use CRTE-PUBLIC-DRAFT-3 instead.",
+    "Message": "Unknown version. I only know CRTE-PUBLIC-DRAFT-3.",
     "AcceptVersions": [ "CRTE-PUBLIC-DRAFT-3" ]
 }
 ```
@@ -213,9 +232,9 @@ Time passes and Carol needs to make a request to the Saas API and needs a Bearer
 ```
 
 The code calculates the verification hash from this JSON using the process outlined above. The result of hashing the above example request is:
-- "G1OwGvkBVSSBlTLzuQeWmq6cK1WrW/o8JNaEZPL5h9c="<!--CASE_STUDY_HASH-->
+- `G1OwGvkBVSSBlTLzuQeWmq6cK1WrW/o8JNaEZPL5h9c=`<!--CASE_STUDY_HASH-->
 
-The hash is saved as a text file to her web file server using the random filename selected earlier. With this in place, the POST request can be sent to the SAAS API. The HTTP client library used to make the POST request will perform the necessary TLS handshake as part of making the connection.
+The hash is saved as a text file to her web server using the random filename selected earlier. With this in place, the POST request can be sent to the SAAS API. The HTTP client library used to make the POST request will perform the necessary TLS handshake as part of making the connection.
 
 ## Checking the request
 The SAAS website receives this request and validates the request body, performing the following checks:
@@ -237,7 +256,7 @@ Having the URL to get the Caller's verification hash, the Issuer service perform
 - The TLS handshake completes with a valid certificate.  :heavy_check_mark:
 - The GET response code is 200.  :heavy_check_mark:
 - The response's `Content-Type` is `text/plain`.  :heavy_check_mark:
-- The text, once CRLF endings have been trimmed, is 256 bits encoded in BASE-64.  :heavy_check_mark:
+- The text, once any CRLF bytes have been trimmed from the end, is 256 bits encoded in BASE-64.  :heavy_check_mark:
 
 (If any of these tests had failed, the specific error would be indicated in a 400 error response to the initial POST request. As the download was successful, that isn't needed.)
 
@@ -246,15 +265,17 @@ Having successfully retrieved a verification hash, it must now find the expected
 ## Checking the verification hash
 The Issuer service performs the same PBKDF2 operation on the JSON request that the Caller performed earlier. With both the retrieved verification hash and the internally calculated expected hash, the Issuer service may compare the two strings. If they don't match, the Issuer service would make a 400 response to the original POST request complaining that the verification hash doesn't match the request body. In this case, they do indeed match and the Issuer is reassured that the Caller is actually Carol.
 
-Satisfied the request is genuine, the Saas service generates a Bearer token and returns it to the caller as the response to the POST request, together with its expiry time.<!--CASE_STUDY_RESPONSE-->
+Satisfied the request is genuine, the Saas service generates a Bearer token and returns it to the caller as the response to the POST request, together with when it was issued and its expiry time.<!--CASE_STUDY_RESPONSE-->
+
 ```
 {
-    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIiI6ImJpbGxwZy5jb20vbmdneXUifQ.eyJzdWIiOiJjYXJvbC5leGFtcGxlIiwiaXNzIjoic2Fzcy5leGFtcGxlIiwiaWF0IjoxMTExODYzNjAwLCJleHAiOjExMTE4NjcyMDB9.v1MT1qsF_qpYKqKnlXkNJXqUgisweiIr-Tp92MybWjg",
-    "ExpiresAt": 1111867200
+    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIiI6ImJpbGxwZy5jb20vbmdneXUifQ.eyJzdWIiOiJjYXJvbC5leGFtcGxlIiwiaXNzIjoic2Fzcy5leGFtcGxlIiwiaWF0IjoxMTExODYzNjAxLCJleHAiOjExMTE4NjcyMDF9.C7PshUwZG6C-6jeDe32vIvx2NCoiyB4CU_oKrMRvzDM",
+    "IssuedAt": 1111863601,
+    "ExpiresAt": 1111867201
 }
 ```
 
-She may now use the issued Bearer token to call the Saas API until that token expires. Additionally, the verification hash can be deleted if she so wishes.
+She may now use the issued Bearer token to call the Saas API until that token expires. Additionally, the verification hash file can be deleted from the website if she so wishes.
 
 ## Answers to Anticipated Questions
 
@@ -267,14 +288,21 @@ Then this exchange is not for you. It works by having two web servers make reque
 ### I have a web server on the other side of the Internet but not the same machine.
 Your web site needs to be covered by TLS, and for your code to be able to publish a small static file to a folder on it. If you can be reasonably certain that no-one else can publish files on that folder, it'll be suitable for this exchange.
 
+### What sort of range should be allowed for identifying an `IssuerUrl` to a single user.
+I recommend keeping it tight to either a file inside a single folder or to a single URL with a single query string parameter.
+
+For example, if a user affirms they are in control of `https://example.com/crte/`, then allow `https://example.com/crte/1234.txt`, but reject any sub-folders or URLs with query strings. Similarly, if a user affirms they are in control of 'https://example.com/crte?ID=' then allow variations of URLs with that query string parameter changing, rejecting any requests with sub-folders or additional query string parameters.
+
+Ultimately, it is up to each pair of Caller and Issuer to agree what URLs identify that Caller. This document does not proscribe that scope.
+
 ### TLS supports client-side certificates.
-To use client-side certificates, the client side would need access to the private key. This would need secure storage for the key, avoidance of which is the main motivation of this idea. 
+To use client-side certificates, the client side would need access to the private key. This would need secure storage for the key which the caller code has access to. Avoidance of this is the main motivation of this exchange.
 
 ### How long should a bearer token last until expiry?
 Up to you but (finger in the air) I'd go for an hour. If the exchange takes too long, remember you can do it in advance and have the Bearer token ready if needed.
 
-### What if either web service uses a self-signed TLS certificate or one signed by an untrusted root?
-If a connection to an untrusted TLS certificate is found, abandon the request and maybe log an error. Fortunately, this is default of most HTTP client libraries.
+### What if either HTTP transaction uses a self-signed TLS certificate or one signed by an untrusted root?
+If a connection to an untrusted TLS certificate is found, abandon the request and maybe log an error. Fortunately, this is default of most (all?) HTTP client libraries.
 
 If you want to allow for self-signed TLS certificates, since this exchange relies on a pre-existing relationship, you could perhaps allow for "pinned" TLS certificates to be configured.
 
@@ -282,7 +310,15 @@ If you want to allow for self-signed TLS certificates, since this exchange relie
 The attacker can't eavesdrop or spoof because TLS is securing the channel.
 
 ### What if an attacker can predict the verification hash URL?"
-Let them. For an attacker to exploit knowing a current verification hash, they would need to be able to reverse that hash back into the original JSON request, including the unpredictable `Unus` property. Reversing SHA256 (as part of PBKDF2) is considered practically impossible.
+Let them.
+
+Suppose an attacker knows a current request's verification hash URL. They would be able to make that GET request and from that know the verification hash. Additionally, they could construct their own request for a Bearer token to the genuine Issuer, using the known `VerifyUrl` value with knowledge the genuine Caller's website will respond again to a second GET request with the known verification hash.
+
+To successfully perform this attack, the attacker will need to construct their request body such that its hash will match the verification hash, or else the Issuer service will reject the request. This will require finding the value of the `Unus` property which is unpredictable because it was generated from cryptographic-quality-randomness, sent over a TLS protected channel to the genuine Issuer, and is never reused. 
+
+For an attacker to exploit knowing a current verification hash, they would need to be able to reverse that hash back into the original JSON request, including the unpredictable `Unus` property.  Reversing SHA256 (as part of PBKDF2) is considered practically impossible.
+
+Nonetheless, it is trivial to make the verification hash URL unpredictable by using cryptographic-quality randomness and it may be considered prudent to do so. Any security analysis conducted on this exchange should assume the URL *is* predictable and thus the verification hash may be exposed to attackers.
 
 ### What if an attacker sends a fake POST request to an Issuer?
 The Issuer will attempt to retrieve a verification hash file from the Caller's website. As there won't have a verification hash that matches the fake POST request, the attempt will fail.
@@ -293,31 +329,45 @@ Only the value of the `Unus` property needs to be unpredictable. All of the othe
 ### What if an attacker downloads a verification hash intended for a different issuer?
 To exploit knowing a verification hash, an attacker would need to build a valid JSON request body that resolves to that hash. As the value of the `Unus` property is included in the hash but not revealed to an attacker, the task is practically impossible.
 
-### What if a Caller sends a POST request to an Issuer, but that Issuer copies that the request along to a different Issuer?
+### What if a Caller sends a legitimate POST request to an Issuer, but that Issuer copies that request along to a different Issuer?
 The second Issuer will reject the request because they will observe the `IssuerUrl` property of the request is for the first Issuer, not itself.
+
+For this reason it is important that Issuer services reject any requests with a URL other than one belonging to them, including "localhost" and similar. Services should also avoid trusting the value of the "Host" header when comparing the value of `IssuerUrl` against the expected URL, as attacking callers might be able to spoof this header.
 
 ### What if an attacker floods the POST request URL with many fake requests?
 Any number of fake requests will all be rejected by the Issuer because there will be no verification hash that matches the expected hash and the Issuer will not respond with a Bearer token without one.
 
 Despite this, the fact that a POST request will trigger a second GET request might be used as a denial-of-service attack. For this reason, it may be prudent for an Issuer to track IP address blocks with a history of making bad POST requests and rejecting subsequent requests that originate from these blocks.
 
-This exchange normally requires a pre-existing relationship between the participants, but it isn't unreasonable to suppose that open Issuer services exist that will take POST requests with any URL as the `VerifyUrl` property value. These should, to avoid being a participant in a denial-of-service attack, keep track of which Verification services have a history of having any result other than returning a correct verification hash. A web site that isn't participating in this exchange might nonetheless have a public folder of text files that are exactly the right length for a verification hash, but only ones that match the expected hash will be willing participants.
+This exchange normally requires a pre-existing relationship between the participants, but it isn't unreasonable to suppose that open Issuer services exist that will take POST requests with any valid URL as the `VerifyUrl` property value. These should, to avoid being a participant in a denial-of-service attack, keep track of which `VerifyUrl` domains and IPs have a history of having any result other than returning a correct verification hash. A web site that isn't participating in this exchange might nonetheless have a public folder of text files that are exactly the right length for a verification hash, but only ones that match the expected hash will be willing participants.
 
 It may also be prudent to keep the POST URL secret, so attackers can't send in a flood of fake requests if they don't know where to send them. As this would only be a method to mitigate a denial-of-service attack, the secret URL doesn't have to be treated as secret needing secure storage. The URL could be set in a unencrypted config file and if it does leak, be replaced without urgency at the participant's convenience. The security of the exchange relies on TLS and the verification hash, not the secrecy of the URLs.
 
-### What if a malicious Caller causes the connect to retrieve the verification hash to stay open?
+### What if there's a website that will host files from anyone?
+Maybe don't claim that website as one that you have exclusive control over.
+
+At its a core, a Bearer token issued by this exchange is the result of someone who was able to demonstrate control of a particular URL. If the group of people who have that control is "anyone" than that's who the Bearer token is identifying you as.
+
+### What if a malicious Caller supplies a verification URL that keeps the request open?
 [I am grateful to "buzer" of Hacker News for asking this question.](https://news.ycombinator.com/item?id=38110536)
 
-An attacker sets themselves up and configures their website to host verification hash files. However, instead of responding with verification hashes, this website keeps the GET request open and never closes it. As a result, the Issuer server is left holding two TCP connections open - the original POST request and the GET request that won't end. If this happens many times it could cause a denial-of-service by the many opened connections being kept alive.
+Suppose an attacker sets themselves up and configures their website to host verification hash files. However, instead of responding with verification hashes, this website keeps the GET request open and never closes it. As a result, the Issuer server is left holding two TCP connections open - the original POST request and the GET request that won't end. If this happens many times it could cause a denial-of-service by the many opened connections being kept alive.
 
 We're used to web services making calls to databases or file systems and waiting for those external systems to respond before responding to its own received request. The difference in this scenario is that the external system we're waiting for is controlled by someone else who may be hostile.
 
-This could be mitigated by the Issuer configuring a low timeout for the request that fetches the verification hash. The allowed time only needs to be long enough to perform the hash and the usual roundtrip overhead of a request. If the verification hash requests takes too long the overall transaction can be abandoned.
+This can be mitigated by the Issuer configuring a low timeout for the request that fetches the verification hash. The allowed time only needs to be long enough to perform the hash and the usual roundtrip overhead of a request. If the verification hash requests takes too long the overall transaction can be abandoned.
 
 Nonetheless, I have a separate proposal that will allow for the POST request to use a 202 "Accepted" response where the underlying connection can be closed and reopened later. Instead of keeping the POST request open, the Issuer can close the request and the Caller may reopen it at a later time.
 
 ### Why does the PBKDF2 operation have a fixed salt?
 The fixed hash only appears in this document and does not go over the wire as a request is made, so any hash produced which passes validation must have been calculated by someone reading this document. Any hashes produced will have no value outside of this documented exchange.
+
+### Why use PBKDF2 at all?
+PBKDF2 (which wraps SHA256) is used to allow for additional rounds of hashing to make an attack looking for a JSON string that hashes to a known verification hash much harder.
+
+I don't think this is necessary (indeed, most of the examples in this document use `"Rounds":1`) because the `Unus` property is already 256 bits of unpredictable cryptographic quality randomness. For an attack exercising knowledge of a verification hash, looping through all possible `Unus` values, is already a colossally impractical exercise, even without additional rounds of PBKDF2. A previous draft of this proposal used a single round of SHA256, but I ultimately switched to PBKDF2 to allow for added rounds without needing a substantially updated new version of this protocol and for all implementations needing significant updates. For now, I'm going to continue using 1 as the default number of rounds. 
+
+As this proposal is still in the public-draft phase, I am open to be persuaded that PBKDF2 is not needed and a single round of SHA256 is quite sufficient thank you very much. I'm also open to be persuaded that the default number of rounds needs to be significantly higher.
 
 ### What are the previous public drafts?
 

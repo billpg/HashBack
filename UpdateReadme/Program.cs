@@ -58,13 +58,13 @@ long UnixTime(DateTime utc)
     return (long)(utc.ToUniversalTime() - DateTime.Parse("1970-01-01T00:00:00Z")).TotalSeconds;
 }
 
-void PopulateExample(string keyBase, DateTime issuedAt, string issuerUrl, string verifyUrl)
+void PopulateExample(string keyBase, DateTime now, string issuerUrl, string verifyUrl)
 {
     /* Build request JSON. */
     var requestJson = new JObject();
     requestJson["CrossRequestTokenExchange"] = "CRTE-PUBLIC-DRAFT-3";
     requestJson["IssuerUrl"] = issuerUrl;
-    requestJson["Now"] = UnixTime(issuedAt);
+    requestJson["Now"] = UnixTime(now);
     requestJson["Unus"] = GenerateUnus(keyBase);
     requestJson["Rounds"] = 1;
     requestJson["VerifyUrl"] = verifyUrl;
@@ -73,11 +73,13 @@ void PopulateExample(string keyBase, DateTime issuedAt, string issuerUrl, string
     /* Insert the hash of the above JSON into the readme. */
     string hash1066 = CryptoHelpers.HashRequestBody(requestJson);
     int hash1066Index = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_HASH-->"));
-    readmeLines[hash1066Index] = $"- \"{hash1066}\"<!--{keyBase}_HASH-->";
+    readmeLines[hash1066Index] = $"- `{hash1066}`<!--{keyBase}_HASH-->";
 
     /* Build response JSON. */
+    DateTime issuedAt = now.AddSeconds(1);
     var responseJson = new JObject();
     responseJson["BearerToken"] = ToBearerToken(new Uri(verifyUrl).Host, new Uri(issuerUrl).Host, issuedAt, out DateTime expiresAt);
+    responseJson["IssuedAt"] = UnixTime(issuedAt);
     responseJson["ExpiresAt"] = UnixTime(expiresAt);
     ReplaceJson($"<!--{keyBase}_RESPONSE-->", responseJson);
 }
@@ -160,7 +162,7 @@ string ToBearerToken(string caller, string issuer, DateTime issuedAt, out DateTi
     string jwtBody = JWT64Encode(new JObject { ["sub"] = caller, ["iss"] = issuer, ["iat"] = iat, ["exp"] = exp });
     string jwtHeaderDotBody = jwtHeader + "." + jwtBody;
 
-    using var hmac = System.Security.Cryptography.HMAC.Create("HMACSHA256");
+    using var hmac = new System.Security.Cryptography.HMACSHA256();
     hmac.Key = System.Text.Encoding.ASCII.GetBytes("your-256-bit-secret");
     var hash = hmac.ComputeHash(System.Text.Encoding.ASCII.GetBytes(jwtHeaderDotBody));
     string jwtSig = JWT64EncodeBytes(hash);
