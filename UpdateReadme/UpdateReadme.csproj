@@ -8,7 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\billpg.CrossRequestTokenExchange\billpg.CrossRequestTokenExchange.csproj" />
+    <Compile Remove="GenFixedSalt\**" />
+    <EmbeddedResource Remove="GenFixedSalt\**" />
+    <None Remove="GenFixedSalt\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
 </Project>

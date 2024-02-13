@@ -2,6 +2,7 @@
  * signatures using the crypto-helper functions. */
 using billpg.CrossRequestTokenExchange;
 using Newtonsoft.Json.Linq;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 /* Locate and load README.md into memory. */
@@ -9,50 +10,125 @@ string readmePath = FindFileByName("README.md");
 var readmeLines = File.ReadAllLines(readmePath).ToList();
 var readmeOrigText = string.Join("\r\n", readmeLines);
 
+/* Call the GenFixedSalt EXE and its last-modified. */
+var fixedSaltExePath = FindFileByName("GenFixedSalt.exe");
+var exeLastModified = UnixTime(new FileInfo(fixedSaltExePath).LastWriteTimeUtc).ToString();
+
+/* Pull out the last-modified from the readme. If they differ,
+ * re-run the salt generator. */
+var expectedLastMod = File.ReadAllText("ExeExpectedLastMod.txt");
+if (expectedLastMod != exeLastModified)
+{
+    /* Log that we're calling the salt generator. */
+    Console.WriteLine($"Calling {fixedSaltExePath}");
+
+    /* Replace the last-mod record. */
+    File.WriteAllText("ExeExpectedLastMod.txt", exeLastModified);
+
+    /* Run the fixed salt generator. */
+    var psi = new ProcessStartInfo(fixedSaltExePath);
+    psi.RedirectStandardOutput = true;
+    var fixedSalt = Process.Start(psi).StandardOutput.ReadLine();
+
+    /* Look for the fixed salt in the README. */
+    int fixedSaltIndex = readmeLines.FindIndex(src => src.Contains("<!--FIXED_SALT-->"));
+    readmeLines[fixedSaltIndex] = "     - `" + fixedSalt + "`<!--FIXED_SALT-->";
+
+    /* Does it match the string in CryptoHelper? */
+    if (fixedSalt != CryptoHelpers.FIXED_SALT_AS_STRING)
+    {
+        /* Rewrite CryptoHelpers.cs. */
+        string cryptoHelperPath = FindFileByName("CryptoHelpers.cs");
+        var cryptoLines = File.ReadAllLines(cryptoHelperPath).ToList();
+        int sourceIndex = cryptoLines.FindIndex(src => src.Contains("FIXED_SALT_AS_STRING")) + 1;
+        var sourceLine = cryptoLines[sourceIndex].Split('"');
+        cryptoLines[sourceIndex] = sourceLine[0] + "\"" + fixedSalt + "\";";
+        File.WriteAllLines(cryptoHelperPath, cryptoLines);
+
+        /* Report update. */
+        Console.WriteLine("Updated CryptoHelper.cs. Rebuild and re-run.");
+        return;
+    }
+}
+
 /* Look for the first use of a JWT. */
-for (int i = 0; i < readmeLines.Count; i++)
+int easterEggIndex = readmeLines.FindIndex(src => src.StartsWith("Authorization: Bearer ey"));
+readmeLines[easterEggIndex] = "Authorization: Bearer " + GenerateEasterEggJWT();
+
+/* Return the number of seconds since 1970 for the supplied timestamp. */
+long UnixTime(DateTime utc)
 {
-    if (readmeLines[i].StartsWith("Authorization: Bearer ey"))
-    {
-        readmeLines[i] = "Authorization: Bearer " + GenerateEasterEggJWT();
-        break;
-    }
+    return (long)(utc.ToUniversalTime() - DateTime.Parse("1970-01-01T00:00:00Z")).TotalSeconds;
 }
 
-/* Start a dictionary of keys and values. */
-var keyValues = GenerateKeyValues("Main");
-
-/* Loop through the entire README, looking for the JSON lines with the
- * selected keys that will need rewriting. */
-foreach (int readmeLineIndex in Enumerable.Range(0, readmeLines.Count))
+void PopulateExample(string keyBase, DateTime now, string issuerUrl, string verifyUrl)
 {
-    /* Switch to a new set of values for each case study. */
-    if (readmeLines[readmeLineIndex].Contains("Case Studies"))
-        keyValues = GenerateKeyValues("CaseStudyApi");
-    if (readmeLines[readmeLineIndex].Contains("# Webhooks"))
-        keyValues = GenerateKeyValues("CaseStudyWebhooks");
+    /* Build request JSON. */
+    var requestJson = new JObject();
+    requestJson["HashBack"] = "HASHBACK-PUBLIC-DRAFT-3-0";
+    requestJson["TypeOfResponse"] = "BearerToken";
+    requestJson["IssuerUrl"] = issuerUrl;
+    requestJson["Now"] = UnixTime(now);
+    requestJson["Unus"] = GenerateUnus(keyBase);
+    requestJson["Rounds"] = 1;
+    requestJson["VerifyUrl"] = verifyUrl;
+    ReplaceJson($"<!--{keyBase}_REQUEST-->", requestJson);
 
-    /* Is this an Authorization header? */
-    if (readmeLines[readmeLineIndex].StartsWith("Authorization: Bearer "))
-    {
-        if (readmeLines[readmeLineIndex].EndsWith("nggyu"))
-            continue;
-        readmeLines[readmeLineIndex] = "Authorization: Bearer " + keyValues["BearerToken"];
-    }
+    /* Insert the hash of the above JSON into the readme. */
+    string hash1066 = CryptoHelpers.HashRequestBody(requestJson);
+    int hash1066Index = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_HASH-->"));
+    readmeLines[hash1066Index] = $"- `{hash1066}`<!--{keyBase}_HASH-->";
 
-    /* Split the current line by quote. If not exactly five parts, move on. */
-    var currentLine = readmeLines[readmeLineIndex].Split('"');
-    if (currentLine.Length != 5)
-        continue;
+    /* Build response JSON. */
+    DateTime issuedAt = now.AddSeconds(1);
+    var responseJson = new JObject();
+    string jwt = ToBearerToken(new Uri(verifyUrl).Host, new Uri(issuerUrl).Host, issuedAt, out DateTime expiresAt);
+    responseJson["BearerToken"] = jwt;
+    responseJson["IssuedAt"] = UnixTime(issuedAt);
+    responseJson["ExpiresAt"] = UnixTime(expiresAt);
+    ReplaceJson($"<!--{keyBase}_RESPONSE-->", responseJson);
 
-    /* Is the key part of the JSON property a known key? */
-    if (keyValues.TryGetValue(currentLine[1], out string? valueForKey) && valueForKey != null)
-    {
-        /* Swap in the new value and replace the reunited line in the file. */
-        currentLine[3] = valueForKey;
-        readmeLines[readmeLineIndex] = String.Join("\"", currentLine);
-    }
+    /* Build a JWT only response. */
+    ReplaceJsonString($"<!--{keyBase}_RESPONSE_JWT_ONLY-->", jwt);
+
+    /* Build a simple token example. */
+    responseJson["BearerToken"] = GenerateUnus(keyBase + "SimpleToken").Substring(0, 40);
+    ReplaceJson($"<!--{keyBase}_RESPONSE_SIMPLE_TOKEN-->", responseJson);
 }
+
+void ReplaceJson(string tag, JObject insert)
+{ 
+    /* Look for the "1066" example JSON. */
+    int markerIndex = readmeLines.FindIndex(src => src.Contains(tag));
+    if (markerIndex < 0) return;
+    int openBraceIndex = readmeLines.FindIndex(markerIndex, src => src == "{");
+    int closeBraceIndex = readmeLines.FindIndex(openBraceIndex, src => src == "}");
+    readmeLines.RemoveRange(openBraceIndex, closeBraceIndex - openBraceIndex + 1);
+
+    /* Insert back into code. */
+    readmeLines.Insert(openBraceIndex, insert.ToString().Replace("\r\n  ", "\r\n    "));
+}
+
+void ReplaceJsonString(string tag, string value)
+{
+    /* Look for the tag, then look for the string. */
+    int markerIndex = readmeLines.FindIndex(src => src.Contains(tag));
+    if (markerIndex < 0) return;
+    int stringIndex = readmeLines.FindIndex(markerIndex, src => src.StartsWith("\"ey"));
+    readmeLines[stringIndex] = "\"" + value + "\"";
+}
+
+PopulateExample(
+    "1066_EXAMPLE", 
+    DateTime.Parse("1986-10-09T23:00:00-04:00"), 
+    "https://issuer.example/api/generate_bearer_token", 
+    "https://caller.example/hashback_files/my_json_hash.txt");
+
+PopulateExample(
+    "CASE_STUDY",
+    DateTime.Parse("2005-03-26T19:00:00Z"),
+    "https://sass.example/api/login/hashback",
+    "https://carol.example/hashback/64961859.txt");
 
 /* If README has changed, rewrite back. */
 if (readmeOrigText != string.Join("\r\n", readmeLines))
@@ -88,93 +164,49 @@ string FindFileByName(string fileName)
     throw new Exception("Could not find " + fileName);
 }
 
-/* Deterministically generate keys and values for the example JSON objects. */
-Dictionary<string,string> GenerateKeyValues(string realm)
-{
-    /* Start an emopty collection. */
-    var keyValues = new Dictionary<string, string>();
-
-    /* Hash the realm to produce intiator and issuer keys. */
-    string hmacKey = GenerateKeyFromString(realm + "HMAC");
-    keyValues["HmacKey"] = hmacKey;
-
-    /* Generate and sign bearer token. */
-    string bearerToken = ToBearerToken(realm, out DateTime expiresAt);
-    var tokenSignature = CryptoHelpers.SignBearerToken(hmacKey, bearerToken);
-    keyValues["BearerToken"] = bearerToken;
-    keyValues["BearerTokenSignature"] = tokenSignature;
-    keyValues["ExpiresAt"] = expiresAt.ToString("s") + "Z";
-
-    /* Completed collection. */
-    return keyValues;
-}
-
-/* Create a random-looking string from a starting string. */
-string GenerateKeyFromString(string v)
+/* Create a random-looking 256-bit Base64 encoded string from a starting string. */
+string GenerateUnus(string v)
 {
     /* Hash the input string and return in hex. */
     using var sha = System.Security.Cryptography.SHA256.Create();
-    byte[] hash = sha.ComputeHash(System.Text.Encoding.ASCII.GetBytes(v));
+    byte[] hash = sha.ComputeHash(System.Text.Encoding.ASCII.GetBytes(v + "Unus"));
     return Convert.ToBase64String(hash);
 }
 
 /* Convert a string into an example JWT. */
-string ToBearerToken(string realm, out DateTime expiresAt)
+string ToBearerToken(string caller, string issuer, DateTime issuedAt, out DateTime expiresAt)
 {
-    string sub = 
-        realm == "Main" ? "the_initiator" :
-        realm == "CaseStudyApi" ? "12" :
-        realm == "CaseStudyWebhooks" ? "saas" :
-        throw new ApplicationException();
-    string iss =
-        realm == "Main" ? "the_issuer" :
-        realm == "CaseStudyApi" ? "saas.example" :
-        realm == "CaseStudyWebhooks" ? "carol.example" :
-        throw new ApplicationException();
-    int addSeconds =
-        realm == "Main" ? 0 :
-        realm == "CaseStudyApi" ? 20000000 :
-        realm == "CaseStudyWebhooks" ? 20010000 :
-        throw new ApplicationException();
-    expiresAt = new DateTime(2024, 1, 2, 3, 4, 5, DateTimeKind.Utc).AddSeconds(addSeconds).ToUniversalTime();
-    long iat = As1970Seconds(expiresAt);
+    expiresAt = issuedAt.ToUniversalTime().AddHours(1).ToUniversalTime();
+    long iat = UnixTime(issuedAt);
+    long exp = UnixTime(expiresAt);
 
-    string jwtHeader = JWT64Encode(new JObject { ["typ"] = "JWT", ["alg"] = "HS256" });
-    string jwtBody = JWT64Encode(new JObject { ["sub"] = sub, ["iss"] = iss, ["iat"] = iat });
+    string jwtHeader = JWT64Encode(new JObject { ["typ"] = "JWT", ["alg"] = "HS256", [""] = "billpg.com/nggyu" });
+    string jwtBody = JWT64Encode(new JObject { ["sub"] = caller, ["iss"] = issuer, ["iat"] = iat, ["exp"] = exp });
     string jwtHeaderDotBody = jwtHeader + "." + jwtBody;
 
-    using var hmac = System.Security.Cryptography.HMAC.Create("HMACSHA256");
+    using var hmac = new System.Security.Cryptography.HMACSHA256();
     hmac.Key = System.Text.Encoding.ASCII.GetBytes("your-256-bit-secret");
     var hash = hmac.ComputeHash(System.Text.Encoding.ASCII.GetBytes(jwtHeaderDotBody));
-    string jwtSig = Convert.ToBase64String(hash).Replace('+','-').Replace('/','_').TrimEnd('=');
+    string jwtSig = JWT64EncodeBytes(hash);
     string jwtFull = jwtHeaderDotBody + "." + jwtSig;
     return jwtFull;
 }
 
-long As1970Seconds(DateTime dt)
-    => (long)(dt - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
-
 string JWT64Encode(JObject j)
-{
-    string jwtAsJson = j.ToString(Newtonsoft.Json.Formatting.None);
-    var jwtAsBytes = System.Text.Encoding.ASCII.GetBytes(jwtAsJson);
-    var jwtAs64 = Convert.ToBase64String(jwtAsBytes);
-    return jwtAs64.TrimEnd('=');
-}
+    => JWT64EncodeString(j.ToString(Newtonsoft.Json.Formatting.None));
+
+string JWT64EncodeBytes(byte[] bytes)
+    => Convert.ToBase64String(bytes).Replace('+', '-').Replace('/', '_').TrimEnd('=');
+
+string JWT64EncodeString(string jsonAsString)
+    => JWT64EncodeBytes(System.Text.Encoding.ASCII.GetBytes(jsonAsString));
 
 /* Generate a fake JWT with an easter egg. */
 string GenerateEasterEggJWT()
 {
-    string Encode(string s)
-    {
-        s = s.Replace('\'', '\"');
-        s = s.Replace('[', '{');
-        s = s.Replace(']', '}');
-
-        string base64 = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes(s)).TrimEnd('=');
-        return base64;
-    }
-
-    return Encode("['':'']") + "." + Encode($"['nggyu':'https://billpg.com/nggyu']") + ".nggyu";
-
+    return
+        JWT64Encode(new JObject { [""] = "" })
+        + "."
+        + JWT64Encode(new JObject { [""] = "https://billpg.com/nggyu" })
+        + ".nggyu";
 }

@@ -3,14 +3,17 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.1.32228.430
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "billpg.CrossRequestTokenExchange", "billpg.CrossRequestTokenExchange.csproj", "{4FEF68D2-5641-43F4-8CAF-2D1FD671D9D0}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{BAA97397-79F6-45A1-847F-F0C3F07E09BA}"
 	ProjectSection(SolutionItems) = preProject
 		..\README.md = ..\README.md
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UpdateReadme", "..\UpdateReadme\UpdateReadme.csproj", "{9865C97E-4D28-42C8-AB2D-62D6D3580BE7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UpdateReadme", "UpdateReadme.csproj", "{9865C97E-4D28-42C8-AB2D-62D6D3580BE7}"
+	ProjectSection(ProjectDependencies) = postProject
+		{79CD83E7-5E5D-46D9-A795-4E711DCF0FDF} = {79CD83E7-5E5D-46D9-A795-4E711DCF0FDF}
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GenFixedSalt", "GenFixedSalt\GenFixedSalt.csproj", "{79CD83E7-5E5D-46D9-A795-4E711DCF0FDF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -18,14 +21,14 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{4FEF68D2-5641-43F4-8CAF-2D1FD671D9D0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{4FEF68D2-5641-43F4-8CAF-2D1FD671D9D0}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{4FEF68D2-5641-43F4-8CAF-2D1FD671D9D0}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{4FEF68D2-5641-43F4-8CAF-2D1FD671D9D0}.Release|Any CPU.Build.0 = Release|Any CPU
 		{9865C97E-4D28-42C8-AB2D-62D6D3580BE7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{9865C97E-4D28-42C8-AB2D-62D6D3580BE7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9865C97E-4D28-42C8-AB2D-62D6D3580BE7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9865C97E-4D28-42C8-AB2D-62D6D3580BE7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{79CD83E7-5E5D-46D9-A795-4E711DCF0FDF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{79CD83E7-5E5D-46D9-A795-4E711DCF0FDF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{79CD83E7-5E5D-46D9-A795-4E711DCF0FDF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{79CD83E7-5E5D-46D9-A795-4E711DCF0FDF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
