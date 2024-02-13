@@ -63,6 +63,7 @@ void PopulateExample(string keyBase, DateTime now, string issuerUrl, string veri
     /* Build request JSON. */
     var requestJson = new JObject();
     requestJson["CrossRequestTokenExchange"] = "CRTE-PUBLIC-DRAFT-3";
+    requestJson["TypeOfResponse"] = "BearerToken";
     requestJson["IssuerUrl"] = issuerUrl;
     requestJson["Now"] = UnixTime(now);
     requestJson["Unus"] = GenerateUnus(keyBase);
@@ -78,22 +79,40 @@ void PopulateExample(string keyBase, DateTime now, string issuerUrl, string veri
     /* Build response JSON. */
     DateTime issuedAt = now.AddSeconds(1);
     var responseJson = new JObject();
-    responseJson["BearerToken"] = ToBearerToken(new Uri(verifyUrl).Host, new Uri(issuerUrl).Host, issuedAt, out DateTime expiresAt);
+    string jwt = ToBearerToken(new Uri(verifyUrl).Host, new Uri(issuerUrl).Host, issuedAt, out DateTime expiresAt);
+    responseJson["BearerToken"] = jwt;
     responseJson["IssuedAt"] = UnixTime(issuedAt);
     responseJson["ExpiresAt"] = UnixTime(expiresAt);
     ReplaceJson($"<!--{keyBase}_RESPONSE-->", responseJson);
+
+    /* Build a JWT only response. */
+    ReplaceJsonString($"<!--{keyBase}_RESPONSE_JWT_ONLY-->", jwt);
+
+    /* Build a simple token example. */
+    responseJson["BearerToken"] = GenerateUnus(keyBase + "SimpleToken").Substring(0, 40);
+    ReplaceJson($"<!--{keyBase}_RESPONSE_SIMPLE_TOKEN-->", responseJson);
 }
 
 void ReplaceJson(string tag, JObject insert)
 { 
     /* Look for the "1066" example JSON. */
     int markerIndex = readmeLines.FindIndex(src => src.Contains(tag));
+    if (markerIndex < 0) return;
     int openBraceIndex = readmeLines.FindIndex(markerIndex, src => src == "{");
     int closeBraceIndex = readmeLines.FindIndex(openBraceIndex, src => src == "}");
     readmeLines.RemoveRange(openBraceIndex, closeBraceIndex - openBraceIndex + 1);
 
     /* Insert back into code. */
     readmeLines.Insert(openBraceIndex, insert.ToString().Replace("\r\n  ", "\r\n    "));
+}
+
+void ReplaceJsonString(string tag, string value)
+{
+    /* Look for the tag, then look for the string. */
+    int markerIndex = readmeLines.FindIndex(src => src.Contains(tag));
+    if (markerIndex < 0) return;
+    int stringIndex = readmeLines.FindIndex(markerIndex, src => src.StartsWith("\"ey"));
+    readmeLines[stringIndex] = "\"" + value + "\"";
 }
 
 PopulateExample(
