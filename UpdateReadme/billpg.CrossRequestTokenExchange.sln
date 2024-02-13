@@ -9,6 +9,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UpdateReadme", "UpdateReadme.csproj", "{9865C97E-4D28-42C8-AB2D-62D6D3580BE7}"
+	ProjectSection(ProjectDependencies) = postProject
+		{79CD83E7-5E5D-46D9-A795-4E711DCF0FDF} = {79CD83E7-5E5D-46D9-A795-4E711DCF0FDF}
+	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GenFixedSalt", "GenFixedSalt\GenFixedSalt.csproj", "{79CD83E7-5E5D-46D9-A795-4E711DCF0FDF}"
 EndProject

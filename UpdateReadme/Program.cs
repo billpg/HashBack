@@ -19,6 +19,9 @@ var exeLastModified = UnixTime(new FileInfo(fixedSaltExePath).LastWriteTimeUtc).
 var expectedLastMod = File.ReadAllText("ExeExpectedLastMod.txt");
 if (expectedLastMod != exeLastModified)
 {
+    /* Log that we're calling the salt generator. */
+    Console.WriteLine($"Calling {fixedSaltExePath}");
+
     /* Replace the last-mod record. */
     File.WriteAllText("ExeExpectedLastMod.txt", exeLastModified);
 
@@ -62,7 +65,7 @@ void PopulateExample(string keyBase, DateTime now, string issuerUrl, string veri
 {
     /* Build request JSON. */
     var requestJson = new JObject();
-    requestJson["CrossRequestTokenExchange"] = "CRTE-PUBLIC-DRAFT-3";
+    requestJson["HashBack"] = "HASHBACK-PUBLIC-DRAFT-3-0";
     requestJson["TypeOfResponse"] = "BearerToken";
     requestJson["IssuerUrl"] = issuerUrl;
     requestJson["Now"] = UnixTime(now);
@@ -119,13 +122,13 @@ PopulateExample(
     "1066_EXAMPLE", 
     DateTime.Parse("1986-10-09T23:00:00-04:00"), 
     "https://issuer.example/api/generate_bearer_token", 
-    "https://caller.example/crte_files/my_json_hash.txt");
+    "https://caller.example/hashback_files/my_json_hash.txt");
 
 PopulateExample(
     "CASE_STUDY",
     DateTime.Parse("2005-03-26T19:00:00Z"),
-    "https://sass.example/api/login/crte",
-    "https://carol.example/crte/64961859.txt");
+    "https://sass.example/api/login/hashback",
+    "https://carol.example/hashback/64961859.txt");
 
 /* If README has changed, rewrite back. */
 if (readmeOrigText != string.Join("\r\n", readmeLines))

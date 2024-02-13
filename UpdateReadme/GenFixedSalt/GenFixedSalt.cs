@@ -1,26 +1,11 @@
 ﻿using System.Text;
 using System.Security.Cryptography;
-using System.Runtime.CompilerServices;
-
-/* Function to load this source's path, set by the compiler. */
-static string ThisSourcePath([CallerFilePath] string path = "")
-    => path;
-
-/* Loop through each byte of this source file and if it isn't a control, 
- * space, non-ASCII or asterisk, save it into a byte collection. Spaces and
- * controls are removed to avoid line ending issues and to allow the layout
- * to change. Asterisks are also removed to allow multi-line comments to be
- * reformatted.) */
-List<byte> passwordBytes = new();
-foreach (byte by in File.ReadAllBytes(ThisSourcePath()))
-    if (by > 32 && by < 127 && by != 42)
-        passwordBytes.Add(by);
 
 /* Call PBKDF2 for some deterministic yet random looking bytes. 
  * The first half is used to shuffle the alphabet while the second half is to
  * select letters from the shuffled alphabet to use in the fixed salt. */
 var bytes = new Queue<byte>(Rfc2898DeriveBytes.Pbkdf2(
-    password: passwordBytes.ToArray(),
+    password: Encoding.ASCII.GetBytes("HashBack"),
     salt: Encoding.ASCII.GetBytes(
         "Dedicated to my Treacle. I love you to the moon and back."),
     iterations: 238854 * 2,
@@ -54,5 +39,3 @@ while (bytes.Any())
 
 /* Output the extracted capitals. */
 Console.WriteLine(fixedHash.ToString());
-
-/* PS. Rutabaga. */
