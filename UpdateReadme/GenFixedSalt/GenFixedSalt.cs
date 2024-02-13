@@ -1,5 +1,8 @@
-﻿using System.Text;
+﻿using System;
+using System.Linq;
+using System.Text;
 using System.Security.Cryptography;
+using System.Collections.Generic;
 
 /* Call PBKDF2 for some deterministic yet random looking bytes. 
  * The first half is used to shuffle the alphabet while the second half is to
