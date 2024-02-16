@@ -4,52 +4,33 @@ using billpg.CrossRequestTokenExchange;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Text;
 
 /* Locate and load README.md into memory. */
 string readmePath = FindFileByName("README.md");
 var readmeLines = File.ReadAllLines(readmePath).ToList();
 var readmeOrigText = string.Join("\r\n", readmeLines);
 
-/* Call the GenFixedSalt EXE and its last-modified. */
-var fixedSaltExePath = FindFileByName("GenFixedSalt.exe");
-var exeLastModified = UnixTime(new FileInfo(fixedSaltExePath).LastWriteTimeUtc).ToString();
+/* Load the fixed salt bytes. */
+const string fixed_salt_password = "HashBack";
+const string fixed_salt_salt = "Dedicated to my Treacle. I love you to the moon and back.";
+const int fixed_salt_rounds = 238854 * 2; 
+var fixedSaltBytes = Rfc2898DeriveBytes.Pbkdf2(
+    password: Encoding.ASCII.GetBytes(fixed_salt_password),
+    salt: Encoding.ASCII.GetBytes(fixed_salt_salt),
+    iterations: fixed_salt_rounds,
+    hashAlgorithm: HashAlgorithmName.SHA512,
+    outputLength: 32);
 
-/* Pull out the last-modified from the readme. If they differ,
- * re-run the salt generator. */
-var expectedLastMod = File.ReadAllText("ExeExpectedLastMod.txt");
-if (expectedLastMod != exeLastModified)
-{
-    /* Log that we're calling the salt generator. */
-    Console.WriteLine($"Calling {fixedSaltExePath}");
+/* Look for the fixed salt in the README. */
+SetTextByMarker(readmeLines, "<!--FIXED_SALT-->", "     - [" + DumpByteArray(fixedSaltBytes) + "]");
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_PASSWORD-->", $"- Password: \"{fixed_salt_password}\" ({fixed_salt_password.Length} bytes.)");
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_DEDICATION-->", $"- Salt: \"{fixed_salt_salt}\" ({fixed_salt_salt.Length} bytes.)");
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_ITERATIONS-->", $"- Iterations: {fixed_salt_rounds}");
 
-    /* Replace the last-mod record. */
-    File.WriteAllText("ExeExpectedLastMod.txt", exeLastModified);
-
-    /* Run the fixed salt generator. */
-    var psi = new ProcessStartInfo(fixedSaltExePath);
-    psi.RedirectStandardOutput = true;
-    var fixedSalt = Process.Start(psi).StandardOutput.ReadLine();
-
-    /* Look for the fixed salt in the README. */
-    int fixedSaltIndex = readmeLines.FindIndex(src => src.Contains("<!--FIXED_SALT-->"));
-    readmeLines[fixedSaltIndex] = "     - `" + fixedSalt + "`<!--FIXED_SALT-->";
-
-    /* Does it match the string in CryptoHelper? */
-    if (fixedSalt != CryptoHelpers.FIXED_SALT_AS_STRING)
-    {
-        /* Rewrite CryptoHelpers.cs. */
-        string cryptoHelperPath = FindFileByName("CryptoHelpers.cs");
-        var cryptoLines = File.ReadAllLines(cryptoHelperPath).ToList();
-        int sourceIndex = cryptoLines.FindIndex(src => src.Contains("FIXED_SALT_AS_STRING")) + 1;
-        var sourceLine = cryptoLines[sourceIndex].Split('"');
-        cryptoLines[sourceIndex] = sourceLine[0] + "\"" + fixedSalt + "\";";
-        File.WriteAllLines(cryptoHelperPath, cryptoLines);
-
-        /* Report update. */
-        Console.WriteLine("Updated CryptoHelper.cs. Rebuild and re-run.");
-        return;
-    }
-}
+/* Set the bytes for CryptoHelper? */
+CryptoHelpers.FIXED_SALT = fixedSaltBytes;
 
 /* Look for the first use of a JWT. */
 int easterEggIndex = readmeLines.FindIndex(src => src.StartsWith("Authorization: Bearer ey"));
@@ -65,7 +46,7 @@ void PopulateExample(string keyBase, DateTime now, string issuerUrl, string veri
 {
     /* Build request JSON. */
     var requestJson = new JObject();
-    requestJson["HashBack"] = "HASHBACK-PUBLIC-DRAFT-3-0";
+    requestJson["HashBack"] = "HASHBACK-PUBLIC-DRAFT-3-1";
     requestJson["TypeOfResponse"] = "BearerToken";
     requestJson["IssuerUrl"] = issuerUrl;
     requestJson["Now"] = UnixTime(now);
@@ -209,4 +190,23 @@ string GenerateEasterEggJWT()
         + "."
         + JWT64Encode(new JObject { [""] = "https://billpg.com/nggyu" })
         + ".nggyu";
+}
+
+void SetTextByMarker(List<string> lines, string marker, string line)
+{
+    int fixedSaltIndex = lines.FindIndex(src => src.Contains(marker));
+    lines[fixedSaltIndex] = line + marker;
+}
+
+string DumpByteArray(IList<byte> bytes)
+{
+    string list = "";
+    for (int i = 0; i < bytes.Count; i++)
+    {
+        if (i % 8 == 0)
+            list += " ";
+        list += $"{bytes[i]},";
+    }
+
+    return list.Trim().Trim(',');
 }

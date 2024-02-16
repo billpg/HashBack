@@ -11,17 +11,9 @@ namespace billpg.CrossRequestTokenExchange
     public static class CryptoHelpers
     {
         /// <summary>
-        /// The fixed salt that will be prefixed to the JSON request body.
-        /// </summary>
-        public const string FIXED_SALT_AS_STRING 
-            = "BECOLRZAMVFWECYGJTLURIDPAYBGMSCQFDXTUYNPMZOAFEDGCKXTJUZLEQFCKXYB";
-
-        /// <summary>
         /// Copy of the fixed salt in byte form.
         /// </summary>
-        public static readonly IList<byte> FIXED_SALT =
-            System.Text.Encoding.ASCII.GetBytes(FIXED_SALT_AS_STRING)
-            .ToList().AsReadOnly();
+        public static IList<byte> FIXED_SALT = null;
 
         /// <summary>
         /// UTF-8's GetBytes, without returning a BOM.
