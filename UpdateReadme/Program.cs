@@ -24,10 +24,14 @@ var fixedSaltBytes = Rfc2898DeriveBytes.Pbkdf2(
     outputLength: 32);
 
 /* Look for the fixed salt in the README. */
-SetTextByMarker(readmeLines, "<!--FIXED_SALT-->", "     - [" + DumpByteArray(fixedSaltBytes) + "]");
 SetTextByMarker(readmeLines, "<!--FIXED_SALT_PASSWORD-->", $"- Password: \"{fixed_salt_password}\" ({fixed_salt_password.Length} bytes.)");
 SetTextByMarker(readmeLines, "<!--FIXED_SALT_DEDICATION-->", $"- Salt: \"{fixed_salt_salt}\" ({fixed_salt_salt.Length} bytes.)");
 SetTextByMarker(readmeLines, "<!--FIXED_SALT_ITERATIONS-->", $"- Iterations: {fixed_salt_rounds}");
+
+/* Look for the fixed salt byte block, two lnes after the marker. */
+int fixedSaltIndex = readmeLines.FindIndex(src => src.Contains("<!--FIXED_SALT-->")) + 2;
+readmeLines.RemoveRange(fixedSaltIndex, 4);
+readmeLines.Insert(fixedSaltIndex, DumpByteArray(fixedSaltBytes));
 
 /* Set the bytes for CryptoHelper? */
 CryptoHelpers.FIXED_SALT = fixedSaltBytes;
@@ -203,10 +207,14 @@ string DumpByteArray(IList<byte> bytes)
     string list = "";
     for (int i = 0; i < bytes.Count; i++)
     {
+        if (i > 0 && i % 8 == 0)
+            list += "\r\n";
         if (i % 8 == 0)
-            list += " ";
+            list += "       ";
+        if (i == 0)
+            list += "[";
         list += $"{bytes[i]},";
     }
 
-    return list.Trim().Trim(',');
+    return list.Trim(',') + "]";
 }

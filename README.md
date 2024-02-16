@@ -110,7 +110,7 @@ The hashing process takes the following steps.
      - ```
        [134,186,14,196,2,181,162,234,
        156,123,82,221,66,168,131,6,
-       14,181,146,190,102,141,141,160,       
+       14,181,146,190,102,141,141,160,
        106,129,196,14,204,107,217,221]
    - Hash Algorithm: SHA256
    - Rounds: The value specified in the JSON request under `Rounds`.
