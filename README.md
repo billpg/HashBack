@@ -1,7 +1,7 @@
 # HashBack Authentication
 A web authentication exchange where a caller proves their identity by publishing a hash value on their website.
 
-This version of the document is a **draft** for review and discussion. It will be tagged as `HASHBACK-PUBLIC-DRAFT-3-1`.
+This version of the document is a **draft-under-development**. It will be tagged as `HASHBACK-PUBLIC-DRAFT-3-1` once finished.
 If you have any comments or notes, please open an issue on this project's public github.
 
 This document is Copyright William Godfrey, 2024. You may use its contents under the terms of the Creative-Commons Attribution license.
@@ -418,19 +418,21 @@ As this proposal is still in the public-draft phase, I am open to be persuaded t
 ### What are the previous public drafts?
 
 - [Public Draft 1](https://github.com/billpg/HashBack/blob/22c67ba14d1a2b38c2a8daf1551f065b077bfbb0/README.md)
-  - Initial revision, then named "Cross Request Token Exchange".
+  - Initial published revision, then named "Cross Request Token Exchange".
   - Used two POST requests in opposite directions, with the second POST request acting as the response to the first.
 - [Public Draft 2](https://github.com/billpg/HashBack/blob/2165a661e093754e038620d3b2be1caeacb9eba0/README.md)
   - Updated to allow a 202 "Accepted" response to the first POST request, avoiding to need to keep the connection open.
   - I had a change of heart to this approach shortly after publishing it.
-- Public Draft 3.0 (This document)
+- [Public Draft 3.0](https://github.com/billpg/HashBack/blob/bf7e2ff1876e9673b04bffb7d70766a10d326976/README.md)
   - Substantial refactoring after realising the verification hash could be a unauthenticated GET request on a static file host.
   - Added a "dot zero" to allow for minor updates, reserving 4.0 for another substantial refactor.
   - Changed name to "HashBack" Authentication, reflecting that a token is only one possible outcome and the the verification hash is the big idea.
+- Public Draft 3.1 (This document)
+  - The "fixed salt" is now the result of running RBKDF2 but without processing the result into capitals letters. This means I no longer need to link to some "attached" C# code and can simply record the input parameters. (The original motivation of having only capital letters in the salt was to support implementations that only accept ASCII strings, but all implementations I could find will accept arbitrary blocks of bytes as input.)
 
 ## Next Steps
 
-This document is a draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using PBKDF2 with its fixed hash correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm that authenticity of the POST request. If you have any comments or notes, please raise an issue on this project's github.
+This document is a draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using PBKDF2 with its fixed salt correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm that authenticity of the POST request. If you have any comments or notes, please raise an issue on this project's github.
 
 In due course I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform the role of an Issuer by sending your API tokens on demand, as well as perform the role of a Caller by asking your API for a token.
 
