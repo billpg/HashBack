@@ -106,8 +106,12 @@ The hashing process takes the following steps.
 1. Convert the JSON request body into its canonical representation of bytes per RFC 8785.
 2. Call PBKDF2 with the following parameters:
    - Password: The JSON request body's canonical representation.
-   - Salt: The following 32 bytes.
-     - [134,186,14,196,2,181,162,234, 156,123,82,221,66,168,131,6, 14,181,146,190,102,141,141,160, 106,129,196,14,204,107,217,221]<!--FIXED_SALT-->
+   - Salt: The following 32 bytes.<!--FIXED_SALT-->
+     - ```
+       [134,186,14,196,2,181,162,234,
+       156,123,82,221,66,168,131,6,
+       14,181,146,190,102,141,141,160,       
+       106,129,196,14,204,107,217,221]
    - Hash Algorithm: SHA256
    - Rounds: The value specified in the JSON request under `Rounds`.
    - Output: 256 bits / 32 bytes
