@@ -28,7 +28,7 @@ SetTextByMarker(readmeLines, "<!--FIXED_SALT_PASSWORD-->", $"- Password: \"{fixe
 SetTextByMarker(readmeLines, "<!--FIXED_SALT_DEDICATION-->", $"- Salt: \"{fixed_salt_salt}\" ({fixed_salt_salt.Length} bytes.)");
 SetTextByMarker(readmeLines, "<!--FIXED_SALT_ITERATIONS-->", $"- Iterations: {fixed_salt_rounds}");
 
-/* Look for the fixed salt byte block, two lnes after the marker. */
+/* Look for the fixed salt byte block, two lines after the marker. */
 int fixedSaltIndex = readmeLines.FindIndex(src => src.Contains("<!--FIXED_SALT-->")) + 2;
 readmeLines.RemoveRange(fixedSaltIndex, 4);
 readmeLines.Insert(fixedSaltIndex, DumpByteArray(fixedSaltBytes));
@@ -39,6 +39,29 @@ CryptoHelpers.FIXED_SALT = fixedSaltBytes;
 /* Look for the first use of a JWT. */
 int easterEggIndex = readmeLines.FindIndex(src => src.StartsWith("Authorization: Bearer ey"));
 readmeLines[easterEggIndex] = "Authorization: Bearer " + GenerateEasterEggJWT();
+
+/* Populate the main examples in the README. */
+PopulateExample(
+    "1066_EXAMPLE",
+    DateTime.Parse("1986-10-09T23:00:00-04:00"),
+    "https://issuer.example/api/generate_bearer_token",
+    "https://caller.example/hashback_files/my_json_hash.txt");
+
+PopulateExample(
+    "CASE_STUDY",
+    DateTime.Parse("2005-03-26T19:00:00Z"),
+    "https://sass.example/api/login/hashback",
+    "https://carol.example/hashback/64961859.txt");
+
+/* If README has changed, rewrite back. */
+if (readmeOrigText != string.Join("\r\n", readmeLines))
+{
+    Console.WriteLine("Saving modified README.md.");
+    File.WriteAllLines(readmePath, readmeLines);
+}
+
+/* Announce end. */
+Console.WriteLine("Finished helper/readme update.");
 
 /* Return the number of seconds since 1970 for the supplied timestamp. */
 long UnixTime(DateTime utc)
@@ -79,6 +102,15 @@ void PopulateExample(string keyBase, DateTime now, string issuerUrl, string veri
     /* Build a simple token example. */
     responseJson["BearerToken"] = GenerateUnus(keyBase + "SimpleToken").Substring(0, 40);
     ReplaceJson($"<!--{keyBase}_RESPONSE_SIMPLE_TOKEN-->", responseJson);
+
+    /* Build a set-cookie example. */
+    int setCookieMarkerIndex = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_SET_COOKIE-->"));
+    if (setCookieMarkerIndex > 0)
+    {
+        int setCookieHeaderIndex = readmeLines.FindIndex(setCookieMarkerIndex, src => src.StartsWith("Set-Cookie"));
+        var setCookieValue = GenerateUnus(keyBase + "SetCookie").Substring(0, 40);
+        readmeLines[setCookieHeaderIndex] = $"Set-Cookie: MyCookie={setCookieValue}; Secure; HttpOnly;";
+    }
 }
 
 void ReplaceJson(string tag, JObject insert)
@@ -102,28 +134,6 @@ void ReplaceJsonString(string tag, string value)
     int stringIndex = readmeLines.FindIndex(markerIndex, src => src.StartsWith("\"ey"));
     readmeLines[stringIndex] = "\"" + value + "\"";
 }
-
-PopulateExample(
-    "1066_EXAMPLE", 
-    DateTime.Parse("1986-10-09T23:00:00-04:00"), 
-    "https://issuer.example/api/generate_bearer_token", 
-    "https://caller.example/hashback_files/my_json_hash.txt");
-
-PopulateExample(
-    "CASE_STUDY",
-    DateTime.Parse("2005-03-26T19:00:00Z"),
-    "https://sass.example/api/login/hashback",
-    "https://carol.example/hashback/64961859.txt");
-
-/* If README has changed, rewrite back. */
-if (readmeOrigText != string.Join("\r\n", readmeLines))
-{
-    Console.WriteLine("Saving modified README.md.");
-    File.WriteAllLines(readmePath, readmeLines);
-}
-
-/* Announce end. */
-Console.WriteLine("Finished helper/readme update.");
 
 /* Find the file with the given name, starting from this file's folder moving upwards. */
 string FindFileByName(string fileName)
