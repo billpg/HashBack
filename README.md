@@ -445,6 +445,7 @@ As this proposal is still in the public-draft phase, I am open to be persuaded t
   - Changed name to "HashBack" Authentication, reflecting that a token is only one possible outcome and the verification hash is the big idea.
 - Public Draft 3.1 (This document)
   - The "fixed salt" is now the result of running RBKDF2 but without processing the result into capitals letters. This means I no longer need to link to some "attached" C# code and can simply record the input parameters. (The original motivation of having only capital letters in the salt was to support implementations that only accept ASCII strings, but all implementations I could find will accept arbitrary blocks of bytes as input.)
+  - Added "SetCookie" as a third response type. Might be useful for a browser making the POST request.
 
 ## Next Steps
 
