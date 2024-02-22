@@ -1,4 +1,7 @@
-﻿using Newtonsoft.Json.Linq;
+﻿/* Copyright William Godfrey, 2024. All rights reserved.
+ * billpg.com
+ */
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,18 +12,29 @@ namespace billpg.HashBackCore
 {
     public class BadRequestException : Exception
     {
-        public Guid IncidentID { get; }
         private IList<string>? AcceptVersions { get; }
         private int? AcceptRounds { get; }
 
-        public static BadRequestException BadVersion()
+        internal static BadRequestException General(string message)
+            => new BadRequestException(message: message);
+
+        internal static BadRequestException BadVersion()
             => new BadRequestException(
-                message: $"Unknown HashBack version. We only know \"{CallerRequest.VERSION_3_0}\" and \"{CallerRequest.VERSION_3_1}\".",
+                message: 
+                    $"Unknown HashBack version. " +
+                    $"We only know \"{CallerRequest.VERSION_3_0}\" " +
+                    $"and \"{CallerRequest.VERSION_3_1}\".",
                 acceptVersions: new List<string> 
                 {
                     CallerRequest.VERSION_3_0,
                     CallerRequest.VERSION_3_1 
                 }.AsReadOnly());
+
+
+        internal static BadRequestException BadRounds(int acceptRounds)
+            => new BadRequestException(
+                message: $"Rounds must be between {IssuerSession.minRounds} and {IssuerSession.maxRounds}.",
+                acceptRounds: acceptRounds);
 
         internal static BadRequestException Required(string missingPropertyName)
             => new BadRequestException(message: $"Request is missing required {missingPropertyName} property.");
@@ -28,19 +42,18 @@ namespace billpg.HashBackCore
         private BadRequestException(string message, IList<string>? acceptVersions = null, int? acceptRounds = null)
             :base(message)
         {
-            this.IncidentID = Guid.NewGuid();
             this.AcceptVersions = acceptVersions;
             this.AcceptRounds = acceptRounds;
         }
 
 
-        public JObject AsJson()
+        public JObject AsJson(Guid incidentID)
         {
             /* Build 400 response body object. */
             var j = new JObject
             {
                 [nameof(this.Message)] = this.Message,
-                [nameof(this.IncidentID)] = this.IncidentID.ToString().ToUpperInvariant()
+                ["IncidentID"] = incidentID.ToHexWithHyphens()
             };
             if (this.AcceptVersions != null)
                 j[nameof(this.AcceptVersions)] = new JArray(this.AcceptVersions);

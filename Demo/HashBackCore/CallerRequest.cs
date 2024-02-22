@@ -1,4 +1,7 @@
-﻿using Newtonsoft.Json.Linq;
+﻿/* Copyright William Godfrey, 2024. All rights reserved.
+ * billpg.com
+ */
+using Newtonsoft.Json.Linq;
 
 namespace billpg.HashBackCore
 {
@@ -83,6 +86,20 @@ namespace billpg.HashBackCore
             /* Return completed object. */
             return new CallerRequest(
                 version, typeOfResponse, issuerUrl, now, unus, rounds, verifyUrl);
+        }
+
+        public static CallerRequest Build(
+            string version, string typeOfResponse, 
+            string issuerUrl, int rounds, string verifyUrl)
+        {
+            return new CallerRequest(
+                version, 
+                typeOfResponse, 
+                issuerUrl, 
+                DateTime.UtcNow.ToUnixTime(), 
+                InternalTools.GenerateUnus(), 
+                rounds, 
+                verifyUrl);
         }
 
     }

@@ -1,6 +1,7 @@
 using billpg.HashBackCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -153,11 +154,16 @@ namespace HashBackCore_Tests
             bool expectAcceptVersions = false, 
             int? expectedRounds = null)
         {
+            /* Pick an Incident ID. */
+            Guid incidentId = Guid.NewGuid();
+
             /* Check the common properties. */
             Assert.AreEqual(expectedMessage, brex.Message);
-            JObject responseBody = brex.AsJson();
+            JObject responseBody = brex.AsJson(incidentId);
             Assert.AreEqual(expectedMessage, responseBody["Message"]?.ToString());
-            Assert.AreEqual(36, responseBody["IncidentID"]?.ToString().Length);
+            Assert.AreEqual(
+                incidentId.ToString().ToUpperInvariant(), 
+                responseBody["IncidentID"]?.ToString());
 
             /* Either test the AcceptVersions property or test it is missing. */
             if (expectAcceptVersions)
