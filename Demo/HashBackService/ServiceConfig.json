@@ -1,0 +1,4 @@
+{
+  "ListenPort": 3001,
+  "RedirectHomeTo":  "https://github.com/billpg/HashBack/"
+}

@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Newtonsoft.Json.Linq;
-
+using billpg.WebAppTools;
 
 namespace billpg.HashBackCore
 {
@@ -44,37 +44,46 @@ namespace billpg.HashBackCore
             string expectIssuerHost, 
             RetrieveVerificationHashFn onGetVerifyHash)
         {
+            /* Utility function to produce error objects. */
+            BadRequestException GeneralError(string message)
+                => new BadRequestException(message);
+            BadRequestException BadRoundsError(int acceptableRounds)
+                => new BadRequestException(
+                    $"Rounds must be between {minRounds} and {maxRounds}."
+                    )
+                    .WithResponseProperty("AcceptRounds", new JValue(acceptableRounds));
+
             /* This API supports al three documented response types. */
             TypeOfResponse typeOfResponse;
             if (Enum.TryParse(req.TypeOfResponse, out typeOfResponse) == false)
-                throw BadRequestException.General("Request's TypeOfResponse is not acceptable.");
+                throw GeneralError("Request's TypeOfResponse is not acceptable.");
 
             /* The issuer URL must be HTTPS and be for the expected issuer host. */
             Uri issuerUrl = new Uri(req.IssuerUrl);
             if (issuerUrl.Scheme != Uri.UriSchemeHttps)
-                throw BadRequestException.General("IssuerUrl is not HTTPS.");
+                throw GeneralError("IssuerUrl is not HTTPS.");
             if (issuerUrl.Host != expectIssuerHost)
-                throw BadRequestException.General("IssuerUrl is for a different issuer.");
+                throw GeneralError("IssuerUrl is for a different issuer.");
 
             /* The "Now" timestamp must be no more than 100s from our clock. */
             long ourNow = DateTime.UtcNow.ToUnixTime();
             if (InternalTools.IsClose(ourNow, req.Now, 100) == false)
-                throw BadRequestException.General("Request's Now is too far from the server's clock.");
+                throw GeneralError("Request's Now is too far from the server's clock.");
             
             /* Check "Unus" is 256 bits. */
             if (IsUnusValid(req.Unus) == false)
-                throw BadRequestException.General("Request's Unus is not valid.");
+                throw GeneralError("Request's Unus is not valid.");
 
             /* Check "Rounds" is within 1-9. */
             if (req.Rounds < minRounds)
-                throw BadRequestException.BadRounds(minRounds);
+                throw BadRoundsError(minRounds);
             if (req.Rounds > maxRounds)
-                throw BadRequestException.BadRounds(maxRounds);
+                throw BadRoundsError(maxRounds);
 
             /* This is an open issuer so only check VerifyUrl is HTTPS. */
             Uri verifyUrl = new Uri(req.VerifyUrl);
             if (verifyUrl.Scheme != Uri.UriSchemeHttps)
-                throw BadRequestException.General("VerifyUrl is not HTTPS.");
+                throw GeneralError("VerifyUrl is not HTTPS.");
 
             /* Download the verification hash. (Will throw an exception on failure.) */
             string remoteVerificationHash = onGetVerifyHash(verifyUrl);
@@ -82,7 +91,7 @@ namespace billpg.HashBackCore
             /* Compare against the expected hash. */
             string expectedHash = req.VerificationHash();
             if (remoteVerificationHash != expectedHash)
-                throw BadRequestException.General("Verification Hash did not match expected hash.");
+                throw GeneralError("Verification Hash did not match expected hash.");
 
             /* Build a JWT response. */
             long expiresAt = ourNow + 3600;
@@ -144,7 +153,7 @@ namespace billpg.HashBackCore
 
         private static string JWTEncode(JObject json)
         {
-            string jsonAsString = json.ToString(Newtonsoft.Json.Formatting.None);
+            string jsonAsString = json.ToStringOneLine();
             byte[] jsonAsBytes = Encoding.ASCII.GetBytes(jsonAsString);
             return JWTEncode(jsonAsBytes);
         }

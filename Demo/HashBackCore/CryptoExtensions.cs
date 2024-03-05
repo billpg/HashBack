@@ -1,12 +1,12 @@
 ﻿/* Copyright William Godfrey, 2024. All rights reserved.
  * billpg.com
  */
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using Newtonsoft.Json.Linq;
 using System.Threading.Tasks;
 
 namespace billpg.HashBackCore
@@ -60,7 +60,7 @@ namespace billpg.HashBackCore
             };
 
             /* Turn it into a string of bytes with no spaces. */
-            string canonicalAsString = canonical.ToString(Newtonsoft.Json.Formatting.None);
+            string canonicalAsString = canonical.ToStringOneLine();
             byte[] canonicalAsBytes = UTF8.GetBytes(canonicalAsString);
 
             /* Select the PBKDF2 salt based on version. 

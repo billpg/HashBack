@@ -1,6 +1,7 @@
 ﻿/* Copyright William Godfrey, 2024. All rights reserved.
  * billpg.com
  */
+using billpg.WebAppTools;
 using Newtonsoft.Json.Linq;
 
 namespace billpg.HashBackCore
@@ -46,33 +47,49 @@ namespace billpg.HashBackCore
 
         public static CallerRequest Parse(JObject json)
         {
+            /* Utility functions to build a bad-request exception. */
+            BadRequestException RequiredPropertyError(string missingPropName)
+                => new BadRequestException($"Request is missing required {missingPropName} property.");
+            BadRequestException BadVersionError()
+                => new BadRequestException(message:
+                        $"Unknown HashBack version. " +
+                        $"We only know \"{CallerRequest.VERSION_3_0}\" " +
+                        $"and \"{CallerRequest.VERSION_3_1}\"."
+                    )
+                    .WithResponseProperty("AcceptVersions", new JArray 
+                        {
+                            CallerRequest.VERSION_3_0,
+                            CallerRequest.VERSION_3_1
+                        }
+                    );
+
             /* Utility functions to load a required property. */
             string LoadRequiredString(string propName)
             {
                 string? value = json[propName]?.Value<string>();
                 if (value == null)
-                    throw BadRequestException.Required(propName);
+                    throw RequiredPropertyError(propName);
                 return value;
             }
             long LoadRequiredLong(string propName)
             {
                 long? value = json[propName]?.Value<long>();
                 if (value.HasValue == false)
-                    throw BadRequestException.Required(propName);
+                    throw RequiredPropertyError(propName);
                 return value.Value;
             }
             int LoadRequiredInt(string propName)
             {
                 int? value = json[propName]?.Value<int>();
                 if (value.HasValue == false)
-                    throw BadRequestException.Required(propName);
+                    throw RequiredPropertyError(propName);
                 return value.Value;
             }
 
             /* Load version and check value. */
             string version = LoadRequiredString(propNameHashBack);
             if (version != VERSION_3_0 && version != VERSION_3_1)
-                throw BadRequestException.BadVersion();
+                throw BadVersionError();
 
             /* Load the remaining properties. The range 
              * of acceptable values will be checked by caller. */

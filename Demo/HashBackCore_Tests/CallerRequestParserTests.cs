@@ -1,9 +1,10 @@
 using billpg.HashBackCore;
+using billpg.WebAppTools;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json.Linq;
 
 namespace HashBackCore_Tests
 {
@@ -159,7 +160,7 @@ namespace HashBackCore_Tests
 
             /* Check the common properties. */
             Assert.AreEqual(expectedMessage, brex.Message);
-            JObject responseBody = brex.AsJson(incidentId);
+            JObject responseBody = brex.BodyWithIncidentId(incidentId);
             Assert.AreEqual(expectedMessage, responseBody["Message"]?.ToString());
             Assert.AreEqual(
                 incidentId.ToString().ToUpperInvariant(), 

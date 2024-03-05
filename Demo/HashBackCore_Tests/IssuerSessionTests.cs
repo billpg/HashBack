@@ -1,4 +1,5 @@
 ﻿using billpg.HashBackCore;
+using billpg.WebAppTools;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
@@ -11,28 +12,59 @@ namespace HashBackCore_Tests
     [TestClass]
     public class IssuerSessionTests
     {
+        /// <summary>
+        /// A reusable request object for testing.
+        /// </summary>
+        private readonly CallerRequest testRequest =
+            CallerRequest.Build(
+                CallerRequest.VERSION_3_1,
+                "BearerToken",
+                "https://issuer.example/issue",
+                1,
+                "https://caller.example/hashback/123.txt");
+
         [TestMethod]
         public void IssuerSession_NormalBearerToken()
         {
-            /* Make a new request object and pull out the expected hash. */
-            var req = CallerRequest.Build(
-                CallerRequest.VERSION_3_1, 
-                "BearerToken", 
-                "https://issuer.example/issue", 
-                1, 
-                "https://caller.example/hashback/123.txt");
-            string expectedVerificationHash = req.VerificationHash();
+            /* Find the expected hash or the reusuable test request. */
+            string expectedVerificationHash = testRequest.VerificationHash();
 
             /* Run the session. */
-            var issuedToken = IssuerSession.Run(req, "issuer.example", GenReturnHash(expectedVerificationHash));
+            var issuedToken = IssuerSession.Run(
+                testRequest, 
+                "issuer.example", 
+                GenReturnHash(expectedVerificationHash));
 
-            /* Check the issued token. (The length check should work 
-             * until 2286 when the timestamp will gain an extra digit.) */
+            /* Check the issued token. (The length check should work until 
+             * November 2286 when the timestamp will gain an extra digit. 
+             * It'll also not work prior to September 2001, but I understand
+             * time travel is impossible so this is not a concern.) */
             Assert.AreEqual(235, issuedToken.JWT.Length);
             Assert.AreEqual(3600, issuedToken.ExpiresAt - issuedToken.IssuedAt);
             Assert.IsTrue(issuedToken.IssuedAt > 1700000000);
 
             /* TODO: When you've written a JWT parser, use that to check the JWT itself. */
+        }
+
+        [TestMethod]
+        public void IssuerSession_WrongIssuerUrl()
+        {
+            /* Run the session with the wrong expected issuer URL. */
+            try
+            {
+                IssuerSession.Run(testRequest, "not.issuer.example", GenReturnHash(""));
+            }
+            catch (BadRequestException brex)
+            {
+                /* Check the exception is as expected. */
+                Assert.AreEqual("IssuerUrl is for a different issuer.", brex.Message);
+
+                /* Test complete, avoid the Assert.Fail below. */
+                return;
+            }
+
+            /* Expected an exception thrown by now. */
+            Assert.Fail("Expected BadRequestException by IssuerSession.");
         }
 
         /// <summary>
