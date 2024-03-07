@@ -3,6 +3,7 @@
 using billpg.CrossRequestTokenExchange;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -13,8 +14,8 @@ var readmeLines = File.ReadAllLines(readmePath).ToList();
 var readmeOrigText = string.Join("\r\n", readmeLines);
 
 /* Load the fixed salt bytes. */
-const string fixed_salt_password = "HashBack";
-const string fixed_salt_salt = "Dedicated to my Treacle. I love you to the moon and back.";
+const string fixed_salt_password = "To my Treacle.";
+const string fixed_salt_salt = "I love you to the moon and back.";
 const int fixed_salt_rounds = 238854 * 2; 
 var fixedSaltBytes = Rfc2898DeriveBytes.Pbkdf2(
     password: Encoding.ASCII.GetBytes(fixed_salt_password),
@@ -23,9 +24,16 @@ var fixedSaltBytes = Rfc2898DeriveBytes.Pbkdf2(
     hashAlgorithm: HashAlgorithmName.SHA512,
     outputLength: 32);
 
+string StringSaltParameters(string label, string value)
+{
+    int byteCount = value.Length;
+    int byteSum = value.Select(ch => (int)ch).Sum();
+    return $"- {label}: \"{value}\" ({byteCount} bytes, summing to {byteSum}.)";
+}
+
 /* Look for the fixed salt in the README. */
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_PASSWORD-->", $"- Password: \"{fixed_salt_password}\" ({fixed_salt_password.Length} bytes.)");
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_DEDICATION-->", $"- Salt: \"{fixed_salt_salt}\" ({fixed_salt_salt.Length} bytes.)");
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_PASSWORD-->", StringSaltParameters("Password", fixed_salt_password));
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_DEDICATION-->", StringSaltParameters("Salt", fixed_salt_salt));
 SetTextByMarker(readmeLines, "<!--FIXED_SALT_ITERATIONS-->", $"- Iterations: {fixed_salt_rounds}");
 
 /* Look for the fixed salt byte block, two lines after the marker. */
