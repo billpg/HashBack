@@ -64,7 +64,7 @@ The request body is a single JSON object. All properties are of string type exce
   - Values:
     - `BearerToken` - The Caller is requesting an opaque token. This should be supported by all Issuer services as a final fall-back option.
     - `JWT` - The Caller is requesting a JWT token.
-    - `SetCookie` - The Caller is requesting a 204 (no content) response with a `Set-Cookie` header.
+    - `204SetCookie` - The Caller is requesting a 204 (no content) response with a `Set-Cookie` header.
     - (Other values may be specified separately from this document.)
 - `IssuerUrl`
   - A copy of the full POST request URL.
@@ -176,7 +176,7 @@ Content-Type: application/json
 "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIiI6ImJpbGxwZy5jb20vbmdneXUifQ.eyJzdWIiOiJjYWxsZXIuZXhhbXBsZSIsImlzcyI6Imlzc3Vlci5leGFtcGxlIiwiaWF0Ijo1MjkyOTcyMDEsImV4cCI6NTI5MzAwODAxfQ.ZuzMUxY1_Zv8duc5kvj5LVTd2B4A9oj4m8qPCMGi7os"
 ```
 
-#### "SetCookie"
+#### "204SetCookie"
 The response body will be a no-content 204 response with a `Set-Cookie` header. This may be useful if a browser is making the POST request and the returned cookie is flagged as http-only, keeping it outside the JS realm.
 
 For example:<!--1066_EXAMPLE_SET_COOKIE-->
@@ -236,7 +236,7 @@ POST https://bob.example/api/BearerRequest
 }
 ```
 #### `AcceptTypeOfResponse`
-The request property allows for a single string to specify the desired response. Three values are specified here (`BearerToken`, `JWT` and `SetCookie`) but later standards may allow for additional values without requiring a new edition of this document.
+The request property allows for a single string to specify the desired response. Three values are specified here (`BearerToken`, `JWT` and `204SetCookie`) but later standards may allow for additional values without requiring a new edition of this document.
 
 If the recipient does not know about the request response type, the response may list the response-type values it does know about using this response property. The value will be a JSON array of those strings.
 
@@ -445,7 +445,7 @@ As this proposal is still in the public-draft phase, I am open to be persuaded t
   - Changed name to "HashBack" Authentication, reflecting that a token is only one possible outcome and the verification hash is the big idea.
 - Public Draft 3.1 (This document)
   - The "fixed salt" is now the result of running RBKDF2 but without processing the result into capitals letters. This means I no longer need to link to some "attached" C# code and can simply record the input parameters. (The original motivation of having only capital letters in the salt was to support implementations that only accept ASCII strings, but all implementations I could find will accept arbitrary blocks of bytes as input.)
-  - Added "SetCookie" as a third response type. Might be useful for a browser making the POST request.
+  - Added "204SetCookie" as a third response type. Might be useful for a browser making the POST request.
 
 ## Next Steps
 
