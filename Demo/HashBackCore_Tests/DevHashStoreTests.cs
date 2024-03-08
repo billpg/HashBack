@@ -14,11 +14,20 @@ namespace HashBackCore_Tests
         [TestMethod]
         public void DevHashStore_RoundTrip()
         {            
-            DevHashStore.Store("MyUser", "MyFilename", "I/Ran/PBKDF2/On/My/JSON/and/this/resulted/A=");
+            var storeReturnValue = DevHashStore.Store(
+                "MyUser", "MyFilename", 
+                Convert.FromBase64String("I/Ran/PBKDF2/On/My/JSON/and/this/resulted/A="));
+            Assert.AreEqual(
+                "A04C3D1BEAA1CEF5D316769AE548F06AB8A4A5A70D3110AA0E119E3152A3E3B4" +
+                "/" +
+                "D6F1B69FA7A6248F4503E4F59B79807001818D5A78F133AA2720FABCE4B351BC" +
+                ".txt", storeReturnValue);
             var loaded = DevHashStore.Load(
-                "EA2F1834F3292C22750DA3CAEFD1181EFA94B3BF3021C46496A44FCE35EAAED3",
-                "3459EBE16B97F1830A8A8EF4D82D7EDFDDED73C91EE49B902CCB959B6C40403F");
-            Assert.AreEqual("I/Ran/PBKDF2/On/My/JSON/and/this/resulted/A=", loaded);
+                storeReturnValue.Substring(0, 64), 
+                storeReturnValue.Substring(65, 64));
+            Assert.AreEqual(
+                "I/Ran/PBKDF2/On/My/JSON/and/this/resulted/A=", 
+                Convert.ToBase64String(loaded));
         }
 
     }

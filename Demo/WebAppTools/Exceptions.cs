@@ -27,6 +27,13 @@ namespace billpg.WebAppTools
         }
     }
 
+    public class NotFoundException: HttpResponseException
+    {
+        public NotFoundException()
+            : base(404, "Not Found", new JObject())
+        { }
+    }
+
     public class BadRequestException: HttpResponseException
     {
         public BadRequestException(string message)

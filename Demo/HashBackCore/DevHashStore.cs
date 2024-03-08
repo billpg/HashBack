@@ -41,16 +41,10 @@ namespace billpg.HashBackCore
         private static readonly Func<string, byte[]> GetUtf8Bytes
             = new UTF8Encoding(false).GetBytes;
 
-        public static void Store(string user, string filename, string hash)
+        public static string Store(string user, string filename, byte[] hashAsBytes)
         {
             /* Replace the supplied strings with their hashed versions. */
             var folder = GetFolder(user, filename);                
-
-            /* Convert the hash to bytes, validating along the way.
-             * Will throw FormatException if not valid base-64. */
-            byte[] hashAsBytes = Convert.FromBase64String(hash);
-            if (hashAsBytes.Length != 256/8)
-                throw new ApplicationException("Hash is not a valid base-64 encoded hash.");
 
             /* Store in memory store. */
             var storedHash = new StoredHash(hashAsBytes);
@@ -58,9 +52,12 @@ namespace billpg.HashBackCore
             {
                 hashes[folder] = storedHash;
             }
+
+            /* Return the hshed path. */
+            return folder;
         }
 
-        public static string Load(string hashedUser, string hashedFilename)
+        public static byte[] Load(string hashedUser, string hashedFilename)
         {
             /* Validate the hashed for hex/length. */
             if (hashedUser.Length != 256 / 4
@@ -80,8 +77,8 @@ namespace billpg.HashBackCore
             if (storedHash.ExpiresAt < DateTime.UtcNow.ToUnixTime())
                 throw new ApplicationException("Not Found");
 
-            /* Return hash in base-64 form. */
-            return Convert.ToBase64String(storedHash.Hash);
+            /* Return hash. */
+            return storedHash.Hash;
         }
 
         private static string GetFolder(string user, string filename)
@@ -91,9 +88,9 @@ namespace billpg.HashBackCore
 
         private static string HashEncode(string from)
         {
-            byte[] sourceAsBytes = GetUtf8Bytes(from);
+            byte[] sourceAsBytes = GetUtf8Bytes(from + "hashback.billpg.com");
             byte[] hashBytes = ComputeSha256(sourceAsBytes);
-            return String.Concat(hashBytes.Select(b => b.ToString("X2")));
+            return string.Concat(hashBytes.Select(b => b.ToString("X2")));
         }
 
         private static bool IsHexDigit(char ch)

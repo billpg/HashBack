@@ -56,5 +56,14 @@ namespace billpg.WebAppTools
                 }
             }
         }
+
+        public static Uri Url(this HttpRequest req)
+        {
+            string protocol = req.IsHttps ? "https" : "http";
+            return new Uri($"{protocol}://{req.Host}{req.Path}");
+        }
+
+        public static Uri WithRelativePath(this Uri baseUrl, string relativePath)
+            => new Uri(baseUrl, relativePath);        
     }
 }

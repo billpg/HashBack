@@ -19,6 +19,7 @@ app.Urls.Add($"http://localhost:{port}");
 /* Configure various end-points with handlers. */
 app.MapGetRedirectTo("/", ServiceConfig.LoadRequiredString("RedirectHomeTo"));
 app.MapPostWrapped("/devHashStore/store", ServiceEndpoints.PostStoreHash);
+app.MapGetWrapped("/devHashStore/load/{user}/{file}", ServiceEndpoints.GetStoreHash);
 
 /* Start running and log. */
 Console.WriteLine("Running.");

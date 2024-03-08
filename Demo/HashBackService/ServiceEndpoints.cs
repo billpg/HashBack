@@ -13,9 +13,38 @@ namespace billpg.HashBackService
 {
     internal static class ServiceEndpoints
     {
-        internal class PostStoreHashResponse
+        private const int hexTokenLength = 256 / 4;
+        private const int hexTokenWithExtLength = hexTokenLength + 4;
+        private static readonly UTF8Encoding UTF8 = new UTF8Encoding(false);
+
+        internal static void GetStoreHash(HttpContext context)
         {
-            public string Hello { get; } = "Hi";
+            /*
+            curl -i http://localhost:3001/devHashStore/load/xyz/abc.txt
+            */
+
+            /* Load the two strings from the URL. If either are missing, 404. */
+            string? userAsHex = context.Request.RouteValues["user"] as string;
+            string? fileAsHex = context.Request.RouteValues["file"] as string;
+            if (userAsHex == null || userAsHex.Length != hexTokenLength || 
+                fileAsHex == null || fileAsHex.Length != hexTokenWithExtLength)
+                throw new NotFoundException();
+
+            /* Reject filenames that don't end in .txt and remove the suffix.
+             * (We know the stringis long enough thanks to the above test.) */
+            if (fileAsHex.Substring(hexTokenLength) != ".txt")
+                throw new NotFoundException();
+            fileAsHex = fileAsHex.Substring(0, hexTokenLength);
+
+            /* Query dev hash store. */
+            byte[] hashAsBytes = DevHashStore.Load(userAsHex, fileAsHex);
+            if (hashAsBytes == null)
+                throw new NotFoundException();
+
+            /* Return hash. */
+            context.Response.StatusCode = 200;
+            context.Response.Headers["Content-Type"] = "text/plain";
+            context.Response.Body.WriteAsync(UTF8.GetBytes(Convert.ToBase64String(hashAsBytes) + "\r\n"));
         }
 
         internal static void PostStoreHash(HttpContext context)
@@ -51,7 +80,13 @@ namespace billpg.HashBackService
                 throw new BadRequestException("Hash property must be 256 bits, base-64 encoded.");
 
             /* Add the hash to the store. */
-            DevHashStore.Store(user, name, hash);
+            string localPath = DevHashStore.Store(user, name, hashAsBytes);
+
+            /* Return a "created" response. */
+            context.Response.StatusCode = 201;
+            context.Response.Headers["Location"] = context.Request.Url().WithRelativePath("load/").WithRelativePath(localPath).ToString();
+            context.Response.Headers["Content-Type"] = "text/plain";
+            context.Response.Body.WriteAsync(UTF8.GetBytes(hash + "\r\n"));
         }
     }
 }
