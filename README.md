@@ -1,7 +1,7 @@
 # HashBack Authentication
 A web authentication exchange where a caller proves their identity by publishing a hash value on their website.
 
-This version of the document is a **draft-under-development**. It will be tagged as `HASHBACK-PUBLIC-DRAFT-3-1` once finished.
+This version of the document is a **public-draft** for review and discussion tagged as `HASHBACK-PUBLIC-DRAFT-3-1`.
 If you have any comments or notes, please open an issue on this project's public github.
 
 This document is Copyright William Godfrey, 2024. You may use its contents under the terms of the Creative-Commons Attribution license.
