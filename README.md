@@ -22,20 +22,7 @@ While a recipient of a call *can't* be certain who a caller is, the caller *can*
 
 Now apply that thought to web authentication. The client can be sure (thanks to TLS) who the server is, but the server can't be sure who the client is, much like the analogy with phone calls. This document describes how the same "call me back" step could be used to authenticate a web API request. 
 
-(As it would be expensive to do that for every single HTTP request, the exchange happens once-off to supply the caller with a Bearer token, which the caller may use until it expires.)
-
-## What's a Bearer token?
-(You may skip this section if you are already familiar with this concept.)
-
-A Bearer token is string of characters. It could be a signed JWT or a string of randomness. If you know what that string is, you can include it any web request where you want to show who you are. The token itself is generated (or "issued") by the service that will accept that token later on as proof that you are who you say you are, because no-one else would have the token. 
-
-```
-POST /api/some/secure/api/
-Authorization: Bearer eyIiOiIifQ.eyIiOiJodHRwczovL2JpbGxwZy5jb20vbmdneXUifQ.nggyu
-{ "Stuff": "Nonsense" }
-```
-
-That's basically it. It's like a password but very long and issued by the remote service. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Bearer tokens typically (but not always) have short life-times and you'd normally be given an expiry time along with the token itself. Cookies are a common variation of this method.
+As it would be expensive to do that for every single HTTP request, the exchange happens once-off to supply the caller with a Bearer token (or other means for authentication), which the caller may use until it expires.
 
 ## The Exchange
 - "Hey Bob. I want to use your API but I need a Bearer token."

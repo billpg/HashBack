@@ -41,12 +41,8 @@ int fixedSaltIndex = readmeLines.FindIndex(src => src.Contains("<!--FIXED_SALT--
 readmeLines.RemoveRange(fixedSaltIndex, 4);
 readmeLines.Insert(fixedSaltIndex, DumpByteArray(fixedSaltBytes));
 
-/* Set the bytes for CryptoHelper? */
+/* Set the bytes for CryptoHelper. */
 CryptoHelpers.FIXED_SALT = fixedSaltBytes;
-
-/* Look for the first use of a JWT. */
-int easterEggIndex = readmeLines.FindIndex(src => src.StartsWith("Authorization: Bearer ey"));
-readmeLines[easterEggIndex] = "Authorization: Bearer " + GenerateEasterEggJWT();
 
 /* Populate the main examples in the README. */
 PopulateExample(
@@ -203,16 +199,6 @@ string JWT64EncodeBytes(byte[] bytes)
 
 string JWT64EncodeString(string jsonAsString)
     => JWT64EncodeBytes(System.Text.Encoding.ASCII.GetBytes(jsonAsString));
-
-/* Generate a fake JWT with an easter egg. */
-string GenerateEasterEggJWT()
-{
-    return
-        JWT64Encode(new JObject { [""] = "" })
-        + "."
-        + JWT64Encode(new JObject { [""] = "https://billpg.com/nggyu" })
-        + ".nggyu";
-}
 
 void SetTextByMarker(List<string> lines, string marker, string line)
 {
