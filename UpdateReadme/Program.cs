@@ -3,57 +3,69 @@
 using billpg.CrossRequestTokenExchange;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Text;
 
 /* Locate and load README.md into memory. */
 string readmePath = FindFileByName("README.md");
 var readmeLines = File.ReadAllLines(readmePath).ToList();
 var readmeOrigText = string.Join("\r\n", readmeLines);
 
-/* Call the GenFixedSalt EXE and its last-modified. */
-var fixedSaltExePath = FindFileByName("GenFixedSalt.exe");
-var exeLastModified = UnixTime(new FileInfo(fixedSaltExePath).LastWriteTimeUtc).ToString();
+/* Load the fixed salt bytes. */
+const string fixed_salt_password = "To my Treacle.";
+const string fixed_salt_salt = "I love you to the moon and back.";
+const int fixed_salt_rounds = 238854 * 2; 
+var fixedSaltBytes = Rfc2898DeriveBytes.Pbkdf2(
+    password: Encoding.ASCII.GetBytes(fixed_salt_password),
+    salt: Encoding.ASCII.GetBytes(fixed_salt_salt),
+    iterations: fixed_salt_rounds,
+    hashAlgorithm: HashAlgorithmName.SHA512,
+    outputLength: 32);
 
-/* Pull out the last-modified from the readme. If they differ,
- * re-run the salt generator. */
-var expectedLastMod = File.ReadAllText("ExeExpectedLastMod.txt");
-if (expectedLastMod != exeLastModified)
+string StringSaltParameters(string label, string value)
 {
-    /* Log that we're calling the salt generator. */
-    Console.WriteLine($"Calling {fixedSaltExePath}");
-
-    /* Replace the last-mod record. */
-    File.WriteAllText("ExeExpectedLastMod.txt", exeLastModified);
-
-    /* Run the fixed salt generator. */
-    var psi = new ProcessStartInfo(fixedSaltExePath);
-    psi.RedirectStandardOutput = true;
-    var fixedSalt = Process.Start(psi).StandardOutput.ReadLine();
-
-    /* Look for the fixed salt in the README. */
-    int fixedSaltIndex = readmeLines.FindIndex(src => src.Contains("<!--FIXED_SALT-->"));
-    readmeLines[fixedSaltIndex] = "     - `" + fixedSalt + "`<!--FIXED_SALT-->";
-
-    /* Does it match the string in CryptoHelper? */
-    if (fixedSalt != CryptoHelpers.FIXED_SALT_AS_STRING)
-    {
-        /* Rewrite CryptoHelpers.cs. */
-        string cryptoHelperPath = FindFileByName("CryptoHelpers.cs");
-        var cryptoLines = File.ReadAllLines(cryptoHelperPath).ToList();
-        int sourceIndex = cryptoLines.FindIndex(src => src.Contains("FIXED_SALT_AS_STRING")) + 1;
-        var sourceLine = cryptoLines[sourceIndex].Split('"');
-        cryptoLines[sourceIndex] = sourceLine[0] + "\"" + fixedSalt + "\";";
-        File.WriteAllLines(cryptoHelperPath, cryptoLines);
-
-        /* Report update. */
-        Console.WriteLine("Updated CryptoHelper.cs. Rebuild and re-run.");
-        return;
-    }
+    int byteCount = value.Length;
+    int byteSum = value.Select(ch => (int)ch).Sum();
+    return $"- {label}: \"{value}\" ({byteCount} bytes, summing to {byteSum}.)";
 }
 
-/* Look for the first use of a JWT. */
-int easterEggIndex = readmeLines.FindIndex(src => src.StartsWith("Authorization: Bearer ey"));
-readmeLines[easterEggIndex] = "Authorization: Bearer " + GenerateEasterEggJWT();
+/* Look for the fixed salt in the README. */
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_PASSWORD-->", StringSaltParameters("Password", fixed_salt_password));
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_DEDICATION-->", StringSaltParameters("Salt", fixed_salt_salt));
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_ITERATIONS-->", $"- Iterations: {fixed_salt_rounds}");
+
+/* Look for the fixed salt byte block, two lines after the marker. */
+int fixedSaltIndex = readmeLines.FindIndex(src => src.Contains("<!--FIXED_SALT-->")) + 2;
+readmeLines.RemoveRange(fixedSaltIndex, 4);
+readmeLines.Insert(fixedSaltIndex, DumpByteArray(fixedSaltBytes));
+
+/* Set the bytes for CryptoHelper. */
+CryptoHelpers.FIXED_SALT = fixedSaltBytes;
+
+/* Populate the main examples in the README. */
+PopulateExample(
+    "1066_EXAMPLE",
+    DateTime.Parse("1986-10-09T23:00:00-04:00"),
+    "https://issuer.example/api/generate_bearer_token",
+    "https://caller.example/hashback_files/my_json_hash.txt");
+
+PopulateExample(
+    "CASE_STUDY",
+    DateTime.Parse("2005-03-26T19:00:00Z"),
+    "https://sass.example/api/login/hashback",
+    "https://carol.example/hashback/64961859.txt");
+
+/* If README has changed, rewrite back. */
+if (readmeOrigText != string.Join("\r\n", readmeLines))
+{
+    Console.WriteLine("Saving modified README.md.");
+    File.WriteAllLines(readmePath, readmeLines);
+}
+
+/* Announce end. */
+Console.WriteLine("Finished helper/readme update.");
 
 /* Return the number of seconds since 1970 for the supplied timestamp. */
 long UnixTime(DateTime utc)
@@ -65,7 +77,7 @@ void PopulateExample(string keyBase, DateTime now, string issuerUrl, string veri
 {
     /* Build request JSON. */
     var requestJson = new JObject();
-    requestJson["HashBack"] = "HASHBACK-PUBLIC-DRAFT-3-0";
+    requestJson["HashBack"] = "HASHBACK-PUBLIC-DRAFT-3-1";
     requestJson["TypeOfResponse"] = "BearerToken";
     requestJson["IssuerUrl"] = issuerUrl;
     requestJson["Now"] = UnixTime(now);
@@ -94,6 +106,15 @@ void PopulateExample(string keyBase, DateTime now, string issuerUrl, string veri
     /* Build a simple token example. */
     responseJson["BearerToken"] = GenerateUnus(keyBase + "SimpleToken").Substring(0, 40);
     ReplaceJson($"<!--{keyBase}_RESPONSE_SIMPLE_TOKEN-->", responseJson);
+
+    /* Build a set-cookie example. */
+    int setCookieMarkerIndex = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_SET_COOKIE-->"));
+    if (setCookieMarkerIndex > 0)
+    {
+        int setCookieHeaderIndex = readmeLines.FindIndex(setCookieMarkerIndex, src => src.StartsWith("Set-Cookie"));
+        var setCookieValue = GenerateUnus(keyBase + "SetCookie").Substring(0, 40);
+        readmeLines[setCookieHeaderIndex] = $"Set-Cookie: MyCookie={setCookieValue}; Secure; HttpOnly;";
+    }
 }
 
 void ReplaceJson(string tag, JObject insert)
@@ -117,28 +138,6 @@ void ReplaceJsonString(string tag, string value)
     int stringIndex = readmeLines.FindIndex(markerIndex, src => src.StartsWith("\"ey"));
     readmeLines[stringIndex] = "\"" + value + "\"";
 }
-
-PopulateExample(
-    "1066_EXAMPLE", 
-    DateTime.Parse("1986-10-09T23:00:00-04:00"), 
-    "https://issuer.example/api/generate_bearer_token", 
-    "https://caller.example/hashback_files/my_json_hash.txt");
-
-PopulateExample(
-    "CASE_STUDY",
-    DateTime.Parse("2005-03-26T19:00:00Z"),
-    "https://sass.example/api/login/hashback",
-    "https://carol.example/hashback/64961859.txt");
-
-/* If README has changed, rewrite back. */
-if (readmeOrigText != string.Join("\r\n", readmeLines))
-{
-    Console.WriteLine("Saving modified README.md.");
-    File.WriteAllLines(readmePath, readmeLines);
-}
-
-/* Announce end. */
-Console.WriteLine("Finished helper/readme update.");
 
 /* Find the file with the given name, starting from this file's folder moving upwards. */
 string FindFileByName(string fileName)
@@ -201,12 +200,25 @@ string JWT64EncodeBytes(byte[] bytes)
 string JWT64EncodeString(string jsonAsString)
     => JWT64EncodeBytes(System.Text.Encoding.ASCII.GetBytes(jsonAsString));
 
-/* Generate a fake JWT with an easter egg. */
-string GenerateEasterEggJWT()
+void SetTextByMarker(List<string> lines, string marker, string line)
 {
-    return
-        JWT64Encode(new JObject { [""] = "" })
-        + "."
-        + JWT64Encode(new JObject { [""] = "https://billpg.com/nggyu" })
-        + ".nggyu";
+    int fixedSaltIndex = lines.FindIndex(src => src.Contains(marker));
+    lines[fixedSaltIndex] = line + marker;
+}
+
+string DumpByteArray(IList<byte> bytes)
+{
+    string list = "";
+    for (int i = 0; i < bytes.Count; i++)
+    {
+        if (i > 0 && i % 8 == 0)
+            list += "\r\n";
+        if (i % 8 == 0)
+            list += "       ";
+        if (i == 0)
+            list += "[";
+        list += $"{bytes[i]},";
+    }
+
+    return list.Trim(',') + "]";
 }

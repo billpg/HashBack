@@ -1,7 +1,7 @@
 # HashBack Authentication
 A web authentication exchange where a caller proves their identity by publishing a hash value on their website.
 
-This version of the document is a **public-draft** for review and discussion tagged as `HASHBACK-PUBLIC-DRAFT-3-0`.
+This version of the document is a **public-draft** for review and discussion tagged as `HASHBACK-PUBLIC-DRAFT-3-1`.
 If you have any comments or notes, please open an issue on this project's public github.
 
 This document is Copyright William Godfrey, 2024. You may use its contents under the terms of the Creative-Commons Attribution license.
@@ -22,20 +22,7 @@ While a recipient of a call *can't* be certain who a caller is, the caller *can*
 
 Now apply that thought to web authentication. The client can be sure (thanks to TLS) who the server is, but the server can't be sure who the client is, much like the analogy with phone calls. This document describes how the same "call me back" step could be used to authenticate a web API request. 
 
-(As it would be expensive to do that for every single HTTP request, the exchange happens once-off to supply the caller with a Bearer token, which the caller may use until it expires.)
-
-## What's a Bearer token?
-(You may skip this section if you are already familiar with this concept.)
-
-A Bearer token is string of characters. It could be a signed JWT or a string of randomness. If you know what that string is, you can include it any web request where you want to show who you are. The token itself is generated (or "issued") by the service that will accept that token later on as proof that you are who you say you are, because no-one else would have the token. 
-
-```
-POST /api/some/secure/api/
-Authorization: Bearer eyIiOiIifQ.eyIiOiJodHRwczovL2JpbGxwZy5jb20vbmdneXUifQ.nggyu
-{ "Stuff": "Nonsense" }
-```
-
-That's basically it. It's like a password but very long and issued by the remote service. If anyone finds out what your Bearer token is they would be able to impersonate you, so it's important they go over secure channels only. Bearer tokens typically (but not always) have short life-times and you'd normally be given an expiry time along with the token itself. Cookies are a common variation of this method.
+As it would be expensive to do that for every single HTTP request, the exchange happens once-off to supply the caller with a Bearer token (or other means for authentication), which the caller may use until it expires.
 
 ## The Exchange
 - "Hey Bob. I want to use your API but I need a Bearer token."
@@ -56,7 +43,7 @@ The request body is a single JSON object. All properties are of string type exce
 
 - `HashBack`
   - Confirms this is a request for a Bearer token and indicates which version of this exchange the Caller wishes to use.
-  - This version of this document is specified by the value "HASHBACK-PUBLIC-DRAFT-3-0". 
+  - This version of this document is specified by the value "HASHBACK-PUBLIC-DRAFT-3-1". 
   - See the section describing 400 error responses below for version negotiation.
 - `TypeOfResponse`
   - States what type of response the Caller is requesting. 
@@ -64,6 +51,7 @@ The request body is a single JSON object. All properties are of string type exce
   - Values:
     - `BearerToken` - The Caller is requesting an opaque token. This should be supported by all Issuer services as a final fall-back option.
     - `JWT` - The Caller is requesting a JWT token.
+    - `204SetCookie` - The Caller is requesting a 204 (no content) response with a `Set-Cookie` header.
     - (Other values may be specified separately from this document.)
 - `IssuerUrl`
   - A copy of the full POST request URL.
@@ -88,7 +76,7 @@ The request body is a single JSON object. All properties are of string type exce
 For example:<!--1066_EXAMPLE_REQUEST-->
 ```
 {
-    "HashBack": "HASHBACK-PUBLIC-DRAFT-3-0",
+    "HashBack": "HASHBACK-PUBLIC-DRAFT-3-1",
     "TypeOfResponse": "BearerToken",
     "IssuerUrl": "https://issuer.example/api/generate_bearer_token",
     "Now": 529297200,
@@ -106,28 +94,37 @@ The hashing process takes the following steps.
 1. Convert the JSON request body into its canonical representation of bytes per RFC 8785.
 2. Call PBKDF2 with the following parameters:
    - Password: The JSON request body's canonical representation.
-   - Salt: The following 64 ASCII bytes. (All are ASCII capital letter bytes.)
-     - `BECOLRZAMVFWECYGJTLURIDPAYBGMSCQFDXTUYNPMZOAFEDGCKXTJUZLEQFCKXYB`<!--FIXED_SALT-->
+   - Salt: The following 32 bytes.<!--FIXED_SALT-->
+     - ```
+       [113,218,98,9,6,165,151,157,
+       46,28,229,16,66,91,91,72,
+       150,246,69,83,216,235,21,239,
+       162,229,139,163,6,73,175,201]
+       ```
    - Hash Algorithm: SHA256
    - Rounds: The value specified in the JSON request under `Rounds`.
-   - Output: 256 bits.
+   - Output: 256 bits / 32 bytes
 3. Encode the hash result using BASE-64, including the trailing `=` character.
 
 (A simplified RFC 8785 generator could be used, thanks to all of the values being simple integers or strings and all the JSON property names beginning (by design) with a different capital letter.)
 
 The fixed salt is used to ensure that a valid hash is only meaningful in light of this document, as that salt is not sent over the wire with the request.
 
-The salt string itself was generated by the attached C# program. This calls PBKDF2 with hard-coded string and a very high iteration count. After a little processing, the program outputs a string of 64 capital letters that was deterministically derived, taking steps to remove repeated letters for aesthetic reasons.
-
-[Please see the source code used to generate the fixed salt which includes commentary for how it works.](https://github.com/billpg/CrossRequestTokenExchange/blob/a543ff814c3dbf9e5b8e1e0a0e2bf2febccb718a/UpdateReadme/GenFixedSalt/GenFixedSalt.cs)
-
 Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The text file itself must be one line with the BASE-64 encoded hash in ASCII as that only line. The file must either be exactly 44 bytes long with no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence.
 
 The expected hash of the above example is: 
-- `2pFPaBO1bf6B7O8t9mCX8XZqU8rPtxcEYRU4eurPJEU=`<!--1066_EXAMPLE_HASH-->
+- `gnegmhqavAFiKctk5RTywzDKC5utN+nHjTzgNABH70Q=`<!--1066_EXAMPLE_HASH-->
+
+#### Generation of the fixed salt
+The salt string itself was generated by a PBKDF2 call with a high iteration count. For reference, the following parameters were used:
+- Password: "To my Treacle." (14 bytes, summing to 1239.)<!--FIXED_SALT_PASSWORD-->
+- Salt: "I love you to the moon and back." (32 bytes, summing to 2827.)<!--FIXED_SALT_DEDICATION-->
+- Hash Algorithm: SHA512
+- Iterations: 477708<!--FIXED_SALT_ITERATIONS-->
+- Output: 256 bits / 32 bytes
 
 ### 200 "Success" Response
-A 200 response indicates the Issuer service is satisfied the POST request came from the genuine Caller. The specific response will depend on the value of the `TypeOfResponse` request property.
+A 200 response indicates the Issuer service is satisfied the POST request came from the genuine Caller. The specific response will depend on the value of the `TypeOfResponse` request property. Future response types might include, for example, a cryptographic key exchange.
 
 #### "BearerToken"
 The response body includes the requested Bearer token and when that token expires. The JSON will have the following properties.
@@ -160,10 +157,20 @@ Content-Type: application/json
 #### "JWT"
 The response body will be a single JSON string value (including quotes) with the JWT token. The expiry and issued timestamps and other claims may be encoded inside the JWT according to that standard's rules.
 
-For example<!--1066_EXAMPLE_RESPONSE_JWT_ONLY-->
+For example:<!--1066_EXAMPLE_RESPONSE_JWT_ONLY-->
 ```
 Content-Type: application/json
 "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIiI6ImJpbGxwZy5jb20vbmdneXUifQ.eyJzdWIiOiJjYWxsZXIuZXhhbXBsZSIsImlzcyI6Imlzc3Vlci5leGFtcGxlIiwiaWF0Ijo1MjkyOTcyMDEsImV4cCI6NTI5MzAwODAxfQ.ZuzMUxY1_Zv8duc5kvj5LVTd2B4A9oj4m8qPCMGi7os"
+```
+
+#### "204SetCookie"
+The response body will be a no-content 204 response with a `Set-Cookie` header. This may be useful if a browser is making the POST request and the returned cookie is flagged as http-only, keeping it outside the JS realm.
+
+For example:<!--1066_EXAMPLE_SET_COOKIE-->
+```
+204 No Content
+Server: A Hypothetical Web Server
+Set-Cookie: MyCookie=I7Si8GoSb24COy47HsKqcilv++x8wqQi5HpthnJC; Secure; HttpOnly;
 ```
 
 ### 400 "Bad Request" Response
@@ -211,12 +218,12 @@ POST https://bob.example/api/BearerRequest
 
 400 Bad Request
 { 
-    "Message": "Unknown version. I only know HASHBACK-PUBLIC-DRAFT-3-0.",
-    "AcceptVersions": [ "HASHBACK-PUBLIC-DRAFT-3-0" ]
+    "Message": "Unknown version. I only know HASHBACK-PUBLIC-DRAFT-3-1.",
+    "AcceptVersions": [ "HASHBACK-PUBLIC-DRAFT-3-1" ]
 }
 ```
 #### `AcceptTypeOfResponse`
-The request property allows for a single string to specify the desired response. Two values are specified here (`BearerToken` and `JWT`) but later standards may allow for additional values without requiring a new edition of this document.
+The request property allows for a single string to specify the desired response. Three values are specified here (`BearerToken`, `JWT` and `204SetCookie`) but later standards may allow for additional values without requiring a new edition of this document.
 
 If the recipient does not know about the request response type, the response may list the response-type values it does know about using this response property. The value will be a JSON array of those strings.
 
@@ -255,15 +262,15 @@ POST https://bob.example/api/BearerRequest
 The service may respond with any applicable standard HTTP error code in the event of an unexpected error. 
 
 # An extended example.
-**SAAS** is a website with an API designed for their customers to use. When a customer wishes to use this API, their code must first go through this exchange to obtain a Bearer token. The service publishes a document for how their customers cam do this, including that the URL to POST requests to is `https://saas.example/api/login/crte`.
+**SAAS** is a website with an API designed for their customers to use. When a customer wishes to use this API, their code must first go through this exchange to obtain a Bearer token. The service publishes a document for how their customers cam do this, including that the URL to POST requests to is `https://saas.example/api/login/hashback`.
 
-**Carol** is a customer of Saas. She's recently signed up and logged into the Saas customer portal. On her authentication page under the CRTE section, she's configured her account affirming that `https://carol.example/crte/` is a folder under her sole control and where her verification hashes will be saved.
+**Carol** is a customer of Saas. She's recently signed up and logged into the Saas customer portal. On her authentication page under the *HashBack Authentication* section, she's configured her account affirming that `https://carol.example/hashback/` is a folder under her sole control and where her verification hashes will be saved.
 
 ## Making the request.
 Time passes and Carol needs to make a request to the Saas API and needs a Bearer token. Her code builds a JSON request:<!--CASE_STUDY_REQUEST-->
 ```
 {
-    "HashBack": "HASHBACK-PUBLIC-DRAFT-3-0",
+    "HashBack": "HASHBACK-PUBLIC-DRAFT-3-1",
     "TypeOfResponse": "BearerToken",
     "IssuerUrl": "https://sass.example/api/login/hashback",
     "Now": 1111863600,
@@ -274,14 +281,14 @@ Time passes and Carol needs to make a request to the Saas API and needs a Bearer
 ```
 
 The code calculates the verification hash from this JSON using the process outlined above. The result of hashing the above example request is:
-- `3IoVdF2nnOJ1mwNGZYXoZcPLTsY2NyL+8JIWJB3jKzM=`<!--CASE_STUDY_HASH-->
+- `cMrpOXW6hMJmi9IMKEPHfvN29yfyaPEVY064coS9L8c=`<!--CASE_STUDY_HASH-->
 
 The hash is saved as a text file to her web server using the random filename selected earlier. With this in place, the POST request can be sent to the SAAS API. The HTTP client library used to make the POST request will perform the necessary TLS handshake as part of making the connection.
 
 ## Checking the request
 The SAAS website receives this request and validates the request body, performing the following checks:
 - The request arrived via HTTPS.  :heavy_check_mark:
-- The version string `HASHBACK-PUBLIC-DRAFT-3-0` is known.  :heavy_check_mark:
+- The version string `HASHBACK-PUBLIC-DRAFT-3-1` is known.  :heavy_check_mark:
 - The `IssuerUrl` value is a URL belonging to itself - `saas.example`.  :heavy_check_mark:
 - The `Now` time-stamp is reasonably close to the server's internal clock.  :heavy_check_mark:
 - The `Unus` value represents 256 bits encoded in base-64.  :heavy_check_mark:
@@ -333,7 +340,7 @@ Your web site needs to be covered by TLS, and for your code to be able to publis
 ### What sort of range should be allowed for identifying an `IssuerUrl` to a single user.
 I recommend keeping it tight to either a file inside a single folder or to a single URL with a single query string parameter.
 
-For example, if a user affirms they are in control of `https://example.com/crte/`, then allow `https://example.com/crte/1234.txt`, but reject any sub-folders or URLs with query strings. Similarly, if a user affirms they are in control of `https://example.com/crte?ID=` then allow variations of URLs with that query string parameter changing, rejecting any requests with sub-folders or additional query string parameters.
+For example, if a user affirms they are in control of `https://example.com/hashback/`, then allow `https://example.com/hashback/1234.txt`, but reject any sub-folders or URLs with query strings. Similarly, if a user affirms they are in control of `https://example.com/hashback?ID=` then allow variations of URLs with that query string parameter changing, rejecting any requests with sub-folders or additional query string parameters.
 
 Ultimately, it is up to each pair of Caller and Issuer to agree what URLs identify that Caller. This document does not proscribe that scope.
 
@@ -414,19 +421,22 @@ As this proposal is still in the public-draft phase, I am open to be persuaded t
 ### What are the previous public drafts?
 
 - [Public Draft 1](https://github.com/billpg/HashBack/blob/22c67ba14d1a2b38c2a8daf1551f065b077bfbb0/README.md)
-  - Initial revision, then named "Cross Request Token Exchange".
+  - Initial published revision, then named "Cross Request Token Exchange".
   - Used two POST requests in opposite directions, with the second POST request acting as the response to the first.
 - [Public Draft 2](https://github.com/billpg/HashBack/blob/2165a661e093754e038620d3b2be1caeacb9eba0/README.md)
   - Updated to allow a 202 "Accepted" response to the first POST request, avoiding to need to keep the connection open.
   - I had a change of heart to this approach shortly after publishing it.
-- Public Draft 3.0 (This document)
+- [Public Draft 3.0](https://github.com/billpg/HashBack/blob/bf7e2ff1876e9673b04bffb7d70766a10d326976/README.md)
   - Substantial refactoring after realising the verification hash could be a unauthenticated GET request on a static file host.
   - Added a "dot zero" to allow for minor updates, reserving 4.0 for another substantial refactor.
-  - Changed name to "HashBack" Authentication, reflecting that a token is only one possible outcome and the the verification hash is the big idea.
+  - Changed name to "HashBack" Authentication, reflecting that a token is only one possible outcome and the verification hash is the big idea.
+- Public Draft 3.1 (This document)
+  - The "fixed salt" is now the result of running RBKDF2 but without processing the result into capitals letters. This means I no longer need to link to some "attached" C# code and can simply record the input parameters. (The original motivation of having only capital letters in the salt was to support implementations that only accept ASCII strings, but all implementations I could find will accept arbitrary blocks of bytes as input.)
+  - Added "204SetCookie" as a third response type. Might be useful for a browser making the POST request.
 
 ## Next Steps
 
-This document is a draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using PBKDF2 with its fixed hash correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm that authenticity of the POST request. If you have any comments or notes, please raise an issue on this project's github.
+This document is a draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using PBKDF2 with its fixed salt correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm that authenticity of the POST request. If you have any comments or notes, please raise an issue on this project's github.
 
 In due course I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform the role of an Issuer by sending your API tokens on demand, as well as perform the role of a Caller by asking your API for a token.
 
