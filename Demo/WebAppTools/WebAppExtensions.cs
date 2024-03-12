@@ -41,6 +41,12 @@ namespace billpg.WebAppTools
                     /* Call through to the wrapped context. */
                     handler(context);
                 }
+                catch (ApplicationException ex) when (ex.Message == "Not Found")
+                {
+                    context.Response.StatusCode = 404;
+                    context.Response.ContentType = "text/plain";
+                    context.Response.Body.WriteAsync(Utf8GetBytes(ex.Message));
+                }
                 catch (HttpResponseException hrex)
                 {
                     /* Convert the response body to an array of bytes. */

@@ -12,7 +12,7 @@ namespace billpg.HashBackCore
     public class CallerRequest
     {
         public const string VERSION_3_0 = "HASHBACK-PUBLIC-DRAFT-3-0";
-        public const string VERSION_3_1 = "HASHBACK-PUBLIC-DRAFT-3-1-UNDERDEV";
+        public const string VERSION_3_1 = "HASHBACK-PUBLIC-DRAFT-3-1";
 
         public string Version { get; } = "";
         public string TypeOfResponse { get; } = "";
@@ -114,7 +114,7 @@ namespace billpg.HashBackCore
                 typeOfResponse, 
                 issuerUrl, 
                 DateTime.UtcNow.ToUnixTime(), 
-                InternalTools.GenerateUnus(), 
+                CryptoExtensions.GenerateUnus(), 
                 rounds, 
                 verifyUrl);
         }

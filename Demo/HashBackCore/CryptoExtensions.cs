@@ -22,6 +22,12 @@ namespace billpg.HashBackCore
         private static readonly UTF8Encoding UTF8 = new UTF8Encoding(false);
 
         /// <summary>
+        /// Compute SHA256 hash from bytes.
+        /// </summary>
+        private static readonly Func<byte[], byte[]> ComputeSha256
+            = System.Security.Cryptography.SHA256.Create().ComputeHash;
+
+        /// <summary>
         /// A copy of public-draft 3.0's fixed salt in byte array form.
         /// </summary>
         private static IList<byte> VERSION_3_0_FIXED_SALT
@@ -46,11 +52,10 @@ namespace billpg.HashBackCore
         /// <returns>The verification hash for this object.</returns>
         public static string VerificationHash(this CallerRequest req)
         {
-            /* Build JSON with each property in the expected order per RFC 8785. 
-             * (Any "-UNDERDEV" suffix is removed to allow for documented hash testing.) */
+            /* Build JSON with each property in the expected order per RFC 8785. */
             var canonical = new JObject
             {
-                ["HashBack"] = req.Version.Replace("-UNDERDEV", ""),
+                ["HashBack"] = req.Version,
                 ["IssuerUrl"] = req.IssuerUrl,
                 ["Now"] = req.Now,
                 ["Rounds"] = req.Rounds,
@@ -84,5 +89,42 @@ namespace billpg.HashBackCore
             /* Return hash in BASE-64. */
             return Convert.ToBase64String(hashAsBytes);
         }
+
+        /// <summary>
+        /// Generate a string token that could be used as a Unus property value.
+        /// </summary>
+        /// <returns>256 bits of cryptgraphic quality randomness in base-64 encoding.</returns>
+        public static string GenerateUnus()
+        {
+            /* Generate 256 cryptographic quality random bits into a block of bytes. */
+            using var rnd = RandomNumberGenerator.Create();
+            byte[] randomBytes = new byte[256 / 8];
+            rnd.GetBytes(randomBytes);
+
+            /* Encode those bytes as BASE64, including the trailing equals. */
+            return Convert.ToBase64String(randomBytes);
+        }
+
+        public static string UserToHashedUser(string user, string secret)
+        {
+            /* Call PBKDF2 to turn the name and salt into a key. */
+            byte[] hashAsBytes = Rfc2898DeriveBytes.Pbkdf2(
+                password: UTF8.GetBytes(user),
+                salt: UTF8.GetBytes(secret),
+                hashAlgorithm: HashAlgorithmName.SHA512,
+                iterations: 3,
+                outputLength: 99);
+
+            /* Encode, removing and unwanted characters. */
+            string hashAsString = 
+                Convert.ToBase64String(hashAsBytes)
+                .Replace("/", "")
+                .Replace("+", "")
+                .Replace("=", "");
+
+            /* Return the left-most ten characters. */
+            return hashAsString.Substring(0, 10);            
+        }
+
     }
 }

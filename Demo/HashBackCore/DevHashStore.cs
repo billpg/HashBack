@@ -13,10 +13,10 @@ namespace billpg.HashBackCore
     {
         private class StoredHash
         {
-            public readonly byte[] Hash;
+            public readonly string Hash;
             public readonly long ExpiresAt;
 
-            public StoredHash(byte[] hash)
+            public StoredHash(string hash)
             {
                 this.Hash = hash;
                 this.ExpiresAt = DateTime.UtcNow.ToUnixTime() + 100;
@@ -24,10 +24,16 @@ namespace billpg.HashBackCore
         }        
 
         /// <summary>
-        /// 64k pre-initiualised stores of hashes.
+        /// Store of hashes. Lock before use.
         /// </summary>
         private static readonly Dictionary<string, StoredHash> hashes
             = new Dictionary<string, StoredHash>();
+
+        /// <summary>
+        /// List of hash keys in order of adding, so old ones can be shifted off.
+        /// </summary>
+        private static readonly List<string> hashKeysInOrder
+            = new List<string>();
 
         /// <summary>
         /// Compute SHA256 hash from bytes.
@@ -41,36 +47,40 @@ namespace billpg.HashBackCore
         private static readonly Func<string, byte[]> GetUtf8Bytes
             = new UTF8Encoding(false).GetBytes;
 
-        public static string Store(string user, string filename, byte[] hashAsBytes)
-        {
-            /* Replace the supplied strings with their hashed versions. */
-            var folder = GetFolder(user, filename);                
+        private static string HashKey(string userHashed, long filename)
+            => $"cache/{userHashed}/{filename}";
 
+        public static void Store(string userHashed, long filename, string hash)
+        {
             /* Store in memory store. */
-            var storedHash = new StoredHash(hashAsBytes);
+            var storedHash = new StoredHash(hash);
             lock (hashes)
             {
-                hashes[folder] = storedHash;
-            }
+                /* Store the new key. */
+                string key = HashKey(userHashed, filename);
+                hashes[key] = storedHash;
+                hashKeysInOrder.Add(key);
 
-            /* Return the hshed path. */
-            return folder;
+                /* Remove all the older ones until the size is acceptable. */
+                while (hashKeysInOrder.Count > 9999)
+                {
+                    string keyToFlush = hashKeysInOrder[0];
+                    hashes.Remove(keyToFlush);
+                    hashKeysInOrder.Remove(keyToFlush);
+                }
+            }
         }
 
-        public static byte[] Load(string hashedUser, string hashedFilename)
+        public static string Load(string userHashed, long filename)
         {
-            /* Validate the hashed for hex/length. */
-            if (hashedUser.Length != 256 / 4
-                || hashedFilename.Length != 256 / 4
-                || hashedUser.All(IsHexDigit) == false
-                || hashedFilename.All(IsHexDigit) == false)
-                throw new ApplicationException("NotHex");
-
-            /* Read from the store. */
-            StoredHash storedHash;
+            /* Read from the store and remove. */
+            StoredHash? storedHash;
             lock (hashes)
-            {
-                storedHash = hashes[$"{hashedUser}/{hashedFilename}.txt"];
+            {               
+                string key = HashKey(userHashed, filename);
+                if (hashes.TryGetValue(key, out storedHash) == false || storedHash == null)
+                    throw new ApplicationException("Not Found");
+                hashes.Remove(key);
             }
 
             /* Check expiry. */
@@ -80,21 +90,5 @@ namespace billpg.HashBackCore
             /* Return hash. */
             return storedHash.Hash;
         }
-
-        private static string GetFolder(string user, string filename)
-        {
-            return HashEncode(user) + "/" + HashEncode(filename) + ".txt";
-        }
-
-        private static string HashEncode(string from)
-        {
-            byte[] sourceAsBytes = GetUtf8Bytes(from + "hashback.billpg.com");
-            byte[] hashBytes = ComputeSha256(sourceAsBytes);
-            return string.Concat(hashBytes.Select(b => b.ToString("X2")));
-        }
-
-        private static bool IsHexDigit(char ch)
-            => (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'F');
-        
     }
 }

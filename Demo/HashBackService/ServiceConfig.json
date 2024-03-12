@@ -1,4 +1,7 @@
 {
+  "IssuerHost": "hashbackdemo.example.com",
   "ListenPort": 3001,
-  "RedirectHomeTo":  "https://github.com/billpg/HashBack/"
+  "RedirectHomeTo": "https://github.com/billpg/HashBack/",
+  "RedirectHashStoreTo": "https://github.com/billpg/HashBack/Demo/DevHashStore.md",
+  "HashStoreUserHashSecret": "This string is a secret. Shhhhh!"
 }

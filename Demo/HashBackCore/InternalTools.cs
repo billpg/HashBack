@@ -30,20 +30,7 @@ namespace billpg.HashBackCore
         internal static long ToUnixTime(this DateTime from)
             => (long)(from.ToUniversalTime().Subtract(UNIX_EPOCH).TotalSeconds);
 
-        /// <summary>
-        /// Generate a string token that could be used as a Unus property value.
-        /// </summary>
-        /// <returns>256 bits of cryptgraphic quality randomness in base-64 encoding.</returns>
-        internal static string GenerateUnus()
-        {
-            /* Generate 256 cryptographic quality random bits into a block of bytes. */
-            using var rnd = System.Security.Cryptography.RandomNumberGenerator.Create();
-            byte[] randomBytes = new byte[256 / 8];
-            rnd.GetBytes(randomBytes);
 
-            /* Encode those bytes as BASE64, including the trailing equals. */
-            return Convert.ToBase64String(randomBytes);
-        }
 
         internal static bool IsClose(long x, long y, int maxDiff)
             => x > (y-maxDiff) && x < (y+maxDiff);
