@@ -14,7 +14,7 @@ namespace billpg.HashBackService
     internal static class DevHashStoreEndpoints
     {
         private static readonly UTF8Encoding UTF8 = new UTF8Encoding(false);
-        private static readonly string expectedHost = ServiceConfig.LoadRequiredString("IssuerHost");
+        private static readonly string rootUrl = ServiceConfig.LoadRequiredString("RootUrl");
         private static readonly string userHashSecret =
             ServiceConfig.LoadStringOrSet(
                 "HashStoreUserHashSecret",
@@ -44,7 +44,7 @@ namespace billpg.HashBackService
                 ["//1"] = "Thank you. Your user folder is",
                 ["UserFolder"] = userHashed,
                 ["//2"] = "which means your VerifyUrl must start",
-                ["VerifyUrlStartsWith"] = $"https://{expectedHost}/devStoreHash/load/{userHashed}/",
+                ["VerifyUrlStartsWith"] = $"{rootUrl}/devStoreHash/load/{userHashed}/",
                 ["//3"] = "and end with a number with 4-10 digits and \".txt\"."
             };
             context.Response.Body.WriteAsync(UTF8.GetBytes(responseBody.ToStringIndented()));
@@ -110,19 +110,16 @@ namespace billpg.HashBackService
             if (reqParsed.Rounds < 1 || reqParsed.Rounds > 9)
                 throw new BadRequestException("Rounds request property must be 1-9.");
 
-            /* Pull out the expected host from config. */
-
             /* Helper function to build a bad-request for a bad VeirfyUrl value. */
             BadRequestException BadVerifyUrl()
                 => new BadRequestException(
                     $"VerifyUrl must be form of " +
-                    $"https://{expectedHost}/devStoreHash/load/(user)/(number).txt");
+                    $"{rootUrl}/devStoreHash/load/(user)/(number).txt");
 
             /* Validate the VerifyUrl and pull out the filename along the way. */
             var verifyUrl = new Uri(reqParsed.VerifyUrl);
-            if (verifyUrl.Scheme != "https")
-                throw BadVerifyUrl();
-            if (verifyUrl.Host != expectedHost)
+            var verifyUrlRoot = $"{verifyUrl.Scheme}://{verifyUrl.Authority}";
+            if (verifyUrlRoot != rootUrl)
                 throw BadVerifyUrl();
             if (verifyUrl.Query != "")
                 throw BadVerifyUrl();

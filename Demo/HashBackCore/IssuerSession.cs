@@ -41,7 +41,7 @@ namespace billpg.HashBackCore
 
         public static IssuedToken Run(
             CallerRequest req, 
-            string expectIssuerHost, 
+            string rootUrl, 
             RetrieveVerificationHashFn onGetVerifyHash)
         {
             /* Utility function to produce error objects. */
@@ -60,9 +60,8 @@ namespace billpg.HashBackCore
 
             /* The issuer URL must be HTTPS and be for the expected issuer host. */
             Uri issuerUrl = new Uri(req.IssuerUrl);
-            if (issuerUrl.Scheme != Uri.UriSchemeHttps)
-                throw GeneralError("IssuerUrl is not HTTPS.");
-            if (issuerUrl.Host != expectIssuerHost)
+            string issuerRoot = $"{issuerUrl.Scheme}://{issuerUrl.Authority}";
+            if (issuerRoot != rootUrl)
                 throw GeneralError("IssuerUrl is for a different issuer.");
 
             /* The "Now" timestamp must be no more than 100s from our clock. */
@@ -82,7 +81,7 @@ namespace billpg.HashBackCore
 
             /* This is an open issuer so only check VerifyUrl is HTTPS. */
             Uri verifyUrl = new Uri(req.VerifyUrl);
-            if (verifyUrl.Scheme != Uri.UriSchemeHttps)
+            if (InternalTools.IsValidVerifyUrl(verifyUrl, rootUrl) == false)
                 throw GeneralError("VerifyUrl is not HTTPS.");
 
             /* Download the verification hash. (Will throw an exception on failure.) */
@@ -95,12 +94,13 @@ namespace billpg.HashBackCore
 
             /* Build a JWT response. */
             long expiresAt = ourNow + 3600;
-            string jwt = BuildJWT(expectIssuerHost, verifyUrl.Host, ourNow, expiresAt);
+            string jwt = BuildJWT(issuerUrl.Host, verifyUrl.Host, ourNow, expiresAt);
 
             /* Return success response. */
             return new IssuedToken(jwt, ourNow, expiresAt);
         }
 
+  
         private static bool IsUnusValid(string unus)
         {
             /* Shortcut simple tests. */
@@ -123,6 +123,7 @@ namespace billpg.HashBackCore
             /* Passed all tests. */
             return true;
         }
+
 
         private static string BuildJWT(string issuer, string subject, long issuedAt, long expiresAt)
         {

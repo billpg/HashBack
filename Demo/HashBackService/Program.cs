@@ -25,6 +25,10 @@ app.MapGetWrapped("/devHashStore/user", DevHashStoreEndpoints.GetUser);
 app.MapPostWrapped("/devHashStore/store", DevHashStoreEndpoints.PostStore);
 app.MapGetWrapped("/devHashStore/load/{user}/{file}", DevHashStoreEndpoints.GetStoreHash);
 
+/* Configure the issuer demo. */
+app.MapGetRedirectTo("/issuerDemo", ServiceConfig.LoadRequiredString("RedirectIssuerDemoTo"));
+app.MapPostWrapped("/issuerDemo/request", IssuerDemoEndpoints.RequestPost);
+
 /* Start running and log. */
 Console.WriteLine("Running.");
 app.Run();

@@ -30,10 +30,28 @@ namespace billpg.HashBackCore
         internal static long ToUnixTime(this DateTime from)
             => (long)(from.ToUniversalTime().Subtract(UNIX_EPOCH).TotalSeconds);
 
-
-
         internal static bool IsClose(long x, long y, int maxDiff)
             => x > (y-maxDiff) && x < (y+maxDiff);
         
+        internal static bool IsValidVerifyUrl(Uri url, string rootUrl)
+        {
+            /* If URL is HTTPS allow it. */
+            if (url.Scheme == "https")
+                return true;
+
+            /* If URL is one of ours from the hash store service, allow it.
+             * (This is only needed under debug. As a production service,
+             * the hash store will use HTTPS also. */
+            if ($"{url.Scheme}://{url.Authority}" != rootUrl)
+                return false;
+            if (url.Segments.Length != 5)
+                return false;
+            if (url.AbsolutePath.StartsWith("/devStoreHash/load/") == false)
+                return false;
+
+            /* Passed all tests. */
+            return true;
+        }
+
     }
 }
