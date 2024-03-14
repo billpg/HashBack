@@ -20,10 +20,9 @@ app.Urls.Add($"http://localhost:{port}");
 app.MapGetRedirectTo("/", ServiceConfig.LoadRequiredString("RedirectHomeTo"));
 
 /* Configure the hash store. */
-app.MapGetRedirectTo("/devHashStore", ServiceConfig.LoadRequiredString("RedirectHashStoreTo"));
-app.MapGetWrapped("/devHashStore/user", DevHashStoreEndpoints.GetUser);
-app.MapPostWrapped("/devHashStore/store", DevHashStoreEndpoints.PostStore);
-app.MapGetWrapped("/devHashStore/load/{user}/{file}", DevHashStoreEndpoints.GetStoreHash);
+app.MapGetRedirectTo("/hashes", ServiceConfig.LoadRequiredString("RedirectHashStoreTo"));
+app.MapPostWrapped("/hashes", DevHashStoreEndpoints.AddHash);
+app.MapGetWrapped("/hashes", DevHashStoreEndpoints.GetHash);
 
 /* Configure the issuer demo. */
 app.MapGetRedirectTo("/issuerDemo", ServiceConfig.LoadRequiredString("RedirectIssuerDemoTo"));
