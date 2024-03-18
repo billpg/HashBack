@@ -41,6 +41,11 @@ int fixedSaltIndex = readmeLines.FindIndex(src => src.Contains("<!--FIXED_SALT--
 readmeLines.RemoveRange(fixedSaltIndex, 4);
 readmeLines.Insert(fixedSaltIndex, DumpByteArray(fixedSaltBytes));
 
+/* Look for the line with the fixed salt in hex/base64. */
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_HEX-->", $"- Hex: `{BytesToHex(fixedSaltBytes)}`");
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_B64-->", $"- Base64: `{Convert.ToBase64String(fixedSaltBytes)}`");
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_URL-->", $"- URL: `{System.Web.HttpUtility.UrlEncode(fixedSaltBytes)}`");
+
 /* Set the bytes for CryptoHelper. */
 CryptoHelpers.FIXED_SALT = fixedSaltBytes;
 
@@ -222,3 +227,6 @@ string DumpByteArray(IList<byte> bytes)
 
     return list.Trim(',') + "]";
 }
+
+string BytesToHex(IList<byte> bytes)
+    => string.Concat(bytes.Select(b => b.ToString("X2")));
