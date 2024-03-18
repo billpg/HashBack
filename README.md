@@ -1,7 +1,7 @@
 # HashBack Authentication
 A web authentication exchange where a caller proves their identity by publishing a hash value on their website.
 
-This version of the document is a **public-draft** for review and discussion tagged as `HASHBACK-PUBLIC-DRAFT-3-1`.
+This version of the document is a **draft-under-development** for review and discussion and will be tagged as version **3.1.1**.
 If you have any comments or notes, please open an issue on this project's public github.
 
 This document is Copyright William Godfrey, 2024. You may use its contents under the terms of the Creative-Commons Attribution license.
@@ -25,16 +25,16 @@ Now apply that thought to web authentication. The client can be sure (thanks to 
 As it would be expensive to do that for every single HTTP request, the exchange happens once-off to supply the caller with a Bearer token (or other means for authentication), which the caller may use until it expires.
 
 ## The Exchange
-- "Hey Bob. I want to use your API but I need a Bearer token."
-- "Hey Alice. I've got this request for a Bearer token from someone claiming to be you."
+- "Hey Bob, this is Alice. I want to use your API but I need a Bearer token."
+- "Hey Alice, this is Bob. I've got this request for a Bearer token from someone claiming to be you."
 - "Bob, that was me. Here's proof."
 - "Thank you Alice. Here's your Bearer token."
 
 There are two participants in this exchange:
-- The **Caller** is requesting a Bearer token and publishes proof it made that request.
+- The **Caller** is requesting authentication and publishes proof it made that request.
 - The **Issuer** checks the proof and issues that Bearer token back to the Caller.
 
-To request a Bearer token, the Caller will make a POST request to the Issuer requesting a Bearer token. Thanks to TLS, the Caller can be reassured they are talking to the genuine Issuer, but the Issuer doesn't yet know if the request came from the genuine Caller. To complete the loop, the JSON request will include a URL on the Caller's website which will contain a hash of the request JSON. Thanks again to TLS, the Issuer is reassured that the request came from the genuine Caller. The Issuer will now be able to respond to the initial POST request with an issued Bearer token.
+The Caller makes a POST request to the Issuer. Thanks to TLS, the Caller can be reassured they are talking to the genuine Issuer, but the Issuer doesn't yet know if the request came from the genuine Caller. To complete the loop, the JSON request will include a URL on the Caller's website which will contain a hash of the request JSON. Thanks again to TLS, the Issuer is reassured that the request came from the genuine Caller. The Issuer will now be able to respond to the initial POST request with an issued Bearer token.
 
 (Note that the initial POST request is kept open while the Issuer service retrieves the verification hash from the Caller's website. I am working on a separate proposal utilizing the HTTP status code 202 to allow an open request to be closed and reopened later.)
 
@@ -42,7 +42,7 @@ To request a Bearer token, the Caller will make a POST request to the Issuer req
 The request body is a single JSON object. All properties are of string type except `Now` and `Rounds` which are integers. (`Now` will need to be larger than 32 bits to continue working after 2038.) All properties are required and `null` is not an acceptable value for any of them. The object must not include other properties except these listed here.
 
 - `HashBack`
-  - Confirms this is a request for a Bearer token and indicates which version of this exchange the Caller wishes to use.
+  - Confirms this is a request for authentication and indicates which version of this exchange the Caller wishes to use.
   - This version of this document is specified by the value "HASHBACK-PUBLIC-DRAFT-3-1". 
   - See the section describing 400 error responses below for version negotiation.
 - `TypeOfResponse`
