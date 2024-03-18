@@ -133,10 +133,10 @@ namespace billpg.HashBackService
 
         internal static void GetHash(HttpContext context)
         {
-            /* Load the ID query string parameter. */
+            /* Load the ID query string parameter. If not used, redirect to the documentation. */
             string? idAsString = context.Request.Query["ID"];
             if (idAsString == null)
-                throw new BadRequestException("Missing required ID query string parameter.");
+                context.Response.Redirect(ServiceConfig.LoadRequiredString("RedirectHashStoreTo"));
             if (Guid.TryParse(idAsString, out Guid id) == false)
                 throw new BadRequestException("ID query string is not a valid UUID.");
 
@@ -148,7 +148,8 @@ namespace billpg.HashBackService
             /* Return hash. */
             context.Response.StatusCode = 200;
             context.Response.Headers["Content-Type"] = "text/plain";
-            context.Response.Body.WriteAsync(Encoding.ASCII.GetBytes(hash + "\r\n"));
+            string hashAsString = Convert.ToBase64String(hash.ToArray());
+            context.Response.Body.WriteAsync(Encoding.ASCII.GetBytes(hashAsString + "\r\n"));
         }
 
         private static string LoadPropertyOrBadRequest(JObject req, string key)

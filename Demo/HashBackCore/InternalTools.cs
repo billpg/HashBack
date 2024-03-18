@@ -42,15 +42,13 @@ namespace billpg.HashBackCore
             /* If URL is one of ours from the hash store service, allow it.
              * (This is only needed under debug. As a production service,
              * the hash store will use HTTPS also. */
-            if ($"{url.Scheme}://{url.Authority}" != rootUrl)
-                return false;
-            if (url.Segments.Length != 5)
-                return false;
-            if (url.AbsolutePath.StartsWith("/devStoreHash/load/") == false)
-                return false;
+            if ($"{url.Scheme}://{url.Authority}" == rootUrl &&
+                url.AbsolutePath == "/hashes" &&
+                url.Query.StartsWith("?ID="))
+                return true;
 
-            /* Passed all tests. */
-            return true;
+            /* Failed all tests. */
+            return false;
         }
 
     }

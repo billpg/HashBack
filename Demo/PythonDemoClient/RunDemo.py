@@ -1,47 +1,98 @@
+import os
+import uuid
 import requests
 import random
+import base64
+import json
 from time import time_ns
+import hashlib
+
 
 api_root = "http://localhost:3001"
 
-print("Requesting user-folder from hash-store service.")
-user_name = "rutabaga84"
-get_user_resp = requests.get(f"{api_root}/devHashStore/user?name={user_name}")
-if get_user_resp.status_code != 200:
-    print(f"API returned status {get_user_resp.status_code}")
-    exit()
-user_folder = get_user_resp.json()["UserFolder"]
-print(f"User Folder = {user_folder}")
+# Select an ID to store the hash. This is needed by the
+# hash storage service and isn't part ofthe HashBack exchange.
+hash_id = uuid.uuid1()
+print(f"Hash ID: {hash_id}")
 
-# Build JSON Request body, including "User" property for the name.
-filename_as_int = int(random.random() * 1000000)
+# Build a "Unus" value from 256 cryptographic quality random bits.
+unus = str(base64.b64encode(os.urandom(256 // 8)), "ascii")
+print(f"Unus: {unus}")
+
+# Build a request JSON in the order RFC8785 expects.
 request_body = {
-    "User": user_name,
     "HashBack": "HASHBACK-PUBLIC-DRAFT-3-1",
-    "TypeOfResponse": "BearerToken",
     "IssuerUrl": f"{api_root}/bleh",
     "Now": time_ns() // (1000 * 1000 * 1000),
     "Rounds": 1,
-    "Unus": "RutabagaRutabagaRutabagaRutabagaRutabagaRut=",
-    "VerifyUrl": f"{api_root}/devStoreHash/load/{user_folder}/{filename_as_int}.txt",
+    "TypeOfResponse": "BearerToken",
+    "Unus": unus,
+    "VerifyUrl": f"{api_root}/hashes?ID={hash_id}",
 }
-print(request_body)
+request_body_as_string = json.dumps(request_body, separators=(",", ":"))
+request_body_as_bytes = bytes(request_body_as_string,'utf-8')
+print(request_body_as_bytes)
 
 
-# Send request to hash store so it'll be available for GETing by the HashBack service.
-store_hash_resp = requests.post(f"{api_root}/devHashStore/store", json=request_body)
-if store_hash_resp.status_code != 200:
-    print(f"API returned status {get_user_resp.status_code}")
-    exit()
-request_hash = store_hash_resp.json()["Hash"]
-hash_url = store_hash_resp.json()["VerifyUrl"]
-print(f"Request Hash: {request_hash}")
-print(f"Hash URL: {hash_url}")
+# Find the hash using PBKDF2
+hash_as_bytes = hashlib.pbkdf2_hmac(
+    hash_name ="SHA256",
+    password=request_body_as_bytes,
+    salt=bytes(
+        [
+            113,
+            218,
+            98,
+            9,
+            6,
+            165,
+            151,
+            157,
+            46,
+            28,
+            229,
+            16,
+            66,
+            91,
+            91,
+            72,
+            150,
+            246,
+            69,
+            83,
+            216,
+            235,
+            21,
+            239,
+            162,
+            229,
+            139,
+            163,
+            6,
+            73,
+            175,
+            201,
+        ]
+    ),
+    iterations=1,
+    dklen = 32
+)
+
+# Encode the completed hash.
+hash_as_string = str(base64.b64encode(hash_as_bytes), 'ascii')
+print(f"Hash: {hash_as_string}")
+
+# Store hash on hash store.
+store_hash_resp = requests.post(
+    f"{api_root}/hashes",
+    json={"ID": str(hash_id), "Hash": hash_as_string},
+)
+print(store_hash_resp)
+print(store_hash_resp.content)
+print(f"{api_root}/hashes?ID={hash_id}")
 
 # Now actually send the request to the actual HashBack service.
-request_body.pop("User")
 hashback_resp = requests.post(f"{api_root}/issuerDemo/request", json=request_body)
-
 
 print(hashback_resp)
 print(hashback_resp.json())

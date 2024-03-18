@@ -5,6 +5,10 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using billpg.HashBackService;
 using billpg.WebAppTools;
+using Newtonsoft.Json.Linq;
+using billpg.HashBackCore;
+using System.Text;
+using System.Security.Cryptography;
 
 /* Announce the service starting. */
 Console.WriteLine("Starting HashBackService.");
@@ -20,7 +24,6 @@ app.Urls.Add($"http://localhost:{port}");
 app.MapGetRedirectTo("/", ServiceConfig.LoadRequiredString("RedirectHomeTo"));
 
 /* Configure the hash store. */
-app.MapGetRedirectTo("/hashes", ServiceConfig.LoadRequiredString("RedirectHashStoreTo"));
 app.MapPostWrapped("/hashes", DevHashStoreEndpoints.AddHash);
 app.MapGetWrapped("/hashes", DevHashStoreEndpoints.GetHash);
 

@@ -16,10 +16,6 @@ namespace billpg.HashBackService
 
         internal static void RequestPost(HttpContext context)
         {
-            /*
-            curl -i --request POST --header "Content-Type: application/json" --data-binary "@temp-request.txt" http://localhost:3001/issuerDemo/request
-            */
-
             /* Load request body. */
             using var ms = new MemoryStream();
             context.Request.Body.CopyToAsync(ms).Wait();
@@ -35,7 +31,10 @@ namespace billpg.HashBackService
 
         private static string DownloadVerifyHash(Uri url)
         {
-            return null;
+            HttpClient http = new HttpClient();
+            var result = http.GetAsync(url.ToString()).Result;
+            var resultBody = result.Content.ReadAsStringAsync().Result;
+            return resultBody.Trim();
         }
     }
 }
