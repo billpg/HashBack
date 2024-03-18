@@ -28,8 +28,8 @@ app.MapPostWrapped("/hashes", DevHashStoreEndpoints.AddHash);
 app.MapGetWrapped("/hashes", DevHashStoreEndpoints.GetHash);
 
 /* Configure the issuer demo. */
-app.MapGetRedirectTo("/issuerDemo", ServiceConfig.LoadRequiredString("RedirectIssuerDemoTo"));
-app.MapPostWrapped("/issuerDemo/request", IssuerDemoEndpoints.RequestPost);
+app.MapGetRedirectTo("/issuer", ServiceConfig.LoadRequiredString("RedirectIssuerDemoTo"));
+app.MapPostWrapped("/issuer", IssuerDemoEndpoints.RequestPost);
 
 /* Start running and log. */
 Console.WriteLine("Running.");

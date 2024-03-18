@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -70,6 +71,17 @@ namespace billpg.WebAppTools
         }
 
         public static Uri WithRelativePath(this Uri baseUrl, string relativePath)
-            => new Uri(baseUrl, relativePath);        
+            => new Uri(baseUrl, relativePath);
+
+        public static void WriteBodyJson(this HttpResponse response, JToken body)
+        {
+            response.ContentType = "application/json";
+            response.WriteBodyString(body.ToString(Newtonsoft.Json.Formatting.Indented));
+        }
+
+        public static void WriteBodyString(this HttpResponse response, string bodyText)
+        {
+            response.Body.WriteAsync(Utf8GetBytes(bodyText));
+        }
     }
 }
