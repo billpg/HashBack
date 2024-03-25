@@ -1,7 +1,8 @@
 {
   "RootUrl": "http://localhost:3001",
   "ListenPort": 3001,
-  "RedirectHomeTo": "https://github.com/billpg/HashBack/",
-  "RedirectHashStoreTo": "https://github.com/billpg/HashBack/Demo/DevHashStore.md",
-  "RedirectIssuerDemoTo": "https://github.com/billpg/HashBack/Demo/IssuerDemo.md"
+  "RedirectHomeTo": "https://github.com/billpg/HashBack/blob/feat/DemoWebsite/Demo/Docs/Home.md",
+  "RedirectHashStoreTo": "https://github.com/billpg/HashBack/blob/feat/DemoWebsite/Demo/Docs/Hashes.md",
+  "RedirectIssuerDemoTo": "https://github.com/billpg/HashBack/blob/feat/DemoWebsite/Demo/Docs/IssuerDemo.md",
+  "RedirectCallerDemoTo": "https://github.com/billpg/HashBack/blob/feat/DemoWebsite/Demo/Docs/CallerDemo.md"
 }
