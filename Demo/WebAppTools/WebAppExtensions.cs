@@ -11,6 +11,21 @@ using System.Threading.Tasks;
 
 namespace billpg.WebAppTools
 {
+    public interface IHandlerProxy
+    {
+        string? RequestParam(string key);
+        Uri RequestUrl { get; }
+        string? RequestHeader(string name);
+        byte[]? RequestBody { get; }
+
+        void ResponseCode(int code);
+        void ResponseHeader(string name, string value);
+        void ResponseBody(byte[] body);
+        void ResponseRedirect(string target);
+        void ResponseAddCookie(string name, string value, CookieOptions opts);
+    }
+
+
     public static class WebAppExtensions
     {
         private const string applicationJson = "application/json";
@@ -19,12 +34,9 @@ namespace billpg.WebAppTools
         private static readonly JsonSerializerOptions ToStringIndented 
             = new JsonSerializerOptions { WriteIndented = true };
         private static readonly JsonSerializerOptions ToStringOneLine
-            = new JsonSerializerOptions { WriteIndented = false };
+            = new JsonSerializerOptions { WriteIndented = false };        
 
-        public delegate void WebHandler(HttpContext context);
-
-        public static void MapGetRedirectTo(this WebApplication app, string pattern, string redirectTo)
-            => app.MapGetWrapped(pattern, context => context.Response.Redirect(redirectTo));
+        public delegate void WebHandler(IHandlerProxy proxy);
 
         public static void MapGetWrapped(this WebApplication app, string pattern, WebHandler handler)
             => app.MapGet(pattern, Wrap(handler));
@@ -32,37 +44,107 @@ namespace billpg.WebAppTools
         public static void MapPostWrapped(this WebApplication app, string pattern, WebHandler handler)
             => app.MapPost(pattern, Wrap(handler));
 
-        private static WebHandler Wrap(WebHandler handler)
+        private static Delegate Wrap(WebHandler handler)
         {
             return Wrapper;
             void Wrapper(HttpContext context)
             {
+                /* Set up proxy around context. */
+                IHandlerProxy proxy = new ProxyForHttpContext(context);
+
                 try
                 {
                     /* Call through to the wrapped context. */
-                    handler(context);
-                }
-                catch (ApplicationException ex) when (ex.Message == "Not Found")
-                {
-                    context.Response.StatusCode = 404;
-                    context.Response.ContentType = "text/plain";
-                    context.Response.Body.WriteAsync(Utf8GetBytes(ex.Message));
+                    handler(proxy);
                 }
                 catch (HttpResponseException hrex)
                 {
-                    /* Convert the response body to an array of bytes. */
-                    var bodyAsString = hrex.ResponseBody.ToString();
-                    var bodyAsBytes = Utf8GetBytes(bodyAsString);
-
-                    /* Set up the response as instructed. */
-                    context.Response.StatusCode = hrex.StatusCode;
-                    context.Response.ContentType = applicationJson;
+                    /* This is the special HTTP response exception, use
+                     * it to build the response itself. */
+                    proxy.ResponseCode(hrex.StatusCode);
                     foreach (var header in hrex.Headers)
-                        context.Response.Headers[header.Key] = header.Value;
-                    context.Response.Body.WriteAsync(bodyAsBytes);
+                        proxy.ResponseHeader(header.Key, header.Value);
+                    proxy.ResponseJson(hrex.ResponseBody);
                 }
             }
         }
+
+        private class ProxyForHttpContext : IHandlerProxy
+        {
+            private HttpContext context;
+
+            internal ProxyForHttpContext(HttpContext context)
+            {
+                this.context = context;
+            }
+
+            Uri IHandlerProxy.RequestUrl => context.Request.Url();
+
+            byte[]? IHandlerProxy.RequestBody
+            {
+                get
+                {
+                    /* Load the full request into memeory, waiting until it has completed. */
+                    using var ms = new MemoryStream();
+                    context.Request.Body.CopyToAsync(ms).Wait();
+
+                    /* Return the loaded bytes. */
+                    return ms.ToArray();
+                }
+            }
+
+            string? IHandlerProxy.RequestHeader(string name)
+            {
+                if (context.Request.Headers.TryGetValue(name, out var headers))
+                    return headers.FirstOrDefault();
+                return null;
+            }
+
+            string? IHandlerProxy.RequestParam(string key)
+            {
+                if (context.Request.Query.TryGetValue(key, out var values))
+                    return values.FirstOrDefault();
+
+                return null;
+            }
+
+            void IHandlerProxy.ResponseAddCookie(string name, string value, CookieOptions opts)
+                => context.Response.Cookies.Append(name, value, opts);
+            
+            void IHandlerProxy.ResponseBody(byte[] body)
+                => context.Response.Body.WriteAsync(body);
+
+            void IHandlerProxy.ResponseCode(int code)
+                => context.Response.StatusCode = code;
+
+            void IHandlerProxy.ResponseHeader(string name, string value)
+                => context.Response.Headers[name] = value;
+
+            void IHandlerProxy.ResponseRedirect(string target)
+                => context.Response.Redirect(target);
+        }
+
+        public static JObject? RequestJson(this IHandlerProxy proxy)
+        {
+            byte[]? requestAsBytes = proxy.RequestBody;
+            if (requestAsBytes == null)
+                return null;
+            string requestAsString = Encoding.UTF8.GetString(requestAsBytes);
+            return JObject.Parse(requestAsString);
+        }
+
+        public static void ResponseText(this IHandlerProxy proxy, string text)
+        {
+            proxy.ResponseHeader("Content-Type", "text/plain");
+            proxy.ResponseBody(Utf8GetBytes(text));
+        }
+
+        public static void ResponseJson(this IHandlerProxy proxy, JToken node)
+        {
+            proxy.ResponseHeader("Content-Type", "application/json");
+            proxy.ResponseBody(Utf8GetBytes(node.ToString(Newtonsoft.Json.Formatting.Indented)));
+        }
+
 
         public static Uri Url(this HttpRequest req)
         {

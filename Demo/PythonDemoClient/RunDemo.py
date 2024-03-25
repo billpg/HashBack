@@ -1,7 +1,6 @@
 import os
 import uuid
 import requests
-import random
 import base64
 import json
 from time import time_ns
@@ -13,14 +12,14 @@ import hashlib
 hashback_service_url = "http://localhost:3001/issuer"
 print(f"HashBack Service URL: {hashback_service_url}")
 
-# This is the base verification hash service URL. The ID 
+# This is the base verification hash service URL. The ID
 # query string paameter will have a UUID we select identifying
 # this request.
 verification_hash_url = "http://localhost:3001/hashes"
-print(f"Veirifcation Hash URL: {verification_hash_url}")
+print(f"Verifcation Hash URL: {verification_hash_url}")
 
 # Select an ID to identify the hash. The hash storage service
-# will use this as the primart key for the hash itself.
+# will use this as the primary key for the hash itself.
 hash_id = uuid.uuid1()
 print(f"Hash ID: {hash_id}")
 
@@ -46,27 +45,27 @@ for request_property_name in request_body:
 
 # Convert the request body JSON into bytes.
 request_body_as_string = json.dumps(request_body, separators=(",", ":"))
-request_body_as_bytes = bytes(request_body_as_string,'utf-8')
+request_body_as_bytes = bytes(request_body_as_string, "utf-8")
 
 # Find the verification hash using PBKDF2, per the HashBack draft version 3.1.
 hash_as_bytes = hashlib.pbkdf2_hmac(
-    hash_name ="SHA256",
+    hash_name="SHA256",
     password=request_body_as_bytes,
-    salt= base64.b64decode("cdpiCQall50uHOUQQltbSJb2RVPY6xXvouWLowZJr8k=")    ,
+    salt=base64.b64decode("cdpiCQall50uHOUQQltbSJb2RVPY6xXvouWLowZJr8k="),
     iterations=1,
-    dklen = 32
+    dklen=32,
 )
 
 # Encode the completed hash.
-hash_as_string = str(base64.b64encode(hash_as_bytes), 'ascii')
+hash_as_string = str(base64.b64encode(hash_as_bytes), "ascii")
 print(f"Hash: {hash_as_string}")
 
 # Upload the hash to the hash service.
-# Note: For actually-secure exchnages, use your own hash service.
-# Upload a small text file to your own website maybe.
-# My examle hash service is open to all and sundry, and the security
+# Note: For actually-secure exchanges, use your own website.
+#
+# My example hash service is open to all and sundry, and the security
 # of this exchange depends on you having a place to publish hashes
-# that no-one else can use.
+# that you can affirm as being the only one in control of it.
 store_hash_resp = requests.post(
     verification_hash_url,
     json={"ID": str(hash_id), "Hash": hash_as_string},

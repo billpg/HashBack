@@ -15,12 +15,12 @@ namespace billpg.HashBackService
         private static readonly UTF8Encoding UTF8 = new UTF8Encoding(false);
         private static readonly string rootUrl = ServiceConfig.LoadRequiredString("RootUrl");
 
-        internal static void RequestPost(HttpContext context)
+        internal static void RequestPost(IHandlerProxy proxy)
         {
             /* Load request body. */
-            using var ms = new MemoryStream();
-            context.Request.Body.CopyToAsync(ms).Wait();
-            var req = JObject.Parse(Encoding.UTF8.GetString(ms.ToArray()));
+            var req = proxy.RequestJson();
+            if (req == null)
+                throw new BadHttpRequestException("Missing request body.");
 
             /* Load the request JSON into a request object. */
             var reqParsed = CallerRequest.Parse(req);
@@ -32,11 +32,11 @@ namespace billpg.HashBackService
             /* Pass control to populate the response to the specific
              * requested handler. */
             if (reqParsed.TypeOfResponse == "BearerToken")
-                PopulateResponseBearerToken(context, token);
+                PopulateResponseBearerToken(proxy, token);
             else if (reqParsed.TypeOfResponse == "JWT")
-                PopulateResponseJWT(context, token.JWT);
+                PopulateResponseJWT(proxy, token.JWT);
             else if (reqParsed.TypeOfResponse == "204SetCookie")
-                PopulateResponse204SetCookie(context, token);
+                PopulateResponse204SetCookie(proxy, token);
             else
                 throw new BadRequestException(
                     "Unknown TypeOfRsponse. Expected BearerToken/JWT/204SetCookie.")
@@ -45,7 +45,7 @@ namespace billpg.HashBackService
                         new JArray { "BearerToken", "JWT", "204SetCookie" });
         }
 
-        private static void PopulateResponseBearerToken(HttpContext context, IssuerSession.IssuedToken token)
+        private static void PopulateResponseBearerToken(IHandlerProxy proxy, IssuerSession.IssuedToken token)
         {
             JObject responseBody = new JObject 
             {
@@ -54,17 +54,17 @@ namespace billpg.HashBackService
                 ["ExpiresAt"] = token.ExpiresAt
             };
 
-            context.Response.StatusCode = 200;
-            context.Response.WriteBodyJson(responseBody);
+            proxy.ResponseCode(200);
+            proxy.ResponseJson(responseBody);
         }
 
-        private static void PopulateResponseJWT(HttpContext context, string jwt)
+        private static void PopulateResponseJWT(IHandlerProxy proxy, string jwt)
         {
-            context.Response.StatusCode = 200;
-            context.Response.WriteBodyJson(JValue.CreateString(jwt));
+            proxy.ResponseCode(200);
+            proxy.ResponseJson(JValue.CreateString(jwt));
         }
 
-        private static void PopulateResponse204SetCookie(HttpContext context, IssuerSession.IssuedToken token)
+        private static void PopulateResponse204SetCookie(IHandlerProxy proxy, IssuerSession.IssuedToken token)
         {
             /* Build cookie options from the token's expiry. */
             CookieOptions opts = new CookieOptions 
@@ -75,8 +75,8 @@ namespace billpg.HashBackService
             };
 
             /* Set response. */
-            context.Response.Cookies.Append("HashBack_JWT", token.JWT, opts);
-            context.Response.StatusCode = 204;
+            proxy.ResponseCode(204);
+            proxy.ResponseAddCookie("HashBack_JWT", token.JWT, opts);
         }
 
         private static string DownloadVerifyHash(Uri url)

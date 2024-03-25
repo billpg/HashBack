@@ -14,26 +14,11 @@ namespace billpg.HashBackService
     internal static class DevHashStoreEndpoints
     {
         /// <summary>
-        /// The root URL of this service.
-        /// </summary>
-        private static readonly string rootUrl = ServiceConfig.LoadRequiredString("RootUrl");
-
-        private static readonly IList<byte> responseBodyAsBytes =
-            Encoding.UTF8.GetBytes(
-                "This is an open hash storage service for testing HashBack implementations\r\n" +
-                "only. It is not suitable for production use, nor for any purpose that\r\n" +
-                "requires security. Use your website where only you and people you trust\r\n" +
-                "have control over what files are published to store your hashes.\r\n" +
-                "\r\n" +
-                "Regards, Bill, billpg.com. \uD83E\uDD89\r\n"
-                ).AsReadOnly();
-
-        /// <summary>
         /// Encapsulated hash storage.
         /// </summary>
         private static class HashStorage
         {
-            /// <summary>Monitor object to lock while accesinng.</summary>
+            /// <summary>Monitor object to lock while accesing.</summary>
             private static readonly object monitor = new object();
 
             /// <summary>Collection of hashes stored.</summary>
@@ -104,12 +89,12 @@ namespace billpg.HashBackService
             }
         } 
 
-        internal static void AddHash(HttpContext context)
+        internal static void AddHash(IHandlerProxy proxy)
         {
             /* Load request body. */
-            using var ms = new MemoryStream();
-            context.Request.Body.CopyToAsync(ms).Wait();
-            var req = JObject.Parse(Encoding.UTF8.GetString(ms.ToArray()));
+            var req = proxy.RequestJson();
+            if (req == null)
+                throw new BadHttpRequestException("Missing request body.");
 
             /* Pull out the ID property and validate. */
             string idAsString = LoadPropertyOrBadRequest(req, "ID");
@@ -126,17 +111,22 @@ namespace billpg.HashBackService
             HashStorage.Store(id, hashAsBytes);
 
             /* Return a success response. */
-            context.Response.StatusCode = 200;
-            context.Response.Headers["Content-Type"] = "text/plain";
-            context.Response.Body.WriteAsync(responseBodyAsBytes.ToArray());
+            proxy.ResponseCode(200);
+            proxy.ResponseText(
+                "This is an open hash storage service for testing HashBack implementations\r\n" +
+                "only. It is not suitable for production use, nor for any purpose that\r\n" +
+                "requires security. Use your website where only you and people you trust\r\n" +
+                "have control over what files are published to store your hashes.\r\n" +
+                "\r\n" +
+                "Regards, Bill, billpg.com. \uD83E\uDD89\r\n");
         }
 
-        internal static void GetHash(HttpContext context)
+        internal static void GetHash(IHandlerProxy proxy)
         {
             /* Load the ID query string parameter. If not used, redirect to the documentation. */
-            string? idAsString = context.Request.Query["ID"];
+            string? idAsString = proxy.RequestParam("ID");
             if (idAsString == null)
-                context.Response.Redirect(ServiceConfig.LoadRequiredString("RedirectHashStoreTo"));
+                proxy.ResponseRedirect(ServiceConfig.LoadRequiredString("RedirectHashStoreTo"));
             if (Guid.TryParse(idAsString, out Guid id) == false)
                 throw new BadRequestException("ID query string is not a valid UUID.");
 
@@ -146,10 +136,8 @@ namespace billpg.HashBackService
                 throw new BadRequestException("No hash with this ID.");
 
             /* Return hash. */
-            context.Response.StatusCode = 200;
-            context.Response.Headers["Content-Type"] = "text/plain";
-            string hashAsString = Convert.ToBase64String(hash.ToArray());
-            context.Response.Body.WriteAsync(Encoding.ASCII.GetBytes(hashAsString + "\r\n"));
+            proxy.ResponseCode(200);
+            proxy.ResponseText(Convert.ToBase64String(hash.ToArray()));
         }
 
         private static string LoadPropertyOrBadRequest(JObject req, string key)
