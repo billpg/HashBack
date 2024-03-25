@@ -21,14 +21,16 @@ var app = WebApplication.Create();
 app.Urls.Add($"http://localhost:{port}");
 
 /* Configure various end-points with handlers. */
-app.MapGetRedirectTo("/", ServiceConfig.LoadRequiredString("RedirectHomeTo"));
+string redirectHome = ServiceConfig.LoadRequiredString("RedirectHomeTo");
+app.MapGet("/", RedirectEndpoints.Found(redirectHome));
 
 /* Configure the hash store. */
 app.MapPostWrapped("/hashes", DevHashStoreEndpoints.AddHash);
 app.MapGetWrapped("/hashes", DevHashStoreEndpoints.GetHash);
 
 /* Configure the issuer demo. */
-app.MapGetRedirectTo("/issuer", ServiceConfig.LoadRequiredString("RedirectIssuerDemoTo"));
+string redirectIssuerDemoDocs = ServiceConfig.LoadRequiredString("RedirectIssuerDemoTo");
+app.MapGet("/issuer", RedirectEndpoints.Found(redirectIssuerDemoDocs));
 app.MapPostWrapped("/issuer", IssuerDemoEndpoints.RequestPost);
 
 /* Start running and log. */
