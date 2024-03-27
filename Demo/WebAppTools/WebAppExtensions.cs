@@ -163,7 +163,13 @@ namespace billpg.WebAppTools
 
         public static void WriteBodyString(this HttpResponse response, string bodyText)
         {
-            response.Body.WriteAsync(Utf8GetBytes(bodyText));
+            response.WriteBodyBytes(Utf8GetBytes(bodyText));
         }
+
+        public static void WriteBodyBytes(this HttpResponse response, byte[] bodyAsBytes)
+        {
+            response.Body.WriteAsync(bodyAsBytes);
+        }
+
     }
 }

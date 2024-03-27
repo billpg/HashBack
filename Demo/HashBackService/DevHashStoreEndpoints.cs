@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using billpg.WebAppTools;
 using Newtonsoft.Json.Linq;
 using billpg.HashBackCore;
+using Microsoft.AspNetCore.Mvc;
 
 namespace billpg.HashBackService
 {
@@ -103,7 +104,7 @@ namespace billpg.HashBackService
 
             /* Pull out the Hash property and validate. */
             string? hashAsString = LoadPropertyOrBadRequest(req, "Hash");
-            var hashAsBytes = ConvertFromBase64OrNull(hashAsString, 256/8);
+            var hashAsBytes = ConvertFromBase64OrNull(hashAsString, 256 / 8);
             if (hashAsBytes == null)
                 throw new BadRequestException("Hash must be 256 bits of BASE64.");
 
@@ -121,23 +122,24 @@ namespace billpg.HashBackService
                 "Regards, Bill, billpg.com. \uD83E\uDD89\r\n");
         }
 
-        internal static void GetHash(IHandlerProxy proxy)
+        internal static string GetHash(
+            [FromQuery(Name = "id")] string? idAsString)
         {
             /* Load the ID query string parameter. If not used, redirect to the documentation. */
-            string? idAsString = proxy.RequestParam("ID");
             if (idAsString == null)
-                proxy.ResponseRedirect(ServiceConfig.LoadRequiredString("RedirectHashStoreTo"));
+                throw ErrorHandler.RedirectExceptionToTargetInConfig("RedirectHashStoreTo");
+
+            /* Convert ID to UUID, reporting bad-request if not valid. */
             if (Guid.TryParse(idAsString, out Guid id) == false)
-                throw new BadRequestException("ID query string is not a valid UUID.");
+                throw ErrorHandler.BadRequestExceptionWithText("ID query string is not a valid UUID.");
 
             /* Load hash from store. */
             var hash = HashStorage.Load(id);
             if (hash == null)
-                throw new BadRequestException("No hash with this ID.");
+                throw ErrorHandler.BadRequestExceptionWithText("No hash with this ID.");
 
             /* Return hash. */
-            proxy.ResponseCode(200);
-            proxy.ResponseText(Convert.ToBase64String(hash.ToArray()));
+            return Convert.ToBase64String(hash.ToArray());
         }
 
         private static string LoadPropertyOrBadRequest(JObject req, string key)
