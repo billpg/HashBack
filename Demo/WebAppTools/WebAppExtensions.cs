@@ -4,6 +4,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Mime;
 using System.Text;
 using System.Text.Json;
@@ -17,6 +18,7 @@ namespace billpg.WebAppTools
         Uri RequestUrl { get; }
         string? RequestHeader(string name);
         byte[]? RequestBody { get; }
+        IPAddress ClientIP { get; }
 
         void ResponseCode(int code);
         void ResponseHeader(string name, string value);
@@ -92,6 +94,9 @@ namespace billpg.WebAppTools
                     return ms.ToArray();
                 }
             }
+
+            IPAddress IHandlerProxy.ClientIP
+                => this.context.Connection.RemoteIpAddress ?? IPAddress.None;
 
             string? IHandlerProxy.RequestHeader(string name)
             {

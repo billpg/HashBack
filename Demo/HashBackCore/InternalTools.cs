@@ -7,7 +7,7 @@ using System.Linq;
 
 namespace billpg.HashBackCore
 {
-    internal static class InternalTools
+    public static class InternalTools
     {
         /// <summary>
         /// Convert a Guid into the standard hex-with-hyphens representation.
@@ -29,6 +29,8 @@ namespace billpg.HashBackCore
         /// <returns>Time in seconds since the start of 1970.</returns>
         internal static long ToUnixTime(this DateTime from)
             => (long)(from.ToUniversalTime().Subtract(UNIX_EPOCH).TotalSeconds);
+
+        public static long NowUnixTime => DateTime.UtcNow.ToUnixTime();
 
         internal static bool IsClose(long x, long y, int maxDiff)
             => x > (y-maxDiff) && x < (y+maxDiff);

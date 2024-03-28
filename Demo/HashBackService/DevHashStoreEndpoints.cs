@@ -9,6 +9,7 @@ using billpg.WebAppTools;
 using Newtonsoft.Json.Linq;
 using billpg.HashBackCore;
 using Microsoft.AspNetCore.Mvc;
+using System.Net;
 
 namespace billpg.HashBackService
 {
@@ -23,8 +24,8 @@ namespace billpg.HashBackService
             private static readonly object monitor = new object();
 
             /// <summary>Collection of hashes stored.</summary>
-            private static readonly Dictionary<Guid, IList<byte>> hashes                
-                = new Dictionary<Guid, IList<byte>>();
+            private static readonly Dictionary<Guid, StoredHash> hashes                
+                = new Dictionary<Guid, StoredHash>();
 
             /// <summary>IDs waiting to be deleted.</summary>
             private static readonly Queue<Guid> waiting = new Queue<Guid>();
@@ -44,7 +45,7 @@ namespace billpg.HashBackService
             /// <param name="id">ID to store hash.</param>
             /// <param name="hash">Hash to store.</param>
             /// <exception cref="BadRequestException">Thrown for any issue found.</exception>
-            public static void Store(Guid id, IList<byte> hash)
+            public static void Store(Guid id, StoredHash hash)
             {
                 lock (monitor)
                 {
@@ -70,7 +71,7 @@ namespace billpg.HashBackService
                 }
             }
 
-            public static IList<byte>? Load(Guid id)
+            public static StoredHash? Load(Guid id)
             {
                 lock (monitor)
                 {
@@ -89,6 +90,20 @@ namespace billpg.HashBackService
                 }
             }
         } 
+
+        internal struct StoredHash
+        {
+            public readonly IList<byte> Hash;
+            public readonly IPAddress SenderIP;
+            public readonly long SentAt;
+
+            public StoredHash(IList<byte> hash, IPAddress senderIP)
+            {
+                this.Hash = hash;
+                this.SenderIP = senderIP;
+                this.SentAt = InternalTools.NowUnixTime;
+            }
+        }
 
         internal static void AddHash(IHandlerProxy proxy)
         {
@@ -109,7 +124,8 @@ namespace billpg.HashBackService
                 throw new BadRequestException("Hash must be 256 bits of BASE64.");
 
             /* Save hash. (This may throw a 400 exception.) */
-            HashStorage.Store(id, hashAsBytes);
+            var hashRecord = new StoredHash(hashAsBytes, proxy.ClientIP);
+            HashStorage.Store(id, hashRecord);
 
             /* Return a success response. */
             proxy.ResponseCode(200);
@@ -123,7 +139,7 @@ namespace billpg.HashBackService
         }
 
         internal static string GetHash(
-            [FromQuery(Name = "id")] string? idAsString)
+            [FromQuery(Name = "id")] string? idAsString, HttpContext context)
         {
             /* Load the ID query string parameter. If not used, redirect to the documentation. */
             if (idAsString == null)
@@ -134,12 +150,14 @@ namespace billpg.HashBackService
                 throw ErrorHandler.BadRequestExceptionWithText("ID query string is not a valid UUID.");
 
             /* Load hash from store. */
-            var hash = HashStorage.Load(id);
-            if (hash == null)
+            var hashRecord = HashStorage.Load(id);
+            if (hashRecord == null)
                 throw ErrorHandler.BadRequestExceptionWithText("No hash with this ID.");
 
-            /* Return hash. */
-            return Convert.ToBase64String(hash.ToArray());
+            /* Respond to caller. */
+            context.Response.Headers.Append("X-Sender-IP", hashRecord.Value.SenderIP.ToString());
+            context.Response.Headers.Append("X-Sent-At", hashRecord.Value.SentAt.ToString());
+            return Convert.ToBase64String(hashRecord.Value.Hash.ToArray());
         }
 
         private static string LoadPropertyOrBadRequest(JObject req, string key)
