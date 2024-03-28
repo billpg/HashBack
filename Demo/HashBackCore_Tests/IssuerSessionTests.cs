@@ -32,7 +32,7 @@ namespace HashBackCore_Tests
             /* Run the session. */
             var issuedToken = IssuerSession.Run(
                 testRequest, 
-                "issuer.example", 
+                "https://issuer.example",
                 GenReturnHash(expectedVerificationHash));
 
             /* Check the issued token. (The length check should work until 

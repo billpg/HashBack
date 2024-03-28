@@ -86,7 +86,7 @@ namespace HashBackCore_Tests
                     unus: "iZ5kWQaBRd3EaMtJpC4AS40JzfFgSepLpvPxMTAbt6w=",
                     rounds: 1,
                     verifyUrl: "https://caller.example/hashback_files/my_json_hash.txt",
-                    expectedVerificationHash: "jww+mkbNDVxZ9RXr2zSTOMRURRFJSbwY2baLLS6j0fc=");
+                    expectedVerificationHash: "gnegmhqavAFiKctk5RTywzDKC5utN+nHjTzgNABH70Q=");
 
         /// <summary>
         /// Test the second example from the under-development 3.1 draft.
@@ -101,6 +101,6 @@ namespace HashBackCore_Tests
                 unus: "TmDFGekvQ+CRgANj9QPZQtBnF077gAc4AeRASFSDXo8=",
                 rounds: 1,
                 verifyUrl: "https://carol.example/hashback/64961859.txt",
-                expectedVerificationHash: "3LMr4CZZAVJNhlbvBmYinrrStO7j0JUeZWg4F6i3a+I=");
+                expectedVerificationHash: "cMrpOXW6hMJmi9IMKEPHfvN29yfyaPEVY064coS9L8c=");
     }
 }
