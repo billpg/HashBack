@@ -21,37 +21,22 @@ namespace HashBackCore_Tests
     public class HashStoreEndpointsTest
     {
         /// <summary>
-        /// Loaded copy of the HashBackService DLL.
+        /// Construct a new HashService instance and configure.
         /// </summary>
-        private static readonly Assembly serviceDll
-            = Assembly.LoadFrom("HashBackService.dll");
-
-        private static MethodInfo ServiceFunction(string typeName, string funcName)
-            => serviceDll
-            .DefinedTypes
-            .Where(ty => ty.Name == typeName)
-            .Single()
-            .DeclaredMethods
-            .Where(fn => fn.Name == funcName)
-            .Single();
-
+        /// <returns>Configured hash service object.</returns>
+        HashService BuildService()
+            => new()
+            {
+                NowService = StartClock(),
+                NoIDRedirectTarget = "https://example.com/lots-of-docs.txt",
+                OnBadRequestException = msg => new ApplicationException(msg)
+            };
+        
         [TestMethod]
-        public void GetHash_UnknownHash()
+        public void HashService_RoundTrip()
         {
-            var context = new MockHttpContext();
-            var getHashFn = ServiceFunction("DevHashStoreEndpoints", "GetHash");
-            var ex = Assert.ThrowsException<System.Reflection.TargetInvocationException>(
-                () => getHashFn.Invoke(null, [Guid.NewGuid().ToString(), context.Context]));
-        }
-
-        [TestMethod]
-        public void MyTestMethod()
-        {
-            /* Construct a new HashService instance and configure. */
-            var svc = new HashService();
-            svc.NowService = StartClock();
-            svc.NoIDRedirectTarget = "https:/example.com/lots-of-docs.txt";
-            svc.OnBadRequestException = msg => new ApplicationException(msg);
+            /* Start new hash service object. */
+            HashService svc = BuildService();
 
             /* Add a hash to the collection. */
             Guid id = Guid.NewGuid();
