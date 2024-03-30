@@ -9,6 +9,13 @@ namespace billpg.HashBackCore
 {
     public static class InternalTools
     {
+        public static string AssertNotNull(this string? s)
+        {
+            if (s == null)
+                throw new NullReferenceException("Null string passed to AssertNotNull");
+            return s;
+        }
+
         /// <summary>
         /// Convert a Guid into the standard hex-with-hyphens representation.
         /// </summary>

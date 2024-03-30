@@ -27,8 +27,10 @@ string redirectHome = ServiceConfig.LoadRequiredString("RedirectHomeTo");
 app.MapGet("/", RedirectEndpoints.Found(redirectHome));
 
 /* Configure the hash store. */
-app.MapPostWrapped("/hashes", DevHashStoreEndpoints.AddHash);
-app.MapGet("/hashes", DevHashStoreEndpoints.GetHash);
+HashService hashSvc = new HashService();
+hashSvc.ConfigureHttpService(app, "/hashes");
+//app.MapPostWrapped("/hashes", DevHashStoreEndpoints.AddHash);
+//app.MapGet("/hashes", DevHashStoreEndpoints.GetHash);
 
 /* Configure the issuer demo. */
 string redirectIssuerDemoDocs = ServiceConfig.LoadRequiredString("RedirectIssuerDemoTo");

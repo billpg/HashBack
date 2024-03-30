@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\billpg.UsefulDataStructures\billpg.UsefulDataStructures.csproj" />
     <ProjectReference Include="..\WebAppTools\WebAppTools.csproj" />
   </ItemGroup>
 
