@@ -82,18 +82,18 @@ namespace HashBackCore_Tests
         private string GetHashInternal(HashService svc, string? idAsString, HttpContext context)
             => (GetHashMethodInfo.Invoke(svc, [idAsString, context]) as string).AssertNotNull();
 
-        OnNowFn StartClock()
+        /// <summary>
+        /// Create a function that returns a mock "now", starting at five billion and
+        /// going up by a kilosecond each subsequent call.
+        /// </summary>
+        /// <returns>Callable "now" function.</returns>
+        InternalTools.OnNowFn StartClock()
         {
             /* Initial value for clock. Use first round value after 32 bit limit. */
             long clock = 5L * 1000 * 1000 * 1000;
 
             /* Return a function that reads the clock and updates the value. */
-            return readClock;
-            long readClock()
-            {
-                clock += 1000;
-                return clock;
-            }          
+            return () => clock += 1000;
         }
 
 

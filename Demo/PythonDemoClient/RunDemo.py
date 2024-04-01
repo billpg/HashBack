@@ -82,8 +82,8 @@ hashback_resp = requests.post(hashback_service_url, json=request_body)
 
 # Validate the response.
 if hashback_resp.status_code != 200:
-    print(f"HashBack Issuer Service failure. Status={store_hash_resp.status_code}")
-    print(store_hash_resp.content)
+    print(f"HashBack Issuer Service failure. Status={hashback_resp.status_code}")
+    print(hashback_resp.content)
     exit()
 
 # Display the result.
@@ -93,4 +93,4 @@ for response_property_name in response_as_json:
     print(f"  {response_property_name} = {response_as_json[response_property_name]}")
 
 # End.
-print("Isser Demo complete.")
+print("Issuer Demo complete.")

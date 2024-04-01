@@ -27,16 +27,21 @@ namespace billpg.HashBackCore
         private static readonly Func<byte[], byte[]> ComputeSha256
             = System.Security.Cryptography.SHA256.Create().ComputeHash;
 
+        public static readonly IList<string> ValidVersions 
+            = new List<string> { CallerRequest.VERSION_3_0, CallerRequest.VERSION_3_1 }
+            .AsReadOnly();
+
         /// <summary>
         /// A copy of public-draft 3.0's fixed salt in byte array form.
         /// </summary>
-        private static IList<byte> VERSION_3_0_FIXED_SALT
-            = Encoding.ASCII.GetBytes("BECOLRZAMVFWECYGJTLURIDPAYBGMSCQFDXTUYNPMZOAFEDGCKXTJUZLEQFCKXYB");
+        private static readonly IList<byte> VERSION_3_0_FIXED_SALT
+            = Encoding.ASCII.GetBytes("BECOLRZAMVFWECYGJTLURIDPAYBGMSCQFDXTUYNPMZOAFEDGCKXTJUZLEQFCKXYB")
+            .AsReadOnly();
 
         /// <summary>
         /// A copy of public-draft 3.1's fixed salt in byte array form.
         /// </summary>
-        private static IList<byte> VERSION_3_1_FIXED_SALT
+        private static readonly IList<byte> VERSION_3_1_FIXED_SALT
             = new List<byte>
             {
                 113, 218, 98, 9, 6, 165, 151, 157,
@@ -45,17 +50,19 @@ namespace billpg.HashBackCore
                 162, 229, 139, 163, 6, 73, 175, 201
             }.AsReadOnly();
 
+        public static string VerificationHash(this CallerRequest req) => throw new NotImplementedException();
+
         /// <summary>
         /// Find the verification hash for this particular request.
         /// </summary>
         /// <param name="req">Loaded request object.</param>
         /// <returns>The verification hash for this object.</returns>
-        public static string VerificationHash(this CallerRequest req)
+        public static string VerificationHash(this IssuerService.Request req)
         {
             /* Build JSON with each property in the expected order per RFC 8785. */
             var canonical = new JObject
             {
-                ["HashBack"] = req.Version,
+                ["HashBack"] = req.HashBack,
                 ["IssuerUrl"] = req.IssuerUrl,
                 ["Now"] = req.Now,
                 ["Rounds"] = req.Rounds,
@@ -71,9 +78,9 @@ namespace billpg.HashBackCore
             /* Select the PBKDF2 salt based on version. 
              * (Exception should never happen because CallerRequest.Parse checks.) */
             IList<byte> fixedSalt;
-            if (req.Version == CallerRequest.VERSION_3_0)
+            if (req.HashBack == CallerRequest.VERSION_3_0)
                 fixedSalt = VERSION_3_0_FIXED_SALT;
-            else if (req.Version == CallerRequest.VERSION_3_1)
+            else if (req.HashBack == CallerRequest.VERSION_3_1)
                 fixedSalt = VERSION_3_1_FIXED_SALT;
             else
                 throw new ApplicationException("Unknown version.");

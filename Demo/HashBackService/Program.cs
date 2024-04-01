@@ -11,6 +11,7 @@ using System.Text;
 using System.Security.Cryptography;
 using System.Linq.Expressions;
 using Microsoft.AspNetCore.Mvc;
+using HashBackService;
 
 /* Announce the service starting. */
 Console.WriteLine("Starting HashBackService.");
@@ -22,20 +23,23 @@ int port = ServiceConfig.LoadRequiredInt("ListenPort");
 var app = WebApplication.Create();
 app.Urls.Add($"http://localhost:{port}");
 
-/* Configure various end-points with handlers. */
+/* Redirect home page visits to the documentation. */
 string redirectHome = ServiceConfig.LoadRequiredString("RedirectHomeTo");
 app.MapGet("/", RedirectEndpoints.Found(redirectHome));
 
 /* Configure the hash store. */
-HashService hashSvc = new HashService();
+var hashSvc = new HashService();
+hashSvc.OnBadRequestException = ErrorHandler.BadRequestExceptionWithText;
+hashSvc.NoIDRedirectTarget = ServiceConfig.LoadRequiredString("RedirectHashServiceTo");
 hashSvc.ConfigureHttpService(app, "/hashes");
-//app.MapPostWrapped("/hashes", DevHashStoreEndpoints.AddHash);
-//app.MapGet("/hashes", DevHashStoreEndpoints.GetHash);
 
 /* Configure the issuer demo. */
+var issuerSvc = new IssuerService();
 string redirectIssuerDemoDocs = ServiceConfig.LoadRequiredString("RedirectIssuerDemoTo");
-app.MapGet("/issuer", RedirectEndpoints.Found(redirectIssuerDemoDocs));
-app.MapPostWrapped("/issuer", IssuerDemoEndpoints.RequestPost);
+issuerSvc.RootUrl = app.Urls.Single();
+issuerSvc.DocumentationUrl = redirectIssuerDemoDocs;
+issuerSvc.OnRetrieveVerificationHash = VerificationHashDownload.Retrieve;
+issuerSvc.ConfigureHttpService(app, "/issuer");
 
 /* Set up the custom error handler. */
 app.Use(async (context, next) =>

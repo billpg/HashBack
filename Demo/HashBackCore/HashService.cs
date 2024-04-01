@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static billpg.HashBackCore.InternalTools;
 using static billpg.HashBackCore.ThreadSafeHashStore;
 
 namespace billpg.HashBackCore
@@ -24,13 +25,6 @@ namespace billpg.HashBackCore
             public string ID { get; set; } = "";
             public string Hash { get; set; } = "";
         }
-
-        /// <summary>
-        /// Delegate for the NowService. 
-        /// Returns a long for the number of seconds since 1970.
-        /// </summary>
-        /// <returns>Number of seconds since 1970.</returns>
-        public delegate long OnNowFn();
 
         /// <summary>
         /// Function to call when the current time in seconds-since-1970 is needed.

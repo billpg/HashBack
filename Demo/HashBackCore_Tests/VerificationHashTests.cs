@@ -22,19 +22,16 @@ namespace HashBackCore_Tests
             string expectedVerificationHash)
         {
             /* Constrct the CallerRequest object per parameters. */
-            var requestJson = new JObject
+            var req = new IssuerService.Request
             {
-                ["HashBack"] = version,
-                ["TypeOfResponse"] = typeOfResponse,
-                ["IssuerUrl"] = issuerUrl,
-                ["Now"] = now,
-                ["Unus"] = unus,
-                ["Rounds"] = rounds,
-                ["VerifyUrl"] = verifyUrl
+                HashBack = version,
+                TypeOfResponse = typeOfResponse,
+                IssuerUrl = issuerUrl,
+                Now = now,
+                Unus = unus,
+                Rounds = rounds,
+                VerifyUrl = verifyUrl
             };
-
-            /* Parse it into a CallerRequest object. */
-            var req = CallerRequest.Parse(requestJson);
 
             /* Find the hash. */
             string actualHash = req.VerificationHash();

@@ -51,7 +51,7 @@ namespace billpg.HashBackCore
             /* If URL is one of ours from the hash store service, allow it.
              * (This is only needed under debug. As a production service,
              * the hash store will use HTTPS also. */
-            if ($"{url.Scheme}://{url.Authority}" == rootUrl &&
+            if (url.Root() == rootUrl &&
                 url.AbsolutePath == "/hashes" &&
                 url.Query.StartsWith("?ID="))
                 return true;
@@ -59,6 +59,19 @@ namespace billpg.HashBackCore
             /* Failed all tests. */
             return false;
         }
+
+        internal static string Root(this Uri url)
+            => $"{url.Scheme}://{url.Authority}";
+
+
+        /// <summary>
+        /// Delegate for the NowService. 
+        /// Returns a long for the number of seconds since 1970.
+        /// </summary>
+        /// <returns>Number of seconds since 1970.</returns>
+        public delegate long OnNowFn();
+
+
 
     }
 }
