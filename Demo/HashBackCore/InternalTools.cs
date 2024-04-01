@@ -9,10 +9,10 @@ namespace billpg.HashBackCore
 {
     public static class InternalTools
     {
-        public static string AssertNotNull(this string? s)
+        public static T AssertNotNull<T>(this T? s) where T: class
         {
             if (s == null)
-                throw new NullReferenceException("Null string passed to AssertNotNull");
+                throw new NullReferenceException("Null passed to AssertNotNull");
             return s;
         }
 
@@ -71,7 +71,23 @@ namespace billpg.HashBackCore
         /// <returns>Number of seconds since 1970.</returns>
         public delegate long OnNowFn();
 
+        public static IssuerSession.TypeOfResponse? ParseTypeOfResponse(string enumAsString)
+        {
+            if (enumAsString == "BearerToken")
+                return IssuerSession.TypeOfResponse.BearerToken;
+            if (enumAsString == "JWT")
+                return IssuerSession.TypeOfResponse.JWT;
+            if (enumAsString == "204SetCookie")
+                return IssuerSession.TypeOfResponse.SetCookie;
+            return null;
+        }
 
-
+        public static string ToJsonString(this IssuerSession.TypeOfResponse enumValue)
+        {
+            if (enumValue == IssuerSession.TypeOfResponse.SetCookie)
+                return "204SetCookie";
+            else
+                return enumValue.ToString();
+        }
     }
 }

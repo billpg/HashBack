@@ -1,5 +1,6 @@
 ﻿using billpg.WebAppTools;
 using Microsoft.AspNetCore.Http;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -59,6 +60,9 @@ namespace billpg.HashBackService
             => RedirectException.ToTargetUrl(ServiceConfig.LoadRequiredString(configKey));
 
         internal static Exception BadRequestExceptionWithText(string message)
-            => new ResponseException(400, "text/plain; charset=utf-8", UTF8NOBOM.GetBytes(message));        
+            => new ResponseException(400, "text/plain; charset=utf-8", UTF8NOBOM.GetBytes(message));
+
+        internal static Exception BadRequestExceptionWithJson(JObject body)
+            => new ResponseException(400, "application/json", UTF8NOBOM.GetBytes(body.ToString()));
     }
 }

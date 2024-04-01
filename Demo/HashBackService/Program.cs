@@ -30,7 +30,7 @@ app.MapGet("/", RedirectEndpoints.Found(redirectHome));
 /* Configure the hash store. */
 var hashSvc = new HashService();
 hashSvc.OnBadRequestException = ErrorHandler.BadRequestExceptionWithText;
-hashSvc.NoIDRedirectTarget = ServiceConfig.LoadRequiredString("RedirectHashServiceTo");
+hashSvc.DocumentationUrl = ServiceConfig.LoadRequiredString("RedirectHashServiceTo");
 hashSvc.ConfigureHttpService(app, "/hashes");
 
 /* Configure the issuer demo. */
@@ -38,6 +38,7 @@ var issuerSvc = new IssuerService();
 string redirectIssuerDemoDocs = ServiceConfig.LoadRequiredString("RedirectIssuerDemoTo");
 issuerSvc.RootUrl = app.Urls.Single();
 issuerSvc.DocumentationUrl = redirectIssuerDemoDocs;
+issuerSvc.OnBadRequest = ErrorHandler.BadRequestExceptionWithJson;
 issuerSvc.OnRetrieveVerificationHash = VerificationHashDownload.Retrieve;
 issuerSvc.ConfigureHttpService(app, "/issuer");
 
@@ -48,21 +49,6 @@ app.Use(async (context, next) =>
     catch (Exception ex)
     { ErrorHandler.Handle(ex, context); }
 });
-
-
-app.MapGet("/err", ThrowAnError);
-string ThrowAnError()
-{
-    throw new ApplicationException("hello");
-}
-
-
-app.MapGet("/text", ReturnHello);
-string ReturnHello()
-    => "hello world";
-
-
-
 
 /* Start running and log. */
 Console.WriteLine("Running.");

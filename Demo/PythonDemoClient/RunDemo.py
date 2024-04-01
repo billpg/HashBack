@@ -18,79 +18,96 @@ print(f"HashBack Service URL: {hashback_service_url}")
 verification_hash_url = "http://localhost:3001/hashes"
 print(f"Verifcation Hash URL: {verification_hash_url}")
 
-# Select an ID to identify the hash. The hash storage service
-# will use this as the primary key for the hash itself.
-hash_id = uuid.uuid1()
-print(f"Hash ID: {hash_id}")
+# Loop through the two available response types.
+for type_of_response in ["BearerToken", "JWT", "204SetCookie"]:
+    print(f"--- {type_of_response} --")
 
-# Build a "Unus" value from 256 cryptographic quality random bits.
-unus = str(base64.b64encode(os.urandom(256 // 8)), "ascii")
-print(f"Unus: {unus}")
+    # Select an ID to identify the hash. The hash storage service
+    # will use this as the primary key for the hash itself.
+    hash_id = uuid.uuid1()
+    print(f"Hash ID: {hash_id}")
 
-# Build a request JSON in the order RFC8785 expects.
-request_body = {
-    "HashBack": "HASHBACK-PUBLIC-DRAFT-3-1",
-    "IssuerUrl": hashback_service_url,
-    "Now": time_ns() // (1000 * 1000 * 1000),
-    "Rounds": 1,
-    "TypeOfResponse": "BearerToken",
-    "Unus": unus,
-    "VerifyUrl": f"{verification_hash_url}?ID={hash_id}",
-}
+    # Build a "Unus" value from 256 cryptographic quality random bits.
+    unus = str(base64.b64encode(os.urandom(256 // 8)), "ascii")
+    print(f"Unus: {unus}")
 
-# Display the request body.
-print("Request Body JSON:")
-for request_property_name in request_body:
-    print(f"  {request_property_name} = {request_body[request_property_name]}")
+    # Build a request JSON in the order RFC8785 expects.
+    request_body = {
+        "HashBack": "HASHBACK-PUBLIC-DRAFT-3-1",
+        "IssuerUrl": hashback_service_url,
+        "Now": time_ns() // (1000 * 1000 * 1000),
+        "Rounds": 1,
+        "TypeOfResponse": type_of_response,
+        "Unus": unus,
+        "VerifyUrl": f"{verification_hash_url}?ID={hash_id}",
+    }
 
-# Convert the request body JSON into bytes.
-request_body_as_string = json.dumps(request_body, separators=(",", ":"))
-request_body_as_bytes = bytes(request_body_as_string, "utf-8")
+    # Display the request body.
+    print("Request Body JSON:")
+    for request_property_name in request_body:
+        print(f"  {request_property_name} = {request_body[request_property_name]}")
 
-# Find the verification hash using PBKDF2, per the HashBack draft version 3.1.
-hash_as_bytes = hashlib.pbkdf2_hmac(
-    hash_name="SHA256",
-    password=request_body_as_bytes,
-    salt=base64.b64decode("cdpiCQall50uHOUQQltbSJb2RVPY6xXvouWLowZJr8k="),
-    iterations=1,
-    dklen=32,
-)
+    # Convert the request body JSON into bytes.
+    request_body_as_string = json.dumps(request_body, separators=(",", ":"))
+    request_body_as_bytes = bytes(request_body_as_string, "utf-8")
 
-# Encode the completed hash.
-hash_as_string = str(base64.b64encode(hash_as_bytes), "ascii")
-print(f"Hash: {hash_as_string}")
+    # Find the verification hash using PBKDF2, per the HashBack draft version 3.1.
+    hash_as_bytes = hashlib.pbkdf2_hmac(
+        hash_name="SHA256",
+        password=request_body_as_bytes,
+        salt=base64.b64decode("cdpiCQall50uHOUQQltbSJb2RVPY6xXvouWLowZJr8k="),
+        iterations=1,
+        dklen=32,
+    )
 
-# Upload the hash to the hash service.
-# Note: For actually-secure exchanges, use your own website.
-#
-# My example hash service is open to all and sundry, and the security
-# of this exchange depends on you having a place to publish hashes
-# that you can affirm as being the only one in control of it.
-store_hash_resp = requests.post(
-    verification_hash_url,
-    json={"ID": str(hash_id), "Hash": hash_as_string},
-)
+    # Encode the completed hash.
+    hash_as_string = str(base64.b64encode(hash_as_bytes), "ascii")
+    print(f"Hash: {hash_as_string}")
 
-# Validate the response.
-if store_hash_resp.status_code != 200:
-    print(f"Hash Service failure. Status={store_hash_resp.status_code}")
-    print(store_hash_resp.content)
-    exit()
+    # Upload the hash to the hash service.
+    # Note: For actually-secure exchanges, use your own website.
+    #
+    # My example hash service is open to all and sundry, and the security
+    # of this exchange depends on you having a place to publish hashes
+    # that you can affirm as being the only one in control of it.
+    store_hash_resp = requests.post(
+        verification_hash_url,
+        json={"ID": str(hash_id), "Hash": hash_as_string},
+    )
 
-# Now actually send the request to the actual HashBack service.
-hashback_resp = requests.post(hashback_service_url, json=request_body)
+    # Validate the response.
+    if store_hash_resp.status_code != 200:
+        print(f"Hash Service failure. Status={store_hash_resp.status_code}")
+        print(store_hash_resp.content)
+        exit()
 
-# Validate the response.
-if hashback_resp.status_code != 200:
-    print(f"HashBack Issuer Service failure. Status={hashback_resp.status_code}")
-    print(hashback_resp.content)
-    exit()
+    # Now actually send the request to the actual HashBack service.
+    hashback_resp = requests.post(hashback_service_url, json=request_body)
 
-# Display the result.
-print("HashBack Issuer Service response:")
-response_as_json = hashback_resp.json()
-for response_property_name in response_as_json:
-    print(f"  {response_property_name} = {response_as_json[response_property_name]}")
+    # Validate the response.
+    if type_of_response in ["BearerToken", "JWT"] and hashback_resp.status_code != 200:
+        print(f"HashBack Issuer Service failure. Status={hashback_resp.status_code}")
+        print(hashback_resp.content)
+        exit()
+    if type_of_response == "204SetCookie" and hashback_resp.status_code != 204:
+        print(f"HashBack Issuer Service failure. Status={hashback_resp.status_code}")
+        print(hashback_resp.content)
+        exit()
+
+    # Show the result.
+    if type_of_response == "BearerToken":
+        # Display the result.
+        print("HashBack Issuer Service response:")
+        response_as_json = hashback_resp.json()
+        for response_property_name in response_as_json:
+            print(f"  {response_property_name} = {response_as_json[response_property_name]}")
+
+    if type_of_response == "JWT":
+        print(f"JWT: {hashback_resp.json()}")
+
+    if type_of_response == "204SetCookie":
+        for cookie in hashback_resp.cookies:
+            print(cookie)
 
 # End.
 print("Issuer Demo complete.")

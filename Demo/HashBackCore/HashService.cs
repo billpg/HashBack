@@ -53,7 +53,7 @@ namespace billpg.HashBackCore
         /// <summary>
         /// URL to redirect users to who "GET /hashes".
         /// </summary>
-        public string NoIDRedirectTarget { get; set; } = "/";
+        public string DocumentationUrl { get; set; } = "https://invalid/";
 
         /// <summary>
         /// The hash store for this instance.
@@ -73,12 +73,12 @@ namespace billpg.HashBackCore
             app.MapPost(path, this.AddHash);
         }
 
-        private string GetHash(
+        private IResult GetHash(
             [FromQuery(Name = "id")] string? idAsString, HttpContext context)
         {
             /* Load the ID query string parameter. If not used, redirect to the documentation. */
             if (idAsString == null)
-                context.Response.Redirect(NoIDRedirectTarget);
+                return Results.Redirect(DocumentationUrl);
 
             /* Convert ID to UUID, reporting bad-request if not valid. */
             if (Guid.TryParse(idAsString, out Guid id) == false)
@@ -92,7 +92,11 @@ namespace billpg.HashBackCore
             /* Respond to caller. (Web server will treat strings a text/plain responses.) */
             context.Response.Headers.Append("X-Sender-IP", hashRecord.Value.SenderIP.ToString());
             context.Response.Headers.Append("X-Sent-At", hashRecord.Value.SentAt.ToString());
-            return Convert.ToBase64String(hashRecord.Value.Hash.ToArray()) + "\r\n";
+            return Results.Text(
+                Convert.ToBase64String(hashRecord.Value.Hash.ToArray()) + "\r\n", 
+                "text/plain", 
+                Encoding.ASCII, 
+                200);
         }
 
         private string AddHash(AddHashRequestBody body, HttpContext context)

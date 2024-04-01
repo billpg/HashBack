@@ -5,6 +5,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using static billpg.HashBackCore.InternalTools;
@@ -72,7 +73,16 @@ namespace billpg.HashBackCore
             context.Response.Redirect(this.DocumentationUrl);
         }
 
-        private BearerTokenResponse HandleRequest(Request req, HttpContext context)
+        /// <summary>
+        /// Options to use when returning a BearerToken response in JSON.
+        /// </summary>
+        private static readonly System.Text.Json.JsonSerializerOptions BearerTokenJsonOptions = new()
+        {
+            PropertyNamingPolicy = null,
+            WriteIndented = true
+        };
+
+        private IResult HandleRequest(Request req, HttpContext context)
         {
             /* Validate the version. */
             if (CryptoExtensions.ValidVersions.Contains(req.HashBack) == false)
@@ -80,9 +90,11 @@ namespace billpg.HashBackCore
                     new JProperty("AcceptVersions", new JArray(CryptoExtensions.ValidVersions)));
 
             /* This API supports al three documented response types. */
-            TypeOfResponse typeOfResponse;
-            if (Enum.TryParse(req.TypeOfResponse, out typeOfResponse) == false)
-                throw BadRequestError("Request's TypeOfResponse is not acceptable.");
+            TypeOfResponse? typeOfResponse = InternalTools.ParseTypeOfResponse(req.TypeOfResponse);
+            if (typeOfResponse == null)
+                throw BadRequestError(
+                    "Request's TypeOfResponse is not acceptable.",
+                    new JProperty("AcceptTypeOfResponse", new JArray { "BearerToken", "JWT", "204SetCookie" }));
 
             /* The issuer URL must be HTTPS and be for the expected issuer host. */
             Uri issuerUrl = new Uri(req.IssuerUrl);
@@ -120,12 +132,25 @@ namespace billpg.HashBackCore
             if (remoteVerificationHash != expectedHash)
                 throw BadRequestError("Verification Hash did not match expected hash.");
 
-            /* Build a JWT response. */
+            /* Build a JWT. */
             long expiresAt = ourNow + 3600;
             string jwt = BuildJWT(issuerUrl.Host, verifyUrl.Host, ourNow, expiresAt);
 
-            /* Return success response. */
-            return new BearerTokenResponse { BearerToken = jwt, IssuedAt = ourNow, ExpiresAt = expiresAt };
+            /* Return based on the requested response type. */
+            if (typeOfResponse == TypeOfResponse.BearerToken)
+                return Results.Json(
+                    new { BearerToken = jwt, IssuedAt = ourNow, ExpiresAt = expiresAt }, 
+                    BearerTokenJsonOptions);
+            if (typeOfResponse == TypeOfResponse.JWT)
+                return Results.Json(jwt);
+            if (typeOfResponse == TypeOfResponse.SetCookie)
+            {
+                context.Response.Cookies.Append("HashBack", jwt);
+                return Results.NoContent();
+            }
+
+            /* Unknown response type. Should never happen as type already checked. */
+            throw new ApplicationException("Unknown type of response.");
         }
 
         private Exception BadRequestError(string message, params JProperty[] props)
@@ -167,15 +192,15 @@ namespace billpg.HashBackCore
             var jwtHeader = new JObject
             {
                 ["typ"] = "JWT",
-                ["alg"] = "HS256",
-                ["this-token-is-trustworthy"] = false
+                ["alg"] = "HS256"
             };
             var jwtBody = new JObject
             {
                 ["iss"] = issuer,
                 ["sub"] = subject,
                 ["iat"] = issuedAt,
-                ["exp"] = expiresAt
+                ["exp"] = expiresAt,
+                ["this-token-is-trustworthy"] = false
             };
 
             /* Encode the header and body. */
