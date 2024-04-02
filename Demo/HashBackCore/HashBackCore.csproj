@@ -7,12 +7,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\billpg.UsefulDataStructures\billpg.UsefulDataStructures.csproj" />
-    <ProjectReference Include="..\WebAppTools\WebAppTools.csproj" />
   </ItemGroup>
 
 </Project>

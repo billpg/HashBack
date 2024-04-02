@@ -17,7 +17,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\HashBackCore\HashBackCore.csproj" />
-    <ProjectReference Include="..\WebAppTools\WebAppTools.csproj" />
   </ItemGroup>
 
   <ItemGroup>

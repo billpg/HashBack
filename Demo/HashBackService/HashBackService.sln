@@ -9,8 +9,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HashBackCore", "..\HashBack
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HashBackCore_Tests", "..\HashBackCore_Tests\HashBackCore_Tests.csproj", "{7B59E945-4818-4F1F-93AD-9AE5068DFC46}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebAppTools", "..\WebAppTools\WebAppTools.csproj", "{ED48A86C-C1E7-477F-8BFE-17A325B21357}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{C20F7874-E2AA-44B2-ABA4-B335EE8AA97D}"
 	ProjectSection(SolutionItems) = preProject
 		..\..\.gitignore = ..\..\.gitignore
@@ -40,10 +38,6 @@ Global
 		{7B59E945-4818-4F1F-93AD-9AE5068DFC46}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7B59E945-4818-4F1F-93AD-9AE5068DFC46}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7B59E945-4818-4F1F-93AD-9AE5068DFC46}.Release|Any CPU.Build.0 = Release|Any CPU
-		{ED48A86C-C1E7-477F-8BFE-17A325B21357}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{ED48A86C-C1E7-477F-8BFE-17A325B21357}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{ED48A86C-C1E7-477F-8BFE-17A325B21357}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{ED48A86C-C1E7-477F-8BFE-17A325B21357}.Release|Any CPU.Build.0 = Release|Any CPU
 		{DCD5B128-CFCA-4456-B618-46BE819DAFD2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{DCD5B128-CFCA-4456-B618-46BE819DAFD2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DCD5B128-CFCA-4456-B618-46BE819DAFD2}.Release|Any CPU.ActiveCfg = Release|Any CPU
