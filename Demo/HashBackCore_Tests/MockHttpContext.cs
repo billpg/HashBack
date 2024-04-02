@@ -21,6 +21,24 @@ namespace HashBackCore_Tests
             public long? ContentLength { get; set; }
         }
 
+        class MockCookies : IResponseCookies
+        {
+            public readonly Dictionary<string, string> Data = [];
+
+            public void Append(string key, string value)
+                => Data[key] = value;
+
+            public void Append(string key, string value, CookieOptions options)
+                => throw new NotImplementedException();
+            
+            public void Delete(string key)
+                => throw new NotImplementedException();
+
+            public void Delete(string key, CookieOptions options)
+                => throw new NotImplementedException();
+        }
+
+        private MockCookies ResponseCookies { get; }
         private MockHeaders RequestHeaders { get; }
         private MockHeaders ResponseHeaders { get; }
         public Mock<HttpRequest> MockRequest { get; }
@@ -37,9 +55,9 @@ namespace HashBackCore_Tests
             /* Build a mock response object. */
             this.MockResponse = new Mock<HttpResponse>();
             this.ResponseHeaders = new MockHeaders();
-            this.MockResponse
-                .Setup(x => x.Headers)
-                .Returns(this.ResponseHeaders);
+            this.MockResponse.Setup(x => x.Headers).Returns(this.ResponseHeaders);
+            this.ResponseCookies = new MockCookies();
+            this.MockResponse.Setup(x => x.Cookies).Returns(this.ResponseCookies);
 
             /* Build a mock request object. */
             this.MockRequest = new Mock<HttpRequest>();
@@ -67,6 +85,12 @@ namespace HashBackCore_Tests
             Assert.IsNotNull(headerValues, $"No header values with name {name}.");
             Assert.AreEqual(1, headerValues.Count, $"Header count for {name} is not one.");
             Assert.AreEqual(expectedValue, headerValues.Single());
+        }
+
+        public void AssertResponseCookieSet(string name, string expectedValue)
+        {
+            var cookieValue = this.ResponseCookies.Data.GetValueOrDefault(name);
+            Assert.AreEqual(expectedValue, cookieValue);
         }
     }
 }

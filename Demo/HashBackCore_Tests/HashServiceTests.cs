@@ -6,6 +6,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using NuGet.Frameworks;
 using System;
+using System.Buffers.Text;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -33,51 +34,18 @@ namespace HashBackCore_Tests
             = HashServiceTypeInfo.DeclaredMethods.Single(fn => fn.Name == "GetHash");
 
         /// <summary>
-        /// Call the AddHash function for a constructed HashService object.
-        /// </summary>
-        /// <param name="svc">Preconfigured HashService object</param>
-        /// <param name="body">Deserialized HJSON requets body.</param>
-        /// <param name="context">Mock HTTP Context object.</param>
-        /// <returns>Text response body.</returns>
-        private string AddHashInternal(HashService svc, AddHashRequestBody body, HttpContext context)
-            => (AddHashMethodInfo.Invoke(svc, [body, context]) as string).AssertNotNull();
-
-        /// <summary>
-        /// Call the private GetHash function.
-        /// </summary>
-        /// <param name="svc">Configured HashService object.</param>
-        /// <param name="idAsString">Hash ID being queried, or null for a redirect.</param>
-        /// <param name="context">Mok HTTP Context object.</param>
-        /// <returns>Text hash response.</returns>
-        private string GetHashInternal(HashService svc, string? idAsString, HttpContext context)
-            => (GetHashMethodInfo.Invoke(svc, [idAsString, context]) as string).AssertNotNull();
-
-        /// <summary>
         /// Construct a new HashService instance and configure.
         /// </summary>
         /// <returns>Configured hash service object.</returns>
         HashService BuildService()
             => new()
             {
-                NowService = StartClock(),
+                NowService = TestCommon.StartClock(),
                 DocumentationUrl = "https://example.com/lots-of-docs.txt",
                 OnBadRequestException = msg => new ApplicationException(msg)
             };
 
 
-        /// <summary>
-        /// Create a function that returns a mock "now", starting at five billion and
-        /// going up by a kilosecond each subsequent call.
-        /// </summary>
-        /// <returns>Callable "now" function.</returns>
-        InternalTools.OnNowFn StartClock()
-        {
-            /* Initial value for clock. Use first round value after 32 bit limit. */
-            long clock = 5L * 1000 * 1000 * 1000;
-
-            /* Return a function that reads the clock and updates the value. */
-            return () => clock += 1000;
-        }
 
         [TestMethod]
         public void HashService_RoundTrip()
@@ -164,8 +132,61 @@ namespace HashBackCore_Tests
 
         [TestMethod]
         public void HashService_AddHash_BadID()
-        {
+            => HashService_AddHashError_Internal(
+                "Rutabaga", 
+                CryptoExtensions.GenerateUnus(), 
+                "ID property is not a valid UUID.");
 
+        [TestMethod]
+        public void HashService_AddHash_EmptyStringID()
+            => HashService_AddHashError_Internal(
+                "",
+                CryptoExtensions.GenerateUnus(),
+                "ID property is not a valid UUID.");
+
+        [TestMethod]
+        public void HashService_AddHash_BadHash_EmptyString()
+            => HashService_AddHashError_Internal(
+                $"{Guid.NewGuid()}",
+                "",
+                "Hash must be 256 bits of BASE64.");
+
+        [TestMethod]
+        public void HashService_AddHash_BadHash_NoEquals()
+            => HashService_AddHashError_Internal(
+                $"{Guid.NewGuid()}",
+                CryptoExtensions.GenerateUnus().TrimEnd('='),
+                "Hash must be 256 bits of BASE64.");
+
+        [TestMethod]
+        public void HashService_AddHash_BadHash_TooShort()
+            => HashService_AddHashError_Internal(
+                $"{Guid.NewGuid()}",
+                "ABCD",
+                "Hash must be 256 bits of BASE64.");
+
+        [TestMethod]
+        public void HashService_AddHash_BadHash_TooLong()
+            => HashService_AddHashError_Internal(
+                $"{Guid.NewGuid()}",
+                new string('/',44),
+                "Hash must be 256 bits of BASE64.");
+
+        private void HashService_AddHashError_Internal(string useID, string useHash, string expectedErrorMessage)
+        {
+            /* Construct a service object and mock context. */
+            HashService svc = BuildService();
+            var mockContext = new MockHttpContext(useClientIP: IPAddress.IPv6Loopback);
+
+            /* Call AddHash with a bad ID, expecting an exception. */
+            var ex = Assert.ThrowsException<TargetInvocationException>(
+                () => AddHashMethodInfo.Invoke(
+                svc,
+                [new AddHashRequestBody { ID = useID, Hash = useHash },
+                mockContext.Context]));
+            Assert.IsNotNull(ex.InnerException);
+            Assert.IsInstanceOfType(ex.InnerException, typeof(ApplicationException));
+            Assert.AreEqual(expectedErrorMessage, ex.InnerException.Message);
         }
 
     }

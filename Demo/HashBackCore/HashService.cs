@@ -108,7 +108,7 @@ namespace billpg.HashBackCore
             /* Pull out the Hash property and validate. */
             var hashAsBytes = ConvertFromBase64OrNull(body.Hash, 256 / 8);
             if (hashAsBytes == null)
-                throw new BadRequestException("Hash must be 256 bits of BASE64.");
+                throw OnBadRequestException("Hash must be 256 bits of BASE64.");
 
             /* Save hash.*/
             var hashRecord = new StoredHash(
