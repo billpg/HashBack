@@ -4,7 +4,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using billpg.HashBackService;
-using billpg.WebAppTools;
 using Newtonsoft.Json.Linq;
 using billpg.HashBackCore;
 using System.Text;

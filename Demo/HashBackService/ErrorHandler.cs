@@ -1,4 +1,3 @@
-﻿using billpg.WebAppTools;
 using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json.Linq;
 using System;
@@ -49,7 +48,7 @@ namespace billpg.HashBackService
             {
                 context.Response.StatusCode = respex.StatusCode;
                 context.Response.ContentType = respex.ContentType;
-                context.Response.WriteBodyBytes(respex.Body);
+                context.Response.Body.WriteAsync(respex.Body);
             }
         }
 
