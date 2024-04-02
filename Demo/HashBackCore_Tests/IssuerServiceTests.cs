@@ -48,7 +48,7 @@ namespace HashBackCore_Tests
             /* Set up a request object with fixed values. */
             var req = new IssuerService.Request
             {
-                HashBack = CallerRequest.VERSION_3_1,
+                HashBack = IssuerService.VERSION_3_1,
                 IssuerUrl = "https://test.invalid/login.php",
                 TypeOfResponse = responseType,
                 Now = 5000001001,

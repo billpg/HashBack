@@ -25,7 +25,7 @@ app.Urls.Add($"http://localhost:{port}");
 
 /* Redirect home page visits to the documentation. */
 string redirectHome = ServiceConfig.LoadRequiredString("RedirectHomeTo");
-app.MapGet("/", RedirectEndpoints.Found(redirectHome));
+app.MapGet("/", () => Results.Redirect(redirectHome));
 
 /* Configure the hash store. */
 var hashSvc = new HashService();

@@ -28,7 +28,7 @@ namespace billpg.HashBackCore
             = System.Security.Cryptography.SHA256.Create().ComputeHash;
 
         public static readonly IList<string> ValidVersions 
-            = new List<string> { CallerRequest.VERSION_3_0, CallerRequest.VERSION_3_1 }
+            = new List<string> { IssuerService.VERSION_3_0, IssuerService.VERSION_3_1 }
             .AsReadOnly();
 
         /// <summary>
@@ -49,8 +49,6 @@ namespace billpg.HashBackCore
                 150, 246, 69, 83, 216, 235, 21, 239,
                 162, 229, 139, 163, 6, 73, 175, 201
             }.AsReadOnly();
-
-        public static string VerificationHash(this CallerRequest req) => throw new NotImplementedException();
 
         /// <summary>
         /// Find the verification hash for this particular request.
@@ -78,9 +76,9 @@ namespace billpg.HashBackCore
             /* Select the PBKDF2 salt based on version. 
              * (Exception should never happen because CallerRequest.Parse checks.) */
             IList<byte> fixedSalt;
-            if (req.HashBack == CallerRequest.VERSION_3_0)
+            if (req.HashBack == IssuerService.VERSION_3_0)
                 fixedSalt = VERSION_3_0_FIXED_SALT;
-            else if (req.HashBack == CallerRequest.VERSION_3_1)
+            else if (req.HashBack == IssuerService.VERSION_3_1)
                 fixedSalt = VERSION_3_1_FIXED_SALT;
             else
                 throw new ApplicationException("Unknown version.");

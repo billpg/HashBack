@@ -46,7 +46,7 @@ namespace HashBackCore_Tests
         [TestMethod]
         public void Test30ExampleOne()
             => TestExpectedHash(               
-                    version: "HASHBACK-PUBLIC-DRAFT-3-0",
+                    version: IssuerService.VERSION_3_0,
                     typeOfResponse: "BearerToken",
                     issuerUrl: "https://issuer.example/api/generate_bearer_token",
                     now: 529297200,
@@ -61,7 +61,7 @@ namespace HashBackCore_Tests
         [TestMethod]
         public void Test30ExampleTwo()
             => TestExpectedHash(
-                version: "HASHBACK-PUBLIC-DRAFT-3-0",
+                version: IssuerService.VERSION_3_0,
                 typeOfResponse: "BearerToken",
                 issuerUrl: "https://sass.example/api/login/hashback",
                 now: 1111863600,
@@ -76,7 +76,7 @@ namespace HashBackCore_Tests
         [TestMethod]
         public void Test31ExampleOne()
             => TestExpectedHash(
-                    version: CallerRequest.VERSION_3_1,
+                    version: IssuerService.VERSION_3_1,
                     typeOfResponse: "BearerToken",
                     issuerUrl: "https://issuer.example/api/generate_bearer_token",
                     now: 529297200,
@@ -91,7 +91,7 @@ namespace HashBackCore_Tests
         [TestMethod]
         public void Test31ExampleTwo()
             => TestExpectedHash(
-                version: CallerRequest.VERSION_3_1,
+                version: IssuerService.VERSION_3_1,
                 typeOfResponse: "BearerToken",
                 issuerUrl: "https://sass.example/api/login/hashback",
                 now: 1111863600,

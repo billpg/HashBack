@@ -71,20 +71,20 @@ namespace billpg.HashBackCore
         /// <returns>Number of seconds since 1970.</returns>
         public delegate long OnNowFn();
 
-        public static IssuerSession.TypeOfResponse? ParseTypeOfResponse(string enumAsString)
+        public static IssuerService.TypeOfResponse? ParseTypeOfResponse(string enumAsString)
         {
             if (enumAsString == "BearerToken")
-                return IssuerSession.TypeOfResponse.BearerToken;
+                return IssuerService.TypeOfResponse.BearerToken;
             if (enumAsString == "JWT")
-                return IssuerSession.TypeOfResponse.JWT;
+                return IssuerService.TypeOfResponse.JWT;
             if (enumAsString == "204SetCookie")
-                return IssuerSession.TypeOfResponse.SetCookie;
+                return IssuerService.TypeOfResponse.SetCookie;
             return null;
         }
 
-        public static string ToJsonString(this IssuerSession.TypeOfResponse enumValue)
+        public static string ToJsonString(this IssuerService.TypeOfResponse enumValue)
         {
-            if (enumValue == IssuerSession.TypeOfResponse.SetCookie)
+            if (enumValue == IssuerService.TypeOfResponse.SetCookie)
                 return "204SetCookie";
             else
                 return enumValue.ToString();

@@ -9,12 +9,25 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using static billpg.HashBackCore.InternalTools;
-using static billpg.HashBackCore.IssuerSession;
 
 namespace billpg.HashBackCore
 {
     public class IssuerService
     {
+
+        public enum TypeOfResponse
+        {
+            BearerToken,
+            JWT,
+            SetCookie
+        }
+
+        public const int minRounds = 1;
+        public const int maxRounds = 9;
+
+        public const string VERSION_3_0 = "HASHBACK-PUBLIC-DRAFT-3-0";
+        public const string VERSION_3_1 = "HASHBACK-PUBLIC-DRAFT-3-1";
+
 
         /// <summary>
         /// The JSON request body in deserialized form.
