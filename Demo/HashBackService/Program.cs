@@ -11,6 +11,7 @@ using System.Security.Cryptography;
 using System.Linq.Expressions;
 using Microsoft.AspNetCore.Mvc;
 using HashBackService;
+using System.Net;
 
 /* Announce the service starting. */
 Console.WriteLine("Starting HashBackService.");
@@ -31,6 +32,16 @@ var hashSvc = new HashService();
 hashSvc.OnBadRequestException = ErrorHandler.BadRequestExceptionWithText;
 hashSvc.DocumentationUrl = ServiceConfig.LoadRequiredString("RedirectHashServiceTo");
 hashSvc.ConfigureHttpService(app, "/hashes");
+
+/* Confgure the hash downloader service. */
+var verifyHashLookup = new VerificationHashRetrieval();
+var ip = verifyHashLookup.NameLookupService("xn--8s9h.billpg.com");
+var verifyHashRetr = new VerificationHashRetrieval();
+var verifyResp = verifyHashRetr.HashDownloadService(
+    ip, new Uri("https://xn--8s9h.billpg.com/hashback/123.txt"));
+
+
+
 
 /* Configure the issuer demo. */
 var issuerSvc = new IssuerService();
