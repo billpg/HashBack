@@ -144,7 +144,7 @@ namespace billpg.HashBackCore
         /// <param name="hash">Supplied hash to convert.</param>
         /// <param name="expectedByteCount">Exactly how many bytes to expect.</param>
         /// <returns>Byte collection, or null if string is not valid.</returns>
-        private static IList<byte>? ConvertFromBase64OrNull(string hash, int expectedByteCount)
+        internal static IList<byte>? ConvertFromBase64OrNull(string hash, int expectedByteCount)
         {
             /* Attempt to convert string into bytes. */
             byte[] hashAsBytes;
