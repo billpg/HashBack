@@ -106,7 +106,7 @@ The hashing process takes the following steps.
    - Output: 256 bits / 32 bytes
 3. Encode the hash result using BASE-64, including the trailing `=` character.
 
-(A simplified RFC 8785 generator could be used, thanks to all of the values being simple integers or strings and all the JSON property names beginning (by design) with a different capital letter.)
+Note that the request only uses simple integers and strings without spaces or control characters. At this level of operation, the only requirement of RFC 8785 is that the properties are in alphabetical order (they all begin with a distinct capital letter by design), that there are no spaces or line endings between the JSON marker characters and that no characters use `\u` encoding. Almost all JSON serializers have a "no spaces" mode but in the absence, some simple post-processing would suffice.
 
 The fixed salt is used to ensure that a valid hash is only meaningful in light of this document, as that salt is not sent over the wire with the request.
 
