@@ -1,6 +1,5 @@
 ﻿/* Modify the README.md file with correct tokens and 
  * signatures using the crypto-helper functions. */
-using billpg.CrossRequestTokenExchange;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.Linq;
@@ -46,9 +45,6 @@ SetTextByMarker(readmeLines, "<!--FIXED_SALT_HEX-->", $"- Hex: `{BytesToHex(fixe
 SetTextByMarker(readmeLines, "<!--FIXED_SALT_B64-->", $"- Base64: `{Convert.ToBase64String(fixedSaltBytes)}`");
 SetTextByMarker(readmeLines, "<!--FIXED_SALT_URL-->", $"- URL: `{System.Web.HttpUtility.UrlEncode(fixedSaltBytes)}`");
 
-/* Set the bytes for CryptoHelper. */
-CryptoHelpers.FIXED_SALT = fixedSaltBytes;
-
 /* Populate the main examples in the README. */
 PopulateExample(
     "1066_EXAMPLE",
@@ -80,19 +76,41 @@ long UnixTime(DateTime utc)
 
 void PopulateExample(string keyBase, DateTime now, string issuerUrl, string verifyUrl)
 {
+    const int rounds = 1;
+
     /* Build request JSON. */
     var requestJson = new JObject();
-    requestJson["HashBack"] = "HASHBACK-PUBLIC-DRAFT-3-1";
-    requestJson["TypeOfResponse"] = "BearerToken";
-    requestJson["IssuerUrl"] = issuerUrl;
+    requestJson["Version"] = "BILLPG-DRAFT-4-0";
+    requestJson["Host"] = new Uri(issuerUrl).Host;
     requestJson["Now"] = UnixTime(now);
     requestJson["Unus"] = GenerateUnus(keyBase);
-    requestJson["Rounds"] = 1;
+    requestJson["Rounds"] = rounds;
     requestJson["VerifyUrl"] = verifyUrl;
     ReplaceJson($"<!--{keyBase}_REQUEST-->", requestJson);
 
+    /* Encode JSON into bytes. */
+    string jsonAsString = requestJson.ToString(Newtonsoft.Json.Formatting.None);
+    byte[] jsonAsBytes = Encoding.ASCII.GetBytes(jsonAsString);
+
+    /* Build JSON into an Authorization header. */
+    int authHeaderIndex = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_AUTH_HEADER-->"));
+    if (authHeaderIndex > 0)
+    {
+        int authHeaderStartIndex = readmeLines.FindIndex(authHeaderIndex, src => src.StartsWith("Authorization"));
+        int authHeaderEndIndx = readmeLines.FindIndex(authHeaderStartIndex, src => src == "```");
+        readmeLines.RemoveRange(authHeaderStartIndex+1, authHeaderEndIndx - authHeaderStartIndex - 1);
+
+        /* Convert JSON into a BASE64 string. */
+        string jsonAsBase64 = Convert.ToBase64String(jsonAsBytes, Base64FormattingOptions.InsertLineBreaks);
+        var jsonAsBase64Lines = jsonAsBase64.Split('\r', '\n').Where(s => s.Length > 0).Select(s => " " + s);
+        readmeLines.InsertRange(authHeaderStartIndex+1, jsonAsBase64Lines);
+
+        //readmeLines[] = $"Set-Cookie: MyCookie={setCookieValue}; Secure; HttpOnly;";
+
+    }
+
     /* Insert the hash of the above JSON into the readme. */
-    string hash1066 = CryptoHelpers.HashRequestBody(requestJson);
+    string hash1066 = HashRequestJsonBytes(jsonAsBytes, rounds);
     int hash1066Index = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_HASH-->"));
     readmeLines[hash1066Index] = $"- `{hash1066}`<!--{keyBase}_HASH-->";
 
@@ -120,6 +138,20 @@ void PopulateExample(string keyBase, DateTime now, string issuerUrl, string veri
         var setCookieValue = GenerateUnus(keyBase + "SetCookie").Substring(0, 40);
         readmeLines[setCookieHeaderIndex] = $"Set-Cookie: MyCookie={setCookieValue}; Secure; HttpOnly;";
     }
+}
+
+string HashRequestJsonBytes(byte[] jsonAsBytes, int rounds)
+{
+    /* Run PBKDF2 over the JSON in byte form. */
+    var hash = Rfc2898DeriveBytes.Pbkdf2(
+        password: jsonAsBytes,
+        salt: fixedSaltBytes,
+        hashAlgorithm: HashAlgorithmName.SHA256,
+        iterations: rounds,
+        outputLength: 256 / 8);
+
+    /* Return as a base-64 string. */
+    return Convert.ToBase64String(hash);
 }
 
 void ReplaceJson(string tag, JObject insert)

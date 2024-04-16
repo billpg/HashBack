@@ -1,7 +1,7 @@
 # HashBack Authentication
 A web authentication exchange where a caller proves their identity by publishing a hash value on their website.
 
-This version of the document is a **draft-under-development** for review and discussion and will be tagged as version **3.1.1**.
+This version of the document is a **draft-under-development** for review and discussion and will be tagged as version **4.0**.
 If you have any comments or notes, please open an issue on this project's public github.
 
 This document is Copyright William Godfrey, 2024. You may use its contents under the terms of the Creative-Commons Attribution license.
@@ -22,41 +22,31 @@ While a recipient of a call *can't* be certain who a caller is, the caller *can*
 
 Now apply that thought to web authentication. The client can be sure (thanks to TLS) who the server is, but the server can't be sure who the client is, much like the analogy with phone calls. This document describes how the same "call me back" step could be used to authenticate a web API request. 
 
-As it would be expensive to do that for every single HTTP request, the exchange happens once-off to supply the caller with a Bearer token (or other means for authentication), which the caller may use until it expires.
+As it would be expensive to do that for every single HTTP request, it is anticipated that this authentication process happen as a once-off to supply the client with a temporary Bearer token or Cookie, which can then be used for subsequent requests until it expires. This is optional and this method could be used for every HTTP request if you so wished.
 
 ## The Exchange
-- "Hey Bob, this is Alice. I want to use your API but I need a Bearer token."
-- "Hey Alice, this is Bob. I've got this request for a Bearer token from someone claiming to be you."
-- "Bob, that was me. Here's proof."
-- "Thank you Alice. Here's your Bearer token."
+In a nutshell, the client adds an `Authorizaton:` header that includes a URL through which the server may get the hash of the contents of this header. By actually getting that hash in a separate transaction and confirming it is correct, the server is reassured that the client is control of what's published at that URL.
 
-There are two participants in this exchange:
-- The **Caller** is requesting authentication and publishes proof it made that request.
-- The **Issuer** checks the proof and issues that Bearer token back to the Caller.
+Thanks to TLS, the client can be reassured they are talking to the genuine recipient server, but the server doesn't yet know if the request came from the genuine client. To complete the loop, the server peforms a separate TLS-protected transaction back to client's website.
 
-The Caller makes a POST request to the Issuer. Thanks to TLS, the Caller can be reassured they are talking to the genuine Issuer, but the Issuer doesn't yet know if the request came from the genuine Caller. To complete the loop, the JSON request will include a URL on the Caller's website which will contain a hash of the request JSON. Thanks again to TLS, the Issuer is reassured that the request came from the genuine Caller. The Issuer will now be able to respond to the initial POST request with an issued Bearer token.
+### The Authorization header
 
-(Note that the initial POST request is kept open while the Issuer service retrieves the verification hash from the Caller's website. I am working on a separate proposal utilizing the HTTP status code 202 to allow an open request to be closed and reopened later.)
+The header is constructed as follows:
+```
+Authorization: HashBack (BASE64 encoded JSON) 
+```
 
-### The POST Request Body
-The request body is a single JSON object. All properties are of string type except `Now` and `Rounds` which are integers. (`Now` will need to be larger than 32 bits to continue working after 2038.) All properties are required and `null` is not an acceptable value for any of them. The object must not include other properties except these listed here.
+The BASE64 encoded block must include the trailing `=` character if applicable. The block may be split onto many lines with a single space character at the beginning of each line according to HTTP's rules.
 
-- `HashBack`
-  - Confirms this is a request for authentication and indicates which version of this exchange the Caller wishes to use.
-  - This version of this document is specified by the value "HASHBACK-PUBLIC-DRAFT-3-1". 
+The inside the BASE64 encoded block is a JSON object. All properties are of string type except `Now` and `Rounds` which are integers. (`Now` will need to be larger than 32 bits to continue working after 2038.) All properties are required and `null` is not an acceptable value for any of them. The object must not include other properties except these listed here.
+
+- `Version`
+  - Indicates which version of this document the client was using. This version is specified by the value "BILLPG-DRAFT-4-0". 
   - See the section describing 400 error responses below for version negotiation.
-- `TypeOfResponse`
-  - States what type of response the Caller is requesting. 
-  - The responding service may use a 400 response to negotiate supported response types. See that section for details.
-  - Values:
-    - `BearerToken` - The Caller is requesting an opaque token. This should be supported by all Issuer services as a final fall-back option.
-    - `JWT` - The Caller is requesting a JWT token.
-    - `204SetCookie` - The Caller is requesting a 204 (no content) response with a `Set-Cookie` header.
-    - (Other values may be specified separately from this document.)
-- `IssuerUrl`
-  - A copy of the full POST request URL.
-  - Because load balancers and CDN systems might modify the URL as POSTed to the service, a copy is included here so there's no doubt exactly which string was used in the verification hash.
-  - The Issuer service must reject all requests that come with a URL that belongs to someone else, as this may be an attacker attempting to re-use a request that was made for a different Issuer.
+- `Host`
+  - The full domain name of the server being called in this request.
+  - Because load balancers and CDN systems might modify the `Host:` header, a copy is included here so there's no doubt exactly which string was used in the verification hash.
+  - The recipient service must reject all requests that come with a name that belongs to someone else or generic names such as `localhost`, as this may be an attacker attempting to re-use a request that was made for a different server.
 - `Now`
   - The current UTC time, expressed as an integer of the number of seconds since the start of 1970.
   - The recipient service should reject this request if timestamp is too far from its current time. This document does not specify a threshold in either direction but instead this is left to the service's configuration. (Finger in the air - ten seconds.)
@@ -68,22 +58,29 @@ The request body is a single JSON object. All properties are of string type exce
 - `Rounds`
   - An integer specifying the number of PBKDF2 rounds used to produce the verification hash. 
   - Must be a positive integer, at least 1.
-  - The Issuer service may request a different number of rounds if the value supplied by the Caller is too low or too high. See section describing 400 error responses below for negotiation of this number.
+  - The recipient service may request a different number of rounds if the value supplied is too low or too high. See section describing 400 error responses below for negotiation of this number.
 - `VerifyUrl`
-  - An `https://` URL belonging to the Caller where the verification hash may be retrieved with a GET request.
-  - The URL must be one that Issuer knows as belonging to a specific user.
+  - An `https://` URL belonging to the client where the verification hash may be retrieved with a GET request.
+  - The URL must be one that server knows as belonging to a specific user. Exactly which URLs belong to which users is beyond the scope of this document.
 
 For example:<!--1066_EXAMPLE_REQUEST-->
 ```
 {
-    "HashBack": "HASHBACK-PUBLIC-DRAFT-3-1",
-    "TypeOfResponse": "BearerToken",
-    "IssuerUrl": "https://issuer.example/api/generate_bearer_token",
+    "Version": "BILLPG-DRAFT-4-0",
+    "Host": "issuer.example",
     "Now": 529297200,
     "Unus": "iZ5kWQaBRd3EaMtJpC4AS40JzfFgSepLpvPxMTAbt6w=",
     "Rounds": 1,
     "VerifyUrl": "https://caller.example/hashback_files/my_json_hash.txt"
 }
+```
+This JSON string is BASE64 encoded and added to the end of the `Authorization:` header: <!--1066_EXAMPLE_AUTH_HEADER-->
+```
+Authorization: HashBack
+ eyJWZXJzaW9uIjoiQklMTFBHLURSQUZULTQtMCIsIkhvc3QiOiJpc3N1ZXIuZXhhbXBsZSIsIk5v
+ dyI6NTI5Mjk3MjAwLCJVbnVzIjoiaVo1a1dRYUJSZDNFYU10SnBDNEFTNDBKemZGZ1NlcExwdlB4
+ TVRBYnQ2dz0iLCJSb3VuZHMiOjEsIlZlcmlmeVVybCI6Imh0dHBzOi8vY2FsbGVyLmV4YW1wbGUv
+ aGFzaGJhY2tfZmlsZXMvbXlfanNvbl9oYXNoLnR4dCJ9
 ```
 
 ### Verification Hash Calculation and Publication
@@ -113,7 +110,7 @@ The fixed salt is used to ensure that a valid hash is only meaningful in light o
 Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The text file itself must be one line with the BASE-64 encoded hash in ASCII as that only line. The file must either be exactly 44 bytes long with no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence.
 
 The expected hash of the above example is: 
-- `gnegmhqavAFiKctk5RTywzDKC5utN+nHjTzgNABH70Q=`<!--1066_EXAMPLE_HASH-->
+- `3dkd9JLMHawUmx8hEWtHIpCdA4qiyTzQUWYvEPMmdb4=`<!--1066_EXAMPLE_HASH-->
 
 #### Generation of the fixed salt
 The salt string itself was generated by a PBKDF2 call with a high iteration count. For reference, the following parameters were used:
@@ -275,9 +272,8 @@ The service may respond with any applicable standard HTTP error code in the even
 Time passes and Carol needs to make a request to the Saas API and needs a Bearer token. Her code builds a JSON request:<!--CASE_STUDY_REQUEST-->
 ```
 {
-    "HashBack": "HASHBACK-PUBLIC-DRAFT-3-1",
-    "TypeOfResponse": "BearerToken",
-    "IssuerUrl": "https://sass.example/api/login/hashback",
+    "Version": "BILLPG-DRAFT-4-0",
+    "Host": "sass.example",
     "Now": 1111863600,
     "Unus": "TmDFGekvQ+CRgANj9QPZQtBnF077gAc4AeRASFSDXo8=",
     "Rounds": 1,
@@ -286,7 +282,7 @@ Time passes and Carol needs to make a request to the Saas API and needs a Bearer
 ```
 
 The code calculates the verification hash from this JSON using the process outlined above. The result of hashing the above example request is:
-- `cMrpOXW6hMJmi9IMKEPHfvN29yfyaPEVY064coS9L8c=`<!--CASE_STUDY_HASH-->
+- `YyD9c857eQNDeSgSKxDA/djI1SBuOZfSrFM53CNoCd8=`<!--CASE_STUDY_HASH-->
 
 The hash is saved as a text file to her web server using the random filename selected earlier. With this in place, the POST request can be sent to the SAAS API. The HTTP client library used to make the POST request will perform the necessary TLS handshake as part of making the connection.
 
