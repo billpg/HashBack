@@ -82,7 +82,8 @@ Authorization: HashBack
  eyJWZXJzaW9uIjoiQklMTFBHLURSQUZULTQtMCIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v
  dyI6NTI5Mjk3MjAwLCJVbnVzIjoiaVo1a1dRYUJSZDNFYU10SnBDNEFTNDBKemZGZ1NlcExwdlB4
  TVRBYnQ2dz0iLCJSb3VuZHMiOjEsIlZlcmlmeVVybCI6Imh0dHBzOi8vY2xpZW50LmV4YW1wbGUv
- aGFzaGJhY2tfZmlsZXMvbXlfanNvbl9oYXNoLnR4dCJ9
+ aGFzaGJhY2tfZmlsZXMvbXlfanNvbl9oYXNoLnR4dCIsIvCfpZoiOiJodHRwczovL2JpbGxwZy5j
+ b20vbmdneXUifQ==
 ```
 
 ### Verification Hash Calculation and Publication
@@ -111,7 +112,7 @@ The fixed salt is used to ensure that a valid hash is only meaningful in light o
 Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The text file itself must be one line with the BASE-64 encoded hash in ASCII as that only line. The file must either be exactly 44 bytes long with no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence.
 
 The expected hash of the above example is: 
-- `zgwSM4IC4wGLBS5PTW51XHXhlr3zf7PgIc7JNyPnI4I=`<!--1066_EXAMPLE_HASH-->
+- `ywATe7vV9IaJmQQdwa2tJk9uVmpYKuazFYF5M88gJeE=`<!--1066_EXAMPLE_HASH-->
 
 Once the service has downloaded that verification hash, it should compare it against the result of hashing the bytes inside the BASE64 block. If the two hashes match, the server may be reassured that the client is indeed the user identified by the URL from where the hash was downloaded and proceed to process the remainder of the request.
 
@@ -149,7 +150,7 @@ Time passes and Carol needs to make a request to the Rutabaga Company API and ne
 ```
 
 The code calculates the verification hash from this JSON using the process outlined above. The result of hashing the above example request is:
-- `YOlmlR4i92q7VppQK9Hy+Dq4HBWO4QqmA9cMU5ovr9M=`<!--CASE_STUDY_HASH-->
+- `Spgtp8UUx8qlSrP+mbkcy0z5W1/fjU+OlmHLCi/Z1V8=`<!--CASE_STUDY_HASH-->
 
 To complete the GET request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows, with line-breaks added for clarity.<!--CASE_STUDY_AUTH_HEADER-->
 ```
@@ -160,7 +161,8 @@ Authorization: HashBack
  eyJWZXJzaW9uIjoiQklMTFBHLURSQUZULTQtMCIsIkhvc3QiOiJydXRhYmFnYS5leGFtcGxlIiwi
  Tm93IjoxMTExODYzNjAwLCJVbnVzIjoiVG1ERkdla3ZRK0NSZ0FOajlRUFpRdEJuRjA3N2dBYzRB
  ZVJBU0ZTRFhvOD0iLCJSb3VuZHMiOjEsIlZlcmlmeVVybCI6Imh0dHBzOi8vY2Fyb2wuZXhhbXBs
- ZS9oYXNoYmFjay82NDk2MTg1OS50eHQifQ==
+ ZS9oYXNoYmFjay82NDk2MTg1OS50eHQiLCLwn6WaIjoiaHR0cHM6Ly9iaWxscGcuY29tL25nZ3l1
+ In0=
 ```
 
 The hash is saved as a text file to her web server using the random filename selected earlier. With this in place, the request for a Bearer token including the  can be sent to the API. The HTTP client library used to make the request will perform the necessary TLS handshake as part of making the connection.
@@ -168,7 +170,7 @@ The hash is saved as a text file to her web server using the random filename sel
 ## Checking the request
 The Rutabaga Company website receives this request and validates the request body, performing the following checks:
 - The request arrived via HTTPS.  :heavy_check_mark:
-- The version string `BILLPG-4-0` is known.  :heavy_check_mark:
+- The version string `BILLPG-DRAFT-4-0` is known.  :heavy_check_mark:
 - The `Host` value is a URL belonging to itself - `rutabaga.example`.  :heavy_check_mark:
 - The `Now` time-stamp is reasonably close to the server's internal clock.  :heavy_check_mark:
 - The `Unus` value represents 256 bits encoded in base-64.  :heavy_check_mark:
@@ -214,74 +216,67 @@ Then this exchange is not for you. It works by having two web servers make reque
 ### I have a web server on the other side of the Internet but not the same machine.
 Your web site needs to be covered by TLS, and for your code to be able to publish a small static file to a folder on it. If you can be reasonably certain that no-one else can publish files on that folder, it'll be suitable for this exchange.
 
-### What sort of range should be allowed for identifying an `IssuerUrl` to a single user.
+### What sort of range should be allowed for identifying an `VerifyUrl` to a single user.
 I recommend keeping it tight to either a file inside a single folder or to a single URL with a single query string parameter.
 
 For example, if a user affirms they are in control of `https://example.com/hashback/`, then allow `https://example.com/hashback/1234.txt`, but reject any sub-folders or URLs with query strings. Similarly, if a user affirms they are in control of `https://example.com/hashback?ID=` then allow variations of URLs with that query string parameter changing, rejecting any requests with sub-folders or additional query string parameters.
 
-Ultimately, it is up to each pair of Caller and Issuer to agree what URLs identify that Caller. This document does not proscribe that scope.
+Ultimately, it is up to the code performing this exchange to agree what URLs identify each user. This document does not proscribe that scope.
 
 ### TLS supports client-side certificates.
 To use client-side certificates, the client side would need access to the private key. This would need secure storage for the key which the caller code has access to. Avoidance of this is the main motivation of this exchange.
-
-### How long should a bearer token last until expiry?
-Up to you but (finger in the air) I'd go for an hour. If the exchange takes too long, remember you can do it in advance and have the Bearer token ready if needed.
 
 ### What if either HTTP transaction uses a self-signed TLS certificate or one signed by an untrusted root?
 If a connection to an untrusted TLS certificate is found, abandon the request and maybe log an error. Fortunately, this is default of most (all?) HTTP client libraries.
 
 If you want to allow for self-signed TLS certificates, since this exchange relies on a pre-existing relationship, you could perhaps allow for "pinned" TLS certificates to be configured.
 
-### What if an attacker attempts to eavesdrop on the initial POST request?"
+### What if an attacker attempts to eavesdrop on a request using this Authorization header?"
 The attacker can't eavesdrop because TLS is securing the channel.
 
-### What if an attacker sends a fake POST request to an Issuer?
-The Issuer will attempt to retrieve a verification hash file from the Caller's website. As there won't be a verification hash that matches the fake POST request, the attempt will fail.
+### What if an attacker sends a fake Authorization header?
+The recipient will attempt to retrieve a verification hash file from the real client's website. As there won't be a verification hash that matches the fake header, the attempt will fail.
 
 ### What if an attacker can predict the verification hash URL?"
 Let them.
 
-Suppose an attacker knows a current request's verification hash URL. They would be able to make that GET request and from that know the verification hash. Additionally, they could construct their own request for a Bearer token to the genuine Issuer, using the known `VerifyUrl` value with knowledge the genuine Caller's website will respond again to a second GET request with the known verification hash.
+Suppose an attacker knows a current request's verification hash URL. They would be able to make that GET request and from that know the verification hash. Additionally, they could construct their own Authorization header to a genuine server, using the known `VerifyUrl` value with knowledge the genuine client's website will respond again to a second GET request with the same known verification hash.
 
-To successfully perform this attack, the attacker will need to construct their request body such that its hash will match the verification hash, or else the Issuer service will reject the request. This will require finding the value of the `Unus` property which is unpredictable because it was generated from cryptographic-quality-randomness, sent over a TLS protected channel to the genuine Issuer, and is never reused. 
+To successfully perform this attack, the attacker will need to construct the JSON block such that its hash will match the verification hash, or else the server will reject the request. This will require finding the value of the `Unus` property which is unpredictable because it was generated from cryptographic-quality-randomness, sent over a TLS protected channel to the genuine server, and is never reused. 
 
 For an attacker to exploit knowing a current verification hash, they would need to be able to reverse that hash back into the original JSON request, including the unpredictable `Unus` property.  Reversing SHA256 (as part of PBKDF2) is considered practically impossible.
 
 Nonetheless, it is trivial to make the verification hash URL unpredictable by using cryptographic-quality randomness and it may be considered prudent to do so. Any security analysis conducted on this exchange should assume the URL *is* predictable and thus the verification hash may be exposed to attackers.
 
-### Does it matter if any part of the POST request is predictable?
+### Does it matter if any part of the Authorization header is predictable?
 Only the value of the `Unus` property needs to be unpredictable. All of the other values may be completely predictable to an attacker because only one unpredictable element is enough to make the verification hash secure.
 
-### What if an attacker downloads a verification hash intended for a different issuer?
-To exploit knowing a verification hash, an attacker would need to build a valid JSON request body that resolves to that hash. As the value of the `Unus` property is included in the hash but not revealed to an attacker, the task is practically impossible.
+### What if an attacker downloads a verification hash intended for a different server?
+To exploit knowing a verification hash, an attacker would need to build a valid JSON block that resolves to that hash. As the value of the `Unus` property is included in the hash but not revealed to an attacker, the task is practically impossible.
 
-### What if a Caller sends a legitimate POST request to an Issuer, but that Issuer copies that request along to a different Issuer?
-The second Issuer will reject the request because they will observe the `IssuerUrl` property of the request is for the first Issuer, not itself.
-
-For this reason it is important that Issuer services reject any requests with a URL other than one belonging to them, including "localhost" and similar. Services should also avoid trusting the value of the "Host" header when comparing the value of `IssuerUrl` against the expected URL, as attacking callers might be able to spoof this header.
+### What if a client sends a legitimate Authorization header to a server, but that server is evil and it copies that request along to a different server?
+The second server will reject the request because they will observe the `Host` property of the request is for the first server, not itself. For this reason it is important that servers reject any requests with a `Host` value other than the domain belonging to them, including "localhost" and similar.
 
 ### What if an attacker floods the POST request URL with many fake requests?
-Any number of fake requests will all be rejected by the Issuer because there will be no verification hash that matches the expected hash and the Issuer will not respond with a Bearer token without one.
+Any number of fake requests will all be rejected by the server because there will be no verification hash that matches the expected hash. A server will accept an Authorization without that matching verification hash that came from a genuine user.
 
-Despite this, the fact that a POST request will trigger a second GET request might be used as a denial-of-service attack. For this reason, it may be prudent for an Issuer to track IP address blocks with a history of making bad POST requests and rejecting subsequent requests that originate from these blocks.
+Despite this, the fact that a request with an Authorization header will trigger a second GET request might be used as a denial-of-service attack. For this reason, it may be prudent for an server to track IP address blocks with a history of making bad POST requests and rejecting subsequent requests that originate from these blocks.
 
-This exchange normally requires a pre-existing relationship between the participants, but it isn't unreasonable to suppose that open Issuer services exist that will take POST requests with any valid URL as the `VerifyUrl` property value. These should, to avoid being a participant in a denial-of-service attack, keep track of which `VerifyUrl` domains and IPs have a history of having any result other than returning a correct verification hash. A web site that isn't participating in this exchange might nonetheless have a public folder of text files that are exactly the right length for a verification hash, but only ones that match the expected hash will be willing participants.
-
-It may also be prudent to keep the POST URL secret, so attackers can't send in a flood of fake requests if they don't know where to send them. As this would only be a method to mitigate a denial-of-service attack, the secret URL doesn't have to be treated as secret needing secure storage. The URL could be set in a unencrypted config file and if it does leak, be replaced without urgency at the participant's convenience. The security of the exchange relies on TLS and the verification hash, not the secrecy of the URLs.
+This exchange normally requires a pre-existing relationship between the participants, but it isn't unreasonable to suppose that open servers might exist that will take authentication requests with any valid URL as the `VerifyUrl` property value. These should, to avoid being a participant in a denial-of-service attack, keep track of which `VerifyUrl` domains and IPs have a history of having any result other than returning a correct verification hash.
 
 ### What if there's a website that will host files from anyone?
 Maybe don't claim that website as one that you have exclusive control over.
 
-At its a core, a Bearer token issued by this exchange is the result of someone who was able to demonstrate control of a particular URL. If the group of people who have that control is "anyone" than that's who the Bearer token is identifying you as.
+At its a core, you pass authentication by being someone who was able to demonstrate control of a particular URL. If the group of people who have that control is "anyone" than that's who can pass authentication.
 
 ### What if a malicious Caller supplies a verification URL that keeps the request open?
 [I am grateful to "buzer" of Hacker News for asking this question.](https://news.ycombinator.com/item?id=38110536)
 
-Suppose an attacker sets themselves up and configures their website to host verification hash files. However, instead of responding with verification hashes, this website keeps the GET request open and never closes it. As a result, the Issuer server is left holding two TCP connections open - the original POST request and the GET request that won't end. If this happens many times it could cause a denial-of-service by the many opened connections being kept alive.
+Suppose an attacker sets themselves up and configures their website to host verification hash files. However, instead of responding with verification hashes, this website keeps the GET request open and never closes it. As a result, the server is left holding two TCP connections open - the original authentication request and the GET request that won't end. If this happens many times it could cause a denial-of-service by the many opened connections being kept alive.
 
 We're used to web services making calls to databases or file systems and waiting for those external systems to respond before responding to its own received request. The difference in this scenario is that the external system we're waiting for is controlled by someone else who may be hostile.
 
-This can be mitigated by the Issuer configuring a low timeout for the request that fetches the verification hash. The allowed time only needs to be long enough to perform the hash and the usual roundtrip overhead of a request. If the verification hash requests takes too long the overall transaction can be abandoned.
+This can be mitigated by the server configuring a low timeout for the request that fetches the verification hash. The allowed time only needs to be long enough to perform the hash and the usual roundtrip overhead of a request. If the verification hash requests takes too long the overall transaction can be abandoned.
 
 Nonetheless, I have a separate proposal that will allow for the POST request to use a 202 "Accepted" response where the underlying connection can be closed and reopened later. Instead of keeping the POST request open, the Issuer can close the request and the Caller may reopen it at a later time.
 
@@ -291,9 +286,17 @@ The fixed hash only appears in this document and does not go over the wire as a 
 ### Why use PBKDF2 at all?
 PBKDF2 (which wraps SHA256) is used to allow for additional rounds of hashing to make an attack looking for a JSON string that hashes to a known verification hash much harder.
 
-I don't think this is necessary (indeed, most of the examples in this document use `"Rounds":1`) because the `Unus` property is already 256 bits of unpredictable cryptographic quality randomness. For an attack exercising knowledge of a verification hash, looping through all possible `Unus` values, is already a colossally impractical exercise, even without additional rounds of PBKDF2. A previous draft of this proposal used a single round of SHA256, but I ultimately switched to PBKDF2 to allow for added rounds without needing a substantially updated new version of this protocol and for all implementations needing significant updates. For now, I'm going to continue using 1 as the default number of rounds. 
+I don't think this is necessary (indeed, all of the examples in this document use `"Rounds":1`) because the `Unus` property is already 256 bits of unpredictable cryptographic quality randomness. For an attack exercising knowledge of a verification hash, looping through all possible `Unus` values, is already a colossally impractical exercise, even without additional rounds of PBKDF2. A previous draft of this proposal used a single round of SHA256, but I ultimately switched to PBKDF2 to allow for added rounds without needing a substantially updated new version of this protocol and for all implementations needing significant updates. For now, I'm going to continue using 1 as the default number of rounds. 
 
 As this proposal is still in the public-draft phase, I am open to be persuaded that PBKDF2 is not needed and a single round of SHA256 is quite sufficient thank you very much. I'm also open to be persuaded that the default number of rounds needs to be significantly higher.
+
+### Is the "Bearer Token" response used in the extended example documented anywhere?
+This originated in public-draft vesion 3.0, linked below. I intend to document this response type as a separate proposal with an applicable `Accept`/`Content-Type` that will go alongside this proposal.
+
+### Why BASE64 the JSON in the `Authorization` header?
+To ensure there's an unambiguous sequence of bytes to feed into the hash. By transfering the JSON block in an encoded set of bytes, the recipient can simply pass the decoded byte array into the hashing object.
+
+I had considered requiring that the JSON be included in the header as unencoded ASCII, without any whitespace characters and IDN domains using `xn--` notiation. HTTP headers (in practice) require that headers use ASCII only and this form would have fitted that system. Can I, in practice, use an `Authorization` header with all of characters JSON uses? I am open to be persuaded that this would be preferable to using BASE64. 
 
 ### What are the previous public drafts?
 
@@ -307,9 +310,13 @@ As this proposal is still in the public-draft phase, I am open to be persuaded t
   - Substantial refactoring after realising the verification hash could be a unauthenticated GET request on a static file host.
   - Added a "dot zero" to allow for minor updates, reserving 4.0 for another substantial refactor.
   - Changed name to "HashBack" Authentication, reflecting that a token is only one possible outcome and the verification hash is the big idea.
-- Public Draft 3.1 (This document)
+- [Public Draft 3.1](https://github.com/billpg/HashBack/blob/d8886ce0cebb159f6484186f5b6ccd750d0dd97c/README.md)
   - The "fixed salt" is now the result of running RBKDF2 but without processing the result into capitals letters. This means I no longer need to link to some "attached" C# code and can simply record the input parameters. (The original motivation of having only capital letters in the salt was to support implementations that only accept ASCII strings, but all implementations I could find will accept arbitrary blocks of bytes as input.)
   - Added "204SetCookie" as a third response type. Might be useful for a browser making the POST request.
+- Public Draft 4.0 (This document)
+  - Realised that having a POST request with a Bearer token as a response is still tying to the "token exchange" of the original public draft when it was called "Cross Request Token Exchange". The JSON could instead go into an `Authorization` header and everything about a response can be removed. Added a note that developers implementing this exchange might prefer to only perform this exchange once and return a Bearer token but noting that it is a decision beyond the scope of this document. The extended example does this.
+  - As I write this I'm uncertain if this is the best approach. I may yet return to the 3.1 draft and consider version 4 (along with version 2) as an abandoned idea.
+
 
 ## Next Steps
 

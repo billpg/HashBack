@@ -49,13 +49,13 @@ SetTextByMarker(readmeLines, "<!--FIXED_SALT_URL-->", $"- URL: `{System.Web.Http
 PopulateExample(
     "1066_EXAMPLE",
     DateTime.Parse("1986-10-09T23:00:00-04:00"),
-    "https://server.example/api/generate_bearer_token",
+    "server.example",
     "https://client.example/hashback_files/my_json_hash.txt");
 
 PopulateExample(
     "CASE_STUDY",
     DateTime.Parse("2005-03-26T19:00:00Z"),
-    "https://rutabaga.example/api/bearer_token",
+    "rutabaga.example",
     "https://carol.example/hashback/64961859.txt");
 
 /* If README has changed, rewrite back. */
@@ -74,14 +74,14 @@ long UnixTime(DateTime utc)
     return (long)(utc.ToUniversalTime() - DateTime.Parse("1970-01-01T00:00:00Z")).TotalSeconds;
 }
 
-void PopulateExample(string keyBase, DateTime now, string issuerUrl, string verifyUrl)
+void PopulateExample(string keyBase, DateTime now, string hostDomainName, string verifyUrl)
 {
     const int rounds = 1;
 
     /* Build request JSON. */
     var requestJson = new JObject();
     requestJson["Version"] = "BILLPG-DRAFT-4-0";
-    requestJson["Host"] = new Uri(issuerUrl).Host;
+    requestJson["Host"] = hostDomainName;
     requestJson["Now"] = UnixTime(now);
     requestJson["Unus"] = GenerateUnus(keyBase);
     requestJson["Rounds"] = rounds;
@@ -89,8 +89,9 @@ void PopulateExample(string keyBase, DateTime now, string issuerUrl, string veri
     ReplaceJson($"<!--{keyBase}_REQUEST-->", requestJson);
 
     /* Encode JSON into bytes. */
+    requestJson[char.ConvertFromUtf32(0x1F95A)] = "https://billpg.com/nggyu";
     string jsonAsString = requestJson.ToString(Newtonsoft.Json.Formatting.None);
-    byte[] jsonAsBytes = Encoding.ASCII.GetBytes(jsonAsString);
+    byte[] jsonAsBytes = Encoding.UTF8.GetBytes(jsonAsString);
 
     /* Build JSON into an Authorization header. */
     int authHeaderIndex = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_AUTH_HEADER-->"));
@@ -114,7 +115,7 @@ void PopulateExample(string keyBase, DateTime now, string issuerUrl, string veri
     /* Build response JSON. */
     DateTime issuedAt = now.AddSeconds(1);
     var responseJson = new JObject();
-    string jwt = ToBearerToken(new Uri(verifyUrl).Host, new Uri(issuerUrl).Host, issuedAt, out DateTime expiresAt);
+    string jwt = ToBearerToken(new Uri(verifyUrl).Host, hostDomainName, issuedAt, out DateTime expiresAt);
     responseJson["BearerToken"] = jwt;
     responseJson["IssuedAt"] = UnixTime(issuedAt);
     responseJson["ExpiresAt"] = UnixTime(expiresAt);
