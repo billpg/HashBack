@@ -36,9 +36,9 @@ The header is constructed as follows:
 Authorization: HashBack (BASE64 encoded JSON) 
 ```
 
-The BASE64 encoded block must include the trailing `=` character if applicable. The block may be split onto many lines with a single space character at the beginning of each line according to HTTP's rules.
+The BASE64 encoded block must be a single block with no spaces or end-of-line characters and must include the trailing `=` characters if applicable according to the rules of BASE64.
 
-The inside the BASE64 encoded block is a JSON object. All properties are of string type except `Now` and `Rounds` which are integers. (`Now` will need to be larger than 32 bits to continue working after 2038.) All properties are required and `null` is not an acceptable value for any of them. The object must not include other properties except these listed here.
+The inside the BASE64 encoded block is a UTF-8 representation of a JSON object with the following properties, all of which are required. These properties are all of string type except `Now` and `Rounds` which are integers. (`Now` will need to be larger than 32 bits to continue working after 2038.)
 
 - `Version`
   - Indicates which version of this document the client was using. This version is specified by the value "BILLPG-DRAFT-4-0". 
@@ -63,34 +63,35 @@ The inside the BASE64 encoded block is a JSON object. All properties are of stri
   - An `https://` URL belonging to the client where the verification hash may be retrieved with a GET request.
   - The URL must be one that server knows as belonging to a specific user. Exactly which URLs belong to which users is beyond the scope of this document.
 
+If either or both of the two properties that include domain names (`Host` and `VerifyUrl`) uses IDN, those non-ASCII characters must be either UTF-8 encoded or use JSON's `\u` notation. Both properties must not use the `xn--` form.
+
 For example:<!--1066_EXAMPLE_REQUEST-->
 ```
 {
     "Version": "BILLPG-DRAFT-4-0",
-    "Host": "issuer.example",
+    "Host": "server.example",
     "Now": 529297200,
     "Unus": "iZ5kWQaBRd3EaMtJpC4AS40JzfFgSepLpvPxMTAbt6w=",
     "Rounds": 1,
-    "VerifyUrl": "https://caller.example/hashback_files/my_json_hash.txt"
+    "VerifyUrl": "https://client.example/hashback_files/my_json_hash.txt"
 }
 ```
-This JSON string is BASE64 encoded and added to the end of the `Authorization:` header: <!--1066_EXAMPLE_AUTH_HEADER-->
+This JSON string is BASE64 encoded and added to the end of the `Authorization:` header. This example adds line-breaks for clarity. In reality, the BASE64 block would be sent as a single block.<!--1066_EXAMPLE_AUTH_HEADER-->
 ```
 Authorization: HashBack
- eyJWZXJzaW9uIjoiQklMTFBHLURSQUZULTQtMCIsIkhvc3QiOiJpc3N1ZXIuZXhhbXBsZSIsIk5v
+ eyJWZXJzaW9uIjoiQklMTFBHLURSQUZULTQtMCIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v
  dyI6NTI5Mjk3MjAwLCJVbnVzIjoiaVo1a1dRYUJSZDNFYU10SnBDNEFTNDBKemZGZ1NlcExwdlB4
- TVRBYnQ2dz0iLCJSb3VuZHMiOjEsIlZlcmlmeVVybCI6Imh0dHBzOi8vY2FsbGVyLmV4YW1wbGUv
+ TVRBYnQ2dz0iLCJSb3VuZHMiOjEsIlZlcmlmeVVybCI6Imh0dHBzOi8vY2xpZW50LmV4YW1wbGUv
  aGFzaGJhY2tfZmlsZXMvbXlfanNvbl9oYXNoLnR4dCJ9
 ```
 
 ### Verification Hash Calculation and Publication
 
-Once the Caller has built the request, it will need to find the JSON object's hash in order to publish it on the Caller's website. The Issuer will also need to repeat this hashing process in order to verify the request is genuine.
+Once the client has built the request, it will need to find the JSON object's hash in order to publish it on their website. The server will also need to repeat this hashing process in order to verify the request is genuine.
 
 The hashing process takes the following steps.
-1. Convert the JSON request body into its canonical representation of bytes per RFC 8785.
-2. Call PBKDF2 with the following parameters:
-   - Password: The JSON request body's canonical representation.
+1. Call PBKDF2 with the following parameters:
+   - Password: The bytes that the went into the BASE64 block.
    - Salt: The following 32 bytes.<!--FIXED_SALT-->
      - ```
        [113,218,98,9,6,165,151,157,
@@ -99,18 +100,22 @@ The hashing process takes the following steps.
        162,229,139,163,6,73,175,201]
        ```
    - Hash Algorithm: SHA256
-   - Rounds: The value specified in the JSON request under `Rounds`.
+   - Rounds: The value specified in the JSON under `Rounds`.
    - Output: 256 bits / 32 bytes
-3. Encode the hash result using BASE-64, including the trailing `=` character.
+2. Encode the hash result using BASE-64, including the trailing `=` character.
 
-Note that the request only uses simple integers and strings without spaces or control characters. At this level of operation, the only requirement of RFC 8785 is that the properties are in alphabetical order (they all begin with a distinct capital letter by design), that there are no spaces or line endings between the JSON marker characters and that no characters use `\u` encoding. Almost all JSON serializers have a "no spaces" mode but in the absence, some simple post-processing would suffice.
+Note that the hash is performed on the same bytes that were encoded inside the BASE64 block. Because of this, the JSON itself may be flexable with formatting whitespace or JSON character encoding, as long as the JSON object is valid according to the rules above. As the intended audience is another machine, no whitespace and UTF-8 encoding is preferable.
 
 The fixed salt is used to ensure that a valid hash is only meaningful in light of this document, as that salt is not sent over the wire with the request.
 
 Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The text file itself must be one line with the BASE-64 encoded hash in ASCII as that only line. The file must either be exactly 44 bytes long with no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence.
 
 The expected hash of the above example is: 
-- `3dkd9JLMHawUmx8hEWtHIpCdA4qiyTzQUWYvEPMmdb4=`<!--1066_EXAMPLE_HASH-->
+- `zgwSM4IC4wGLBS5PTW51XHXhlr3zf7PgIc7JNyPnI4I=`<!--1066_EXAMPLE_HASH-->
+
+Once the service has downloaded that verification hash, it should compare it against the result of hashing the bytes inside the BASE64 block. If the two hashes match, the server may be reassured that the client is indeed the user identified by the URL from where the hash was downloaded and proceed to process the remainder of the request.
+
+If there is any problem with the authentication process, including errors downloading the verification hash or that the supplied hash doesn't match the expected hash, the server must respond with an applicable error response. This should include sufficient detail to assist a reasonably experienced developer to fix the issue in question.
 
 #### Generation of the fixed salt
 The salt string itself was generated by a PBKDF2 call with a high iteration count. For reference, the following parameters were used:
@@ -125,155 +130,17 @@ For your convenience, here is the above 32 byte fixed salt block in a variety of
 - Hex: `71DA620906A5979D2E1CE510425B5B4896F64553D8EB15EFA2E58BA30649AFC9`<!--FIXED_SALT_HEX-->
 - URL: `q%dab%09%06%a5%97%9d.%1c%e5%10B%5b%5bH%96%f6ES%d8%eb%15%ef%a2%e5%8b%a3%06I%af%c9`<!--FIXED_SALT_URL-->
 
-### 200 "Success" Response
-A 200 response indicates the Issuer service is satisfied the POST request came from the genuine Caller. The specific response will depend on the value of the `TypeOfResponse` request property. Future response types might include, for example, a cryptographic key exchange.
-
-#### "BearerToken"
-The response body includes the requested Bearer token and when that token expires. The JSON will have the following properties.
-
-- `BearerToken`
-  - Required not-nullable string.
-  - This is the requested Bearer token. An opaque string of characters without (necessarily) any internal structure.
-  - Because Bearer tokens are sent in ASCII-only HTTP headers, it must consist only of printable ASCII characters.
-- `IssuedAt`
-  - Optional or nullable integer.
-  - The UTC time this token was issued, expressed as an integer of the number of seconds since the start of 1970.
-  - If `null` or missing, the Issuer has chosen not to supply this information.
-  - This value is supplied for documentation and auditing purposes only. The recipient is not expected to make decisions based on the value of this token.
-- `ExpiresAt`
-  - Optional or nullable integer.
-  - The UTC expiry time of this Bearer token, expressed as an integer of the number of seconds since the start of 1970.
-  - If `null` or missing, the Issuer is not declaring a particular expiry. The token will last until a request is made that actively rejects it.
-  - A non-null value is advisory only. The issuer is neither guaranteeing the token will continue to work until it expires, nor that it will stop working once this expiry time has passed. 
-
-For example:<!--1066_EXAMPLE_RESPONSE_SIMPLE_TOKEN-->
-```
-Content-Type: application/json
-{
-    "BearerToken": "6MxEeyaWbL4MBvRkyaELV7cVBS3gcb54aayAHPqs",
-    "IssuedAt": 529297201,
-    "ExpiresAt": 529300801
-}
-```
-
-#### "JWT"
-The response body will be a single JSON string value (including quotes) with the JWT token. The expiry and issued timestamps and other claims may be encoded inside the JWT according to that standard's rules.
-
-For example:<!--1066_EXAMPLE_RESPONSE_JWT_ONLY-->
-```
-Content-Type: application/json
-"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIiI6ImJpbGxwZy5jb20vbmdneXUifQ.eyJzdWIiOiJjYWxsZXIuZXhhbXBsZSIsImlzcyI6Imlzc3Vlci5leGFtcGxlIiwiaWF0Ijo1MjkyOTcyMDEsImV4cCI6NTI5MzAwODAxfQ.ZuzMUxY1_Zv8duc5kvj5LVTd2B4A9oj4m8qPCMGi7os"
-```
-
-#### "204SetCookie"
-The response body will be a no-content 204 response with a `Set-Cookie` header. This may be useful if a browser is making the POST request and the returned cookie is flagged as http-only, keeping it outside the JS realm.
-
-For example:<!--1066_EXAMPLE_SET_COOKIE-->
-```
-204 No Content
-Server: A Hypothetical Web Server
-Set-Cookie: MyCookie=I7Si8GoSb24COy47HsKqcilv++x8wqQi5HpthnJC; Secure; HttpOnly;
-```
-
-### 400 "Bad Request" Response
-As the recipient of this POST request, the Issuer will check the request is valid and conforms to its own requirements. If the request is unacceptable, the Issuer must respond with a 400 "Bad Request" response. The response body should include sufficient detail to assist an experienced developer to fix the problem. 
-
-If the response body is JSON, some of the 400 response properties may have particular documented meanings that Caller software might detect and automatically cause a reattempt of the initial POST request. This mechanism allows negotiation of version and the number of PBKDF2 rounds using this method. (Note that any re-attempted request must use a fresh `Unus` value.)
-
-Any problem with downloading or verifying the verification hash (referenced by the `VerifyUrl` property), should be reported back to the Caller in a 400 response. This includes on the successful download of the verification hash but when it doesn't match the expected hash.
-
-Note that the Issuer service is not required by this document to include any of these properties, or even to return a JSON response body at all. If a JSON response does use any of these properties, they are required by this document to have these documented meanings.
-
-#### `Message`.
-If the response is JSON and the response body includes a property named "Message", the value will be a string of human-readable text describing the problem in a form suitable for logging. The intent of the presence of this property is that the remainder of the response need not be logged or may be deemed as only intended for machine use. (The Caller software is of course free to log the entire response if the developer wishes.)
-
-For example:
-```
-400 Bad Request
-{
-    "Message": "The service at alice.example returned a 404 error."
-}
-```
-
-#### `IncidentID`
-
-If the response includes this property, the value will be a UUID that the service used to record the error. This may be used for an administrator to retrieve logging from the request in order to investigate issues without including information in the response that might constitute revealing privileged information to an unauthenticated agent.
-
-If used, the value must be a valid UUID using ASCII hex digits (capitals or lower case) and hyphens in their standard location.
-
-For example:
-```
-400 Bad Request
-{
-    "Message": "There was a problem downloading the verification hash.",
-    "IncidentID": "db8e215c-a7ee-5104-a3cd-5fc715dec19f"
-}
-```
-
-#### `AcceptVersions`
-If the response includes this particular property, it is reporting that is doesn't know about that version of this exchange listed in the request. The property value will be a JSON array of version strings it does understand. If the requesting code understands many versions of this protocol, the Caller should make an initial request with its preferred version. If the recipient service doesn't know that version, the response should respond listing all the version is does know about. The Caller, if it knows versions other the one it initially selected, should finally select its most preferred version of the protocol it does know about from that list and start the initial request again.
-
-For example:
-```
-POST https://bob.example/api/BearerRequest
-{ "CrossRequestTokenExchange": "NEW-FUTURE-VERSION-THAT-YOU-DONT-KNOW-ABOUT", ... }
-
-400 Bad Request
-{ 
-    "Message": "Unknown version. I only know HASHBACK-PUBLIC-DRAFT-3-1.",
-    "AcceptVersions": [ "HASHBACK-PUBLIC-DRAFT-3-1" ]
-}
-```
-#### `AcceptTypeOfResponse`
-The request property allows for a single string to specify the desired response. Three values are specified here (`BearerToken`, `JWT` and `204SetCookie`) but later standards may allow for additional values without requiring a new edition of this document.
-
-If the recipient does not know about the request response type, the response may list the response-type values it does know about using this response property. The value will be a JSON array of those strings.
-
-For example:
-```
-POST https://bob.example/api/BearerRequest
-{ ..., "TypeOfResponse": "NEW_AUTHENTICATION_TECHNOLOGY", ... }
-
-400 Bad Request
-{ 
-    "Message": "We only know how to issue JWT tokens.",
-    "AcceptTypeOfResponse": ["BearerToken", "JWT"]
-}
-```
-
-#### `AcceptRounds`
-This response property indicates the service doesn't accept the number of PBKDF2 rounds the caller has selected. A too-high value would represent a significant load on hardware while a too-low value might need to be rejected as enabling an attacker.
-
-The property value is a number of rounds the service would accept. If the Caller accepts the responded number of rounds, it may repeat the request with the new number of rounds and a corresponding updated verification hash with the requested number of rounds.
-
-If a service has an acceptable range and the caller selected a value outside this range, the acceptable value returned could be the higher or lower thresholds, depending on which side of the acceptable range was requested.
-
-For example:
-```
-POST https://bob.example/api/BearerRequest
-{ ..., "Rounds": 1, ... }
-
-400 Bad Request
-{ 
-    "Message": "We require the verification hash to have 99 to 999 rounds of PBKDF2.",
-    "AcceptRounds": 99
-}
-```
-
-### Other errors.
-The service may respond with any applicable standard HTTP error code in the event of an unexpected error. 
-
 # An extended example.
-**SAAS** is a website with an API designed for their customers to use. When a customer wishes to use this API, their code must first go through this exchange to obtain a Bearer token. The service publishes a document for how their customers cam do this, including that the URL to POST requests to is `https://saas.example/api/login/hashback`.
+**The Rutabaga Company** operates a website with an API designed for their customers to use. They publish a document for their customers that specifies how to use that API. One GET-able end-point is at `https://rutabaga.example/api/bearer_token` which returns a Bearer token in a JSON response if the request header includes a valid HashBash authentication header.
 
-**Carol** is a customer of Saas. She's recently signed up and logged into the Saas customer portal. On her authentication page under the *HashBack Authentication* section, she's configured her account affirming that `https://carol.example/hashback/` is a folder under her sole control and where her verification hashes will be saved.
+**Carol** is a customer of the Rutabaga Company. She's recently signed up and logged into their customer portal. On her authentication page under the *HashBack Authentication* section, she's configured her account affirming that `https://carol.example/hashback/` is a folder under her sole control and where her verification hashes will be saved.
 
 ## Making the request.
-Time passes and Carol needs to make a request to the Saas API and needs a Bearer token. Her code builds a JSON request:<!--CASE_STUDY_REQUEST-->
+Time passes and Carol needs to make a request to the Rutabaga Company API and needs a Bearer token. Her code builds a JSON object:<!--CASE_STUDY_REQUEST-->
 ```
 {
     "Version": "BILLPG-DRAFT-4-0",
-    "Host": "sass.example",
+    "Host": "rutabaga.example",
     "Now": 1111863600,
     "Unus": "TmDFGekvQ+CRgANj9QPZQtBnF077gAc4AeRASFSDXo8=",
     "Rounds": 1,
@@ -282,26 +149,36 @@ Time passes and Carol needs to make a request to the Saas API and needs a Bearer
 ```
 
 The code calculates the verification hash from this JSON using the process outlined above. The result of hashing the above example request is:
-- `YyD9c857eQNDeSgSKxDA/djI1SBuOZfSrFM53CNoCd8=`<!--CASE_STUDY_HASH-->
+- `YOlmlR4i92q7VppQK9Hy+Dq4HBWO4QqmA9cMU5ovr9M=`<!--CASE_STUDY_HASH-->
 
-The hash is saved as a text file to her web server using the random filename selected earlier. With this in place, the POST request can be sent to the SAAS API. The HTTP client library used to make the POST request will perform the necessary TLS handshake as part of making the connection.
+To complete the GET request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows, with line-breaks added for clarity.<!--CASE_STUDY_AUTH_HEADER-->
+```
+GET /api/bearer-token HTTP/1.1
+Host: rutabaga.example
+User-Agent: Carol's Magnificent Application Server.
+Authorization: HashBack
+ eyJWZXJzaW9uIjoiQklMTFBHLURSQUZULTQtMCIsIkhvc3QiOiJydXRhYmFnYS5leGFtcGxlIiwi
+ Tm93IjoxMTExODYzNjAwLCJVbnVzIjoiVG1ERkdla3ZRK0NSZ0FOajlRUFpRdEJuRjA3N2dBYzRB
+ ZVJBU0ZTRFhvOD0iLCJSb3VuZHMiOjEsIlZlcmlmeVVybCI6Imh0dHBzOi8vY2Fyb2wuZXhhbXBs
+ ZS9oYXNoYmFjay82NDk2MTg1OS50eHQifQ==
+```
+
+The hash is saved as a text file to her web server using the random filename selected earlier. With this in place, the request for a Bearer token including the  can be sent to the API. The HTTP client library used to make the request will perform the necessary TLS handshake as part of making the connection.
 
 ## Checking the request
-The SAAS website receives this request and validates the request body, performing the following checks:
+The Rutabaga Company website receives this request and validates the request body, performing the following checks:
 - The request arrived via HTTPS.  :heavy_check_mark:
-- The version string `HASHBACK-PUBLIC-DRAFT-3-1` is known.  :heavy_check_mark:
-- The `IssuerUrl` value is a URL belonging to itself - `saas.example`.  :heavy_check_mark:
+- The version string `BILLPG-4-0` is known.  :heavy_check_mark:
+- The `Host` value is a URL belonging to itself - `rutabaga.example`.  :heavy_check_mark:
 - The `Now` time-stamp is reasonably close to the server's internal clock.  :heavy_check_mark:
 - The `Unus` value represents 256 bits encoded in base-64.  :heavy_check_mark:
 - The `Rounds` value is within its acceptable 1-99 rounds.  :heavy_check_mark:
 - The `VerifyUrl` value is an HTTPS URL belonging to a known user - Carol.  :heavy_check_mark:
 
-(If the version or `Rounds` property was unacceptable, a 400 response might be used to negotiate acceptable values. In this case, that won't be necessary.)
-
 The service has passed the request for basic validity, but it still doesn't know if the request has genuinely come from Carol's service or not. To perform this step, it proceeds to check the verification hash.
 
 ## Retrieval of the verification hash
-Having the URL to get the Caller's verification hash, the Issuer service performs a GET request for that URL. As part of the request, it makes the following checks:
+Having the URL to get the client's verification hash, the Rutabaga Company's service performs a GET request for that URL. As part of the request, it makes the following checks:
 - The URL lists a valid domain name.  :heavy_check_mark:
 - The TLS handshake completes with a valid certificate.  :heavy_check_mark:
 - The GET response code is 200.  :heavy_check_mark:
@@ -310,22 +187,21 @@ Having the URL to get the Caller's verification hash, the Issuer service perform
 
 (If any of these tests had failed, the specific error would be indicated in a 400 error response to the initial POST request. As the download was successful, that isn't needed.)
 
-Having successfully retrieved a verification hash, it must now find the expected hash from the original POST request body.
+Having successfully retrieved a verification hash, it must now find the expected hash by itself hashing the bytes inside the BASE64 block inside the `Authorization` header.
 
 ## Checking the verification hash
-The Issuer service performs the same PBKDF2 operation on the JSON request that the Caller performed earlier. With both the retrieved verification hash and the internally calculated expected hash, the Issuer service may compare the two strings. If they don't match, the Issuer service would make a 400 response to the original POST request complaining that the verification hash doesn't match the request body. In this case, they do indeed match and the Issuer is reassured that the Caller is actually Carol.
+The service performs the same PBKDF2 operation on the JSON request that the Caller performed earlier. With both the retrieved verification hash and the internally calculated expected hash, the service may compare the two strings. If they don't match, the service would make a 400 response to the original POST request complaining that the verification hash doesn't match the request body. In this case, they do indeed match and the service is reassured that the client is actually Carol.
 
-Satisfied the request is genuine, the Saas service generates a Bearer token and returns it to the caller as the response to the POST request, together with when it was issued and its expiry time.<!--CASE_STUDY_RESPONSE-->
-
+Satisfied the request is genuine, the service generates a Bearer token and returns it to the caller as the response to the POST request, together with when it was issued and its expiry time.<!--CASE_STUDY_RESPONSE-->
 ```
 {
-    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIiI6ImJpbGxwZy5jb20vbmdneXUifQ.eyJzdWIiOiJjYXJvbC5leGFtcGxlIiwiaXNzIjoic2Fzcy5leGFtcGxlIiwiaWF0IjoxMTExODYzNjAxLCJleHAiOjExMTE4NjcyMDF9.C7PshUwZG6C-6jeDe32vIvx2NCoiyB4CU_oKrMRvzDM",
+    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIiI6ImJpbGxwZy5jb20vbmdneXUifQ.eyJzdWIiOiJjYXJvbC5leGFtcGxlIiwiaXNzIjoicnV0YWJhZ2EuZXhhbXBsZSIsImlhdCI6MTExMTg2MzYwMSwiZXhwIjoxMTExODY3MjAxfQ.G9oTXOk9Bqb7nFcngqJe145gDfFJsvb1sg1Cq38QB14",
     "IssuedAt": 1111863601,
     "ExpiresAt": 1111867201
 }
 ```
 
-She may now use the issued Bearer token to call the Saas API until that token expires. Additionally, the verification hash file can be deleted from the website if she so wishes.
+She may now use the issued Bearer token to call the Rutabaga API until that token expires. Additionally, the verification hash file can be deleted from the website if she so wishes.
 
 ## Answers to Anticipated Questions
 

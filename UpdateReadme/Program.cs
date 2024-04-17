@@ -49,13 +49,13 @@ SetTextByMarker(readmeLines, "<!--FIXED_SALT_URL-->", $"- URL: `{System.Web.Http
 PopulateExample(
     "1066_EXAMPLE",
     DateTime.Parse("1986-10-09T23:00:00-04:00"),
-    "https://issuer.example/api/generate_bearer_token",
-    "https://caller.example/hashback_files/my_json_hash.txt");
+    "https://server.example/api/generate_bearer_token",
+    "https://client.example/hashback_files/my_json_hash.txt");
 
 PopulateExample(
     "CASE_STUDY",
     DateTime.Parse("2005-03-26T19:00:00Z"),
-    "https://sass.example/api/login/hashback",
+    "https://rutabaga.example/api/bearer_token",
     "https://carol.example/hashback/64961859.txt");
 
 /* If README has changed, rewrite back. */
@@ -104,9 +104,6 @@ void PopulateExample(string keyBase, DateTime now, string issuerUrl, string veri
         string jsonAsBase64 = Convert.ToBase64String(jsonAsBytes, Base64FormattingOptions.InsertLineBreaks);
         var jsonAsBase64Lines = jsonAsBase64.Split('\r', '\n').Where(s => s.Length > 0).Select(s => " " + s);
         readmeLines.InsertRange(authHeaderStartIndex+1, jsonAsBase64Lines);
-
-        //readmeLines[] = $"Set-Cookie: MyCookie={setCookieValue}; Secure; HttpOnly;";
-
     }
 
     /* Insert the hash of the above JSON into the readme. */
