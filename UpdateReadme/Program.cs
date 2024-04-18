@@ -80,12 +80,12 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
 
     /* Build request JSON. */
     var requestJson = new JObject();
-    requestJson["Version"] = "BILLPG-DRAFT-4-0";
+    //requestJson["Version"] = "BILLPG-DRAFT-4-0";
     requestJson["Host"] = hostDomainName;
     requestJson["Now"] = UnixTime(now);
     requestJson["Unus"] = GenerateUnus(keyBase);
     requestJson["Rounds"] = rounds;
-    requestJson["VerifyUrl"] = verifyUrl;
+    requestJson["Verify"] = verifyUrl;
     ReplaceJson($"<!--{keyBase}_REQUEST-->", requestJson);
 
     /* Encode JSON into bytes. */
@@ -98,7 +98,7 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     if (authHeaderIndex > 0)
     {
         int authHeaderStartIndex = readmeLines.FindIndex(authHeaderIndex, src => src.StartsWith("Authorization"));
-        int authHeaderEndIndx = readmeLines.FindIndex(authHeaderStartIndex, src => src == "```");
+        int authHeaderEndIndx = readmeLines.FindIndex(authHeaderStartIndex+1, src => src.StartsWith(" ") == false);
         readmeLines.RemoveRange(authHeaderStartIndex+1, authHeaderEndIndx - authHeaderStartIndex - 1);
 
         /* Convert JSON into a BASE64 string. */
@@ -116,7 +116,7 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     DateTime issuedAt = now.AddSeconds(1);
     var responseJson = new JObject();
     string jwt = ToBearerToken(new Uri(verifyUrl).Host, hostDomainName, issuedAt, out DateTime expiresAt);
-    responseJson["BearerToken"] = jwt;
+    responseJson["BearerToken"] = GenerateUnus(keyBase + "ShorterBearerToken").Substring(0,40);
     responseJson["IssuedAt"] = UnixTime(issuedAt);
     responseJson["ExpiresAt"] = UnixTime(expiresAt);
     ReplaceJson($"<!--{keyBase}_RESPONSE-->", responseJson);

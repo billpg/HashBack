@@ -25,9 +25,11 @@ Now apply that thought to web authentication. The client can be sure (thanks to 
 As it would be expensive to do that for every single HTTP request, it is anticipated that this authentication process happen as a once-off to supply the client with a temporary Bearer token or Cookie, which can then be used for subsequent requests until it expires. This is optional and this method could be used for every HTTP request if you so wished.
 
 ## The Exchange
-In a nutshell, the client adds an `Authorizaton:` header that includes a URL through which the server may get the hash of the contents of this header. By actually getting that hash in a separate transaction and confirming it is correct, the server is reassured that the client is control of what's published at that URL.
+In a nutshell, a client makes an HTTP/TLS request for a transaction that needs authenticating first.
 
-Thanks to TLS, the client can be reassured they are talking to the genuine recipient server, but the server doesn't yet know if the request came from the genuine client. To complete the loop, the server peforms a separate TLS-protected transaction back to client's website.
+For this, the client adds an `Authorization:` header that (among other things) includes a URL on their own (also TLS protected) website. Here, the client has already published a small text file with the hash of that header. Thanks to TLS, the client can be reassured they are talking to the genuine recipient server, but the server doesn't yet know if the request came from the genuine client.
+
+To complete the loop, the server gets that text file in its own separate TLS-protected transaction. Having an open request from the client and being in possession of a correct hash that verifies the client is who they claim to be, the server is reassured that the client is the one making that request.
 
 ### The Authorization header
 
@@ -36,13 +38,10 @@ The header is constructed as follows:
 Authorization: HashBack (BASE64 encoded JSON) 
 ```
 
-The BASE64 encoded block must be a single block with no spaces or end-of-line characters and must include the trailing `=` characters if applicable according to the rules of BASE64.
+The BASE64 encoded block must be a single block with no spaces or end-of-line characters and must include the trailing `=` characters per the rules of BASE64.
 
-The inside the BASE64 encoded block is a UTF-8 representation of a JSON object with the following properties, all of which are required. These properties are all of string type except `Now` and `Rounds` which are integers. (`Now` will need to be larger than 32 bits to continue working after 2038.)
+The inside the BASE64 encoded block is a UTF-8 representation of a JSON object with the following properties, all of which are required. These properties are all of string type except `Now` and `Rounds` which are integers. (`Now` will need to be larger than 32 bits to continue working after 2038.) Any additional properties not documented here are ignored, but will nonetheless be hashed as part of the block of BASE64-encoded bytes.
 
-- `Version`
-  - Indicates which version of this document the client was using. This version is specified by the value "BILLPG-DRAFT-4-0". 
-  - See the section describing 400 error responses below for version negotiation.
 - `Host`
   - The full domain name of the server being called in this request.
   - Because load balancers and CDN systems might modify the `Host:` header, a copy is included here so there's no doubt exactly which string was used in the verification hash.
@@ -59,31 +58,29 @@ The inside the BASE64 encoded block is a UTF-8 representation of a JSON object w
   - An integer specifying the number of PBKDF2 rounds used to produce the verification hash. 
   - Must be a positive integer, at least 1.
   - The recipient service may request a different number of rounds if the value supplied is too low or too high. See section describing 400 error responses below for negotiation of this number.
-- `VerifyUrl`
+- `Verify`
   - An `https://` URL belonging to the client where the verification hash may be retrieved with a GET request.
   - The URL must be one that server knows as belonging to a specific user. Exactly which URLs belong to which users is beyond the scope of this document.
 
-If either or both of the two properties that include domain names (`Host` and `VerifyUrl`) uses IDN, those non-ASCII characters must be either UTF-8 encoded or use JSON's `\u` notation. Both properties must not use the `xn--` form.
+If either or both of the two properties that include domain names (`Host` and `Verify`) uses IDN, those non-ASCII characters must be either UTF-8 encoded or use JSON's `\u` notation. Both properties must not use the `xn--` form.
 
 For example:<!--1066_EXAMPLE_REQUEST-->
 ```
 {
-    "Version": "BILLPG-DRAFT-4-0",
     "Host": "server.example",
     "Now": 529297200,
     "Unus": "iZ5kWQaBRd3EaMtJpC4AS40JzfFgSepLpvPxMTAbt6w=",
     "Rounds": 1,
-    "VerifyUrl": "https://client.example/hashback_files/my_json_hash.txt"
+    "Verify": "https://client.example/hashback_files/my_json_hash.txt"
 }
 ```
 This JSON string is BASE64 encoded and added to the end of the `Authorization:` header. This example adds line-breaks for clarity. In reality, the BASE64 block would be sent as a single block.<!--1066_EXAMPLE_AUTH_HEADER-->
 ```
 Authorization: HashBack
- eyJWZXJzaW9uIjoiQklMTFBHLURSQUZULTQtMCIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v
- dyI6NTI5Mjk3MjAwLCJVbnVzIjoiaVo1a1dRYUJSZDNFYU10SnBDNEFTNDBKemZGZ1NlcExwdlB4
- TVRBYnQ2dz0iLCJSb3VuZHMiOjEsIlZlcmlmeVVybCI6Imh0dHBzOi8vY2xpZW50LmV4YW1wbGUv
- aGFzaGJhY2tfZmlsZXMvbXlfanNvbl9oYXNoLnR4dCIsIvCfpZoiOiJodHRwczovL2JpbGxwZy5j
- b20vbmdneXUifQ==
+ eyJIb3N0Ijoic2VydmVyLmV4YW1wbGUiLCJOb3ciOjUyOTI5NzIwMCwiVW51cyI6ImlaNWtXUWFC
+ UmQzRWFNdEpwQzRBUzQwSnpmRmdTZXBMcHZQeE1UQWJ0Nnc9IiwiUm91bmRzIjoxLCJWZXJpZnki
+ OiJodHRwczovL2NsaWVudC5leGFtcGxlL2hhc2hiYWNrX2ZpbGVzL215X2pzb25faGFzaC50eHQi
+ LCLwn6WaIjoiaHR0cHM6Ly9iaWxscGcuY29tL25nZ3l1In0=
 ```
 
 ### Verification Hash Calculation and Publication
@@ -112,7 +109,7 @@ The fixed salt is used to ensure that a valid hash is only meaningful in light o
 Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The text file itself must be one line with the BASE-64 encoded hash in ASCII as that only line. The file must either be exactly 44 bytes long with no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence.
 
 The expected hash of the above example is: 
-- `ywATe7vV9IaJmQQdwa2tJk9uVmpYKuazFYF5M88gJeE=`<!--1066_EXAMPLE_HASH-->
+- `8p5svUN2HUM47jy7TEe3MsVmQljQncXnsn+daEsO1aY=`<!--1066_EXAMPLE_HASH-->
 
 Once the service has downloaded that verification hash, it should compare it against the result of hashing the bytes inside the BASE64 block. If the two hashes match, the server may be reassured that the client is indeed the user identified by the URL from where the hash was downloaded and proceed to process the remainder of the request.
 
@@ -132,25 +129,24 @@ For your convenience, here is the above 32 byte fixed salt block in a variety of
 - URL: `q%dab%09%06%a5%97%9d.%1c%e5%10B%5b%5bH%96%f6ES%d8%eb%15%ef%a2%e5%8b%a3%06I%af%c9`<!--FIXED_SALT_URL-->
 
 # An extended example.
-**The Rutabaga Company** operates a website with an API designed for their customers to use. They publish a document for their customers that specifies how to use that API. One GET-able end-point is at `https://rutabaga.example/api/bearer_token` which returns a Bearer token in a JSON response if the request header includes a valid HashBash authentication header.
+**The Rutabaga Company** operates a website with an API designed for their customers to use. They publish a document for their customers that specifies how to use that API. One GET-able end-point is at `https://rutabaga.example/api/bearer_token` which returns a Bearer token in a JSON response if the request header includes a valid HashBack authentication header.
 
 **Carol** is a customer of the Rutabaga Company. She's recently signed up and logged into their customer portal. On her authentication page under the *HashBack Authentication* section, she's configured her account affirming that `https://carol.example/hashback/` is a folder under her sole control and where her verification hashes will be saved.
 
 ## Making the request.
-Time passes and Carol needs to make a request to the Rutabaga Company API and needs a Bearer token. Her code builds a JSON object:<!--CASE_STUDY_REQUEST-->
+Time passes and Carol needs to make a request to the Rutabaga Company API and needs a Bearer token. Her code builds a JSON object in memory:<!--CASE_STUDY_REQUEST-->
 ```
 {
-    "Version": "BILLPG-DRAFT-4-0",
     "Host": "rutabaga.example",
     "Now": 1111863600,
     "Unus": "TmDFGekvQ+CRgANj9QPZQtBnF077gAc4AeRASFSDXo8=",
     "Rounds": 1,
-    "VerifyUrl": "https://carol.example/hashback/64961859.txt"
+    "Verify": "https://carol.example/hashback/64961859.txt"
 }
 ```
 
 The code calculates the verification hash from this JSON using the process outlined above. The result of hashing the above example request is:
-- `Spgtp8UUx8qlSrP+mbkcy0z5W1/fjU+OlmHLCi/Z1V8=`<!--CASE_STUDY_HASH-->
+- `+SdX5J7G+5za6R68pWGQ5awILyBpRwS2fDrpunlnMcg=`<!--CASE_STUDY_HASH-->
 
 To complete the GET request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows, with line-breaks added for clarity.<!--CASE_STUDY_AUTH_HEADER-->
 ```
@@ -158,24 +154,25 @@ GET /api/bearer-token HTTP/1.1
 Host: rutabaga.example
 User-Agent: Carol's Magnificent Application Server.
 Authorization: HashBack
- eyJWZXJzaW9uIjoiQklMTFBHLURSQUZULTQtMCIsIkhvc3QiOiJydXRhYmFnYS5leGFtcGxlIiwi
- Tm93IjoxMTExODYzNjAwLCJVbnVzIjoiVG1ERkdla3ZRK0NSZ0FOajlRUFpRdEJuRjA3N2dBYzRB
- ZVJBU0ZTRFhvOD0iLCJSb3VuZHMiOjEsIlZlcmlmeVVybCI6Imh0dHBzOi8vY2Fyb2wuZXhhbXBs
- ZS9oYXNoYmFjay82NDk2MTg1OS50eHQiLCLwn6WaIjoiaHR0cHM6Ly9iaWxscGcuY29tL25nZ3l1
- In0=
+ eyJIb3N0IjoicnV0YWJhZ2EuZXhhbXBsZSIsIk5vdyI6MTExMTg2MzYwMCwiVW51cyI6IlRtREZH
+ ZWt2UStDUmdBTmo5UVBaUXRCbkYwNzdnQWM0QWVSQVNGU0RYbzg9IiwiUm91bmRzIjoxLCJWZXJp
+ ZnkiOiJodHRwczovL2Nhcm9sLmV4YW1wbGUvaGFzaGJhY2svNjQ5NjE4NTkudHh0Iiwi8J+lmiI6
+ Imh0dHBzOi8vYmlsbHBnLmNvbS9uZ2d5dSJ9
+Accept: application/issued-bearer-token+json
+
 ```
 
-The hash is saved as a text file to her web server using the random filename selected earlier. With this in place, the request for a Bearer token including the  can be sent to the API. The HTTP client library used to make the request will perform the necessary TLS handshake as part of making the connection.
+The hash is saved as a text file to her web server using the random filename selected earlier. With this in place, the request for a Bearer token including the header can be sent to the API. The HTTP client library used to make the request will perform the necessary TLS handshake as part of making the connection.
 
 ## Checking the request
 The Rutabaga Company website receives this request and validates the request body, performing the following checks:
 - The request arrived via HTTPS.  :heavy_check_mark:
-- The version string `BILLPG-DRAFT-4-0` is known.  :heavy_check_mark:
-- The `Host` value is a URL belonging to itself - `rutabaga.example`.  :heavy_check_mark:
+- The `Authorization` header is `HashBack` type with a BASE64-encoded JSON payload.  :heavy_check_mark:
+- The `Host` value is a domain it owns - `rutabaga.example`.  :heavy_check_mark:
 - The `Now` time-stamp is reasonably close to the server's internal clock.  :heavy_check_mark:
 - The `Unus` value represents 256 bits encoded in base-64.  :heavy_check_mark:
 - The `Rounds` value is within its acceptable 1-99 rounds.  :heavy_check_mark:
-- The `VerifyUrl` value is an HTTPS URL belonging to a known user - Carol.  :heavy_check_mark:
+- The `Verify` value is an HTTPS URL belonging to a known user - *Carol*.  :heavy_check_mark:
 
 The service has passed the request for basic validity, but it still doesn't know if the request has genuinely come from Carol's service or not. To perform this step, it proceeds to check the verification hash.
 
@@ -187,17 +184,20 @@ Having the URL to get the client's verification hash, the Rutabaga Company's ser
 - The response's `Content-Type` is `text/plain`.  :heavy_check_mark:
 - The text, once any CRLF bytes have been trimmed from the end, is 256 bits encoded in BASE-64.  :heavy_check_mark:
 
-(If any of these tests had failed, the specific error would be indicated in a 400 error response to the initial POST request. As the download was successful, that isn't needed.)
+(If any of these tests had failed, the specific error would be indicated in a 400 error response to the initial request with the `Authorization` header. As the download was successful, that isn't needed.)
 
 Having successfully retrieved a verification hash, it must now find the expected hash by itself hashing the bytes inside the BASE64 block inside the `Authorization` header.
 
 ## Checking the verification hash
-The service performs the same PBKDF2 operation on the JSON request that the Caller performed earlier. With both the retrieved verification hash and the internally calculated expected hash, the service may compare the two strings. If they don't match, the service would make a 400 response to the original POST request complaining that the verification hash doesn't match the request body. In this case, they do indeed match and the service is reassured that the client is actually Carol.
+The service performs the same PBKDF2 operation on the JSON request that the Caller performed earlier. With both the retrieved verification hash and the internally calculated expected hash, the service may compare the two strings. If they don't match, the service would make a 400 response to the original request complaining that the verification hash doesn't match the request body. In this case, they do indeed match and the service is reassured that the client is actually Carol.
 
-Satisfied the request is genuine, the service generates a Bearer token and returns it to the caller as the response to the POST request, together with when it was issued and its expiry time.<!--CASE_STUDY_RESPONSE-->
+Satisfied the request is genuine, the service generates a Bearer token and returns it to the caller as the response to the initial request, together with when it was issued and its expiry time.<!--CASE_STUDY_RESPONSE-->
 ```
+HTTP/1.1 200 OK
+Content-Type: application/issued-bearer-token+json
+
 {
-    "BearerToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIiI6ImJpbGxwZy5jb20vbmdneXUifQ.eyJzdWIiOiJjYXJvbC5leGFtcGxlIiwiaXNzIjoicnV0YWJhZ2EuZXhhbXBsZSIsImlhdCI6MTExMTg2MzYwMSwiZXhwIjoxMTExODY3MjAxfQ.G9oTXOk9Bqb7nFcngqJe145gDfFJsvb1sg1Cq38QB14",
+    "BearerToken": "9iStrRKcd6OVLoYnAg31zvZ0LBStenOU4IpAGgI1",
     "IssuedAt": 1111863601,
     "ExpiresAt": 1111867201
 }
@@ -216,7 +216,7 @@ Then this exchange is not for you. It works by having two web servers make reque
 ### I have a web server on the other side of the Internet but not the same machine.
 Your web site needs to be covered by TLS, and for your code to be able to publish a small static file to a folder on it. If you can be reasonably certain that no-one else can publish files on that folder, it'll be suitable for this exchange.
 
-### What sort of range should be allowed for identifying an `VerifyUrl` to a single user.
+### What sort of range should be allowed for identifying an `Verify` to a single user.
 I recommend keeping it tight to either a file inside a single folder or to a single URL with a single query string parameter.
 
 For example, if a user affirms they are in control of `https://example.com/hashback/`, then allow `https://example.com/hashback/1234.txt`, but reject any sub-folders or URLs with query strings. Similarly, if a user affirms they are in control of `https://example.com/hashback?ID=` then allow variations of URLs with that query string parameter changing, rejecting any requests with sub-folders or additional query string parameters.
@@ -240,7 +240,7 @@ The recipient will attempt to retrieve a verification hash file from the real cl
 ### What if an attacker can predict the verification hash URL?"
 Let them.
 
-Suppose an attacker knows a current request's verification hash URL. They would be able to make that GET request and from that know the verification hash. Additionally, they could construct their own Authorization header to a genuine server, using the known `VerifyUrl` value with knowledge the genuine client's website will respond again to a second GET request with the same known verification hash.
+Suppose an attacker knows a current request's verification hash URL. They would be able to make that GET request and from that know the verification hash. Additionally, they could construct their own Authorization header to a genuine server, using the known `Verify` value with knowledge the genuine client's website will respond again to a second GET request with the same known verification hash.
 
 To successfully perform this attack, the attacker will need to construct the JSON block such that its hash will match the verification hash, or else the server will reject the request. This will require finding the value of the `Unus` property which is unpredictable because it was generated from cryptographic-quality-randomness, sent over a TLS protected channel to the genuine server, and is never reused. 
 
@@ -262,7 +262,7 @@ Any number of fake requests will all be rejected by the server because there wil
 
 Despite this, the fact that a request with an Authorization header will trigger a second GET request might be used as a denial-of-service attack. For this reason, it may be prudent for an server to track IP address blocks with a history of making bad POST requests and rejecting subsequent requests that originate from these blocks.
 
-This exchange normally requires a pre-existing relationship between the participants, but it isn't unreasonable to suppose that open servers might exist that will take authentication requests with any valid URL as the `VerifyUrl` property value. These should, to avoid being a participant in a denial-of-service attack, keep track of which `VerifyUrl` domains and IPs have a history of having any result other than returning a correct verification hash.
+This exchange normally requires a pre-existing relationship between the participants, but it isn't unreasonable to suppose that open servers might exist that will take authentication requests with any valid URL as the `Verify` property value. These should, to avoid being a participant in a denial-of-service attack, keep track of which `Verify` domains and IPs have a history of having any result other than returning a correct verification hash.
 
 ### What if there's a website that will host files from anyone?
 Maybe don't claim that website as one that you have exclusive control over.
