@@ -105,7 +105,7 @@ The hashing process takes the following steps.
    - Output: 256 bits / 32 bytes
 2. Encode the hash result using BASE-64, including the trailing `=` character.
 
-Note that the hash is performed on the same bytes that were encoded inside the BASE64 block. Because of this, the JSON itself may be flexable with formatting whitespace or JSON character encoding, as long as the JSON object is valid according to the rules above. As the intended audience is another machine, no whitespace and UTF-8 encoding is preferable.
+Note that the hash is performed on the same bytes that were encoded inside the BASE64 block. Because of this, the JSON itself may be flexible with formatting whitespace or JSON character encoding, as long as the JSON object is valid according to the rules above. As the intended audience is another machine, no whitespace and UTF-8 encoding is preferable.
 
 The fixed salt is used to ensure that a valid hash is only meaningful in light of this document, as that salt is not sent over the wire with the request.
 
@@ -291,12 +291,12 @@ I don't think this is necessary (indeed, all of the examples in this document us
 As this proposal is still in the public-draft phase, I am open to be persuaded that PBKDF2 is not needed and a single round of SHA256 is quite sufficient thank you very much. I'm also open to be persuaded that the default number of rounds needs to be significantly higher.
 
 ### Is the "Bearer Token" response used in the extended example documented anywhere?
-This originated in public-draft vesion 3.0, linked below. I intend to document this response type as a separate proposal with an applicable `Accept`/`Content-Type` that will go alongside this proposal.
+This originated in public-draft version 3.0, linked below. I intend to document this response type as a separate proposal with an applicable `Accept`/`Content-Type` that will go alongside this proposal.
 
 ### Why BASE64 the JSON in the `Authorization` header?
-To ensure there's an unambiguous sequence of bytes to feed into the hash. By transfering the JSON block in an encoded set of bytes, the recipient can simply pass the decoded byte array into the hashing object.
+To ensure there's an unambiguous sequence of bytes to feed into the hash. By transferring the JSON block in an encoded set of bytes, the recipient can simply pass the decoded byte array into the hashing object.
 
-I had considered requiring that the JSON be included in the header as unencoded ASCII, without any whitespace characters and IDN domains using `xn--` notiation. HTTP headers (in practice) require that headers use ASCII only and this form would have fitted that system. Can I, in practice, use an `Authorization` header with all of characters JSON uses? I am open to be persuaded that this would be preferable to using BASE64. 
+I had considered requiring that the JSON be included in the header as unencoded ASCII, without any whitespace characters and IDN domains using JSON's `\u` notation. Can I, in practice, use an `Authorization` header with all of characters JSON uses? I am open to be persuaded that this would be preferable to using BASE64. 
 
 ### What are the previous public drafts?
 
@@ -307,14 +307,14 @@ I had considered requiring that the JSON be included in the header as unencoded 
   - Updated to allow a 202 "Accepted" response to the first POST request, avoiding to need to keep the connection open.
   - I had a change of heart to this approach shortly after publishing it.
 - [Public Draft 3.0](https://github.com/billpg/HashBack/blob/bf7e2ff1876e9673b04bffb7d70766a10d326976/README.md)
-  - Substantial refactoring after realising the verification hash could be a unauthenticated GET request on a static file host.
+  - Substantial refactoring. The client makes a POST request with a JSON body and puts a hash of that JSON body on their website. The server fetches that hash and compares it to their own expected hash. The POST response is always a Bearer token.
   - Added a "dot zero" to allow for minor updates, reserving 4.0 for another substantial refactor.
   - Changed name to "HashBack" Authentication, reflecting that a token is only one possible outcome and the verification hash is the big idea.
 - [Public Draft 3.1](https://github.com/billpg/HashBack/blob/d8886ce0cebb159f6484186f5b6ccd750d0dd97c/README.md)
   - The "fixed salt" is now the result of running RBKDF2 but without processing the result into capitals letters. This means I no longer need to link to some "attached" C# code and can simply record the input parameters. (The original motivation of having only capital letters in the salt was to support implementations that only accept ASCII strings, but all implementations I could find will accept arbitrary blocks of bytes as input.)
   - Added "204SetCookie" as a third response type. Might be useful for a browser making the POST request.
 - Public Draft 4.0 (This document)
-  - Realised that having a POST request with a Bearer token as a response is still tying to the "token exchange" of the original public draft when it was called "Cross Request Token Exchange". The JSON could instead go into an `Authorization` header and everything about a response can be removed. Added a note that developers implementing this exchange might prefer to only perform this exchange once and return a Bearer token but noting that it is a decision beyond the scope of this document. The extended example does this.
+  - The JSON request is sent by the client in the form of an HTTP `Authorization` header. The transaction being authenticated could be anything, including a request for a Bearer token. This has the advantage of allowing a once-off request to skip the extra transaction to fetch a Bearer token and act more like traditional HTTP authentication. Also, as this header payload is BASE64 encoded, we don't need to canonicalize the JSON as the hash can be done on the BASE64 encoded bytes.
   - As I write this I'm uncertain if this is the best approach. I may yet return to the 3.1 draft and consider version 4 (along with version 2) as an abandoned idea.
 
 
