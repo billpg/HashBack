@@ -216,7 +216,7 @@ Then this exchange is not for you. It works by having two web servers make reque
 ### I have a web server on the other side of the Internet but not the same machine.
 Your web site needs to be covered by TLS, and for your code to be able to publish a small static file to a folder on it. If you can be reasonably certain that no-one else can publish files on that folder, it'll be suitable for this exchange.
 
-### What sort of range should be allowed for identifying an `Verify` to a single user.
+### What sort of range should be allowed for identifying a verification hash URL to a single user.
 I recommend keeping it tight to either a file inside a single folder or to a single URL with a single query string parameter.
 
 For example, if a user affirms they are in control of `https://example.com/hashback/`, then allow `https://example.com/hashback/1234.txt`, but reject any sub-folders or URLs with query strings. Similarly, if a user affirms they are in control of `https://example.com/hashback?ID=` then allow variations of URLs with that query string parameter changing, rejecting any requests with sub-folders or additional query string parameters.
@@ -226,43 +226,43 @@ Ultimately, it is up to the code performing this exchange to agree what URLs ide
 ### TLS supports client-side certificates.
 To use client-side certificates, the client side would need access to the private key. This would need secure storage for the key which the caller code has access to. Avoidance of this is the main motivation of this exchange.
 
+### What if an attacker attempts to eavesdrop on either request?"
+The attacker can't eavesdrop because TLS is securing the channel.
+
 ### What if either HTTP transaction uses a self-signed TLS certificate or one signed by an untrusted root?
 If a connection to an untrusted TLS certificate is found, abandon the request and maybe log an error. Fortunately, this is default of most (all?) HTTP client libraries.
 
 If you want to allow for self-signed TLS certificates, since this exchange relies on a pre-existing relationship, you could perhaps allow for "pinned" TLS certificates to be configured.
 
-### What if an attacker attempts to eavesdrop on a request using this Authorization header?"
-The attacker can't eavesdrop because TLS is securing the channel.
+### What if an attacker has a TLS certificate signed by a trusted CA?
+Then the attacker has broken TLS itself and we have bigger problems.
+
+If this is a serious concern, then you could keep your own collection of trusted TLS certificates and refuse of recognize any TLS ceritifcates not on your list. You'd effectively be running your own CA if you can't trust the ones built into your HTTP library.
 
 ### What if an attacker sends a fake Authorization header?
 The recipient will attempt to retrieve a verification hash file from the real client's website. As there won't be a verification hash that matches the fake header, the attempt will fail.
 
-### What if an attacker can predict the verification hash URL?"
+### What if an attacker can predict the verification hash URL or has a verification hash intended for another server?"
 Let them.
 
 Suppose an attacker knows a current request's verification hash URL. They would be able to make that GET request and from that know the verification hash. Additionally, they could construct their own Authorization header to a genuine server, using the known `Verify` value with knowledge the genuine client's website will respond again to a second GET request with the same known verification hash.
 
 To successfully perform this attack, the attacker will need to construct the JSON block such that its hash will match the verification hash, or else the server will reject the request. This will require finding the value of the `Unus` property which is unpredictable because it was generated from cryptographic-quality-randomness, sent over a TLS protected channel to the genuine server, and is never reused. 
 
-For an attacker to exploit knowing a current verification hash, they would need to be able to reverse that hash back into the original JSON request, including the unpredictable `Unus` property.  Reversing SHA256 (as part of PBKDF2) is considered practically impossible.
+For an attacker to exploit knowing a current verification hash, they would need to be able to reverse that hash back into the original JSON request, including the unpredictable `Unus` property. Reversing SHA256 (as part of PBKDF2) is considered practically impossible.
 
-Nonetheless, it is trivial to make the verification hash URL unpredictable by using cryptographic-quality randomness and it may be considered prudent to do so. Any security analysis conducted on this exchange should assume the URL *is* predictable and thus the verification hash may be exposed to attackers.
+Nonetheless, it is trivial to make the verification hash URL unpredictable by using cryptographic-quality randomness and it may be considered prudent to do so. (Note to anyone performing a security analysis, please assume the URL *is* predictable and thus the verification hash may be exposed to attackers.)
 
 ### Does it matter if any part of the Authorization header is predictable?
 Only the value of the `Unus` property needs to be unpredictable. All of the other values may be completely predictable to an attacker because only one unpredictable element is enough to make the verification hash secure.
 
-### What if an attacker downloads a verification hash intended for a different server?
-To exploit knowing a verification hash, an attacker would need to build a valid JSON block that resolves to that hash. As the value of the `Unus` property is included in the hash but not revealed to an attacker, the task is practically impossible.
-
 ### What if a client sends a legitimate Authorization header to a server, but that server is evil and it copies that request along to a different server?
-The second server will reject the request because they will observe the `Host` property of the request is for the first server, not itself. For this reason it is important that servers reject any requests with a `Host` value other than the domain belonging to them, including "localhost" and similar.
+The second server will reject the request because they will observe the `Host` property of the request is for the first server, not itself. For this reason it is important that servers reject all requests with a `Host` value other than the domain belonging to them, including "localhost" and similar.
 
 ### What if an attacker floods the POST request URL with many fake requests?
-Any number of fake requests will all be rejected by the server because there will be no verification hash that matches the expected hash. A server will accept an Authorization without that matching verification hash that came from a genuine user.
+Any number of fake requests will all be rejected by the server because the real user is not publishing hashes that match these fake requests.
 
-Despite this, the fact that a request with an Authorization header will trigger a second GET request might be used as a denial-of-service attack. For this reason, it may be prudent for an server to track IP address blocks with a history of making bad POST requests and rejecting subsequent requests that originate from these blocks.
-
-This exchange normally requires a pre-existing relationship between the participants, but it isn't unreasonable to suppose that open servers might exist that will take authentication requests with any valid URL as the `Verify` property value. These should, to avoid being a participant in a denial-of-service attack, keep track of which `Verify` domains and IPs have a history of having any result other than returning a correct verification hash.
+Despite this, the fact that a request for authentication will trigger a second GET request might be used as a denial-of-service attack. For this reason, it may be prudent for an server to track IP address blocks with a history of making bad authentication requests and rejecting subsequent requests that originate from these blocks, or even requiring that clients be at a pre-agreed range of IPs and rejecting anyone outside this range. (Note that I suggest this only as a means to prevent abuse. The security of the authentication method is not dependent on any IP block analysis.)
 
 ### What if there's a website that will host files from anyone?
 Maybe don't claim that website as one that you have exclusive control over.
@@ -291,10 +291,10 @@ I don't think this is necessary (indeed, all of the examples in this document us
 As this proposal is still in the public-draft phase, I am open to be persuaded that PBKDF2 is not needed and a single round of SHA256 is quite sufficient thank you very much. I'm also open to be persuaded that the default number of rounds needs to be significantly higher.
 
 ### Is the "Bearer Token" response used in the extended example documented anywhere?
-This originated in public-draft version 3.0, linked below. I intend to document this response type as a separate proposal with an applicable `Accept`/`Content-Type` that will go alongside this proposal.
+I intend to document this response type as a separate proposal with an applicable `Accept`/`Content-Type` that will go alongside this proposal.
 
 ### Why BASE64 the JSON in the `Authorization` header?
-To ensure there's an unambiguous sequence of bytes to feed into the hash. By transferring the JSON block in an encoded set of bytes, the recipient can simply pass the decoded byte array into the hashing object.
+To ensure there's an unambiguous sequence of bytes to feed into the hash. By transferring the JSON block in an encoded set of bytes, the recipient can simply pass the decoded byte array into the PBKDF2 function as the password parameter.
 
 I had considered requiring that the JSON be included in the header as unencoded ASCII, without any whitespace characters and IDN domains using JSON's `\u` notation. Can I, in practice, use an `Authorization` header with all of characters JSON uses? I am open to be persuaded that this would be preferable to using BASE64. 
 
@@ -317,12 +317,10 @@ I had considered requiring that the JSON be included in the header as unencoded 
   - The JSON request is sent by the client in the form of an HTTP `Authorization` header. The transaction being authenticated could be anything, including a request for a Bearer token. This has the advantage of allowing a once-off request to skip the extra transaction to fetch a Bearer token and act more like traditional HTTP authentication. Also, as this header payload is BASE64 encoded, we don't need to canonicalize the JSON as the hash can be done on the BASE64 encoded bytes.
   - As I write this I'm uncertain if this is the best approach. I may yet return to the 3.1 draft and consider version 4 (along with version 2) as an abandoned idea.
 
-
 ## Next Steps
+This document is a draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using PBKDF2 with its fixed salt correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm that authenticity of the authentication request. If you have any comments or notes, please raise an issue on this project's github.
 
-This document is a draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using PBKDF2 with its fixed salt correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm that authenticity of the POST request. If you have any comments or notes, please raise an issue on this project's github.
-
-In due course I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform the role of an Issuer by sending your API tokens on demand, as well as perform the role of a Caller by asking your API for a token.
+In due course I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform both the role of an authenticating server by downloading your hashes and validating them, as well as perform the role of a client requesting authentication from you and publishing a verification hash for you to download. (and yes, you could point both APIs at each other, just for laughs.)
 
 Ultimately, I hope to publish this as an RFC and establish it as a public standard.
 
