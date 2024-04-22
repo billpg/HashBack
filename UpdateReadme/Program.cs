@@ -50,13 +50,22 @@ PopulateExample(
     "1066_EXAMPLE",
     DateTime.Parse("1986-10-09T23:00:00-04:00"),
     "server.example",
-    "https://client.example/hashback_files/my_json_hash.txt");
+    "https://client.example/hashback_files/my_json_hash.txt", 
+    true);
 
 PopulateExample(
     "CASE_STUDY",
     DateTime.Parse("2005-03-26T19:00:00Z"),
     "rutabaga.example",
-    "https://carol.example/hashback/64961859.txt");
+    "https://carol.example/hashback/64961859.txt", 
+    false);
+
+PopulateExample(
+    "BEARER",
+    DateTime.Parse("1991-08-20T23:02:00+03:00"),
+    "bearer-token-issuer.example",
+    "https://client.example/hb/376358.txt", 
+    false);
 
 /* If README has changed, rewrite back. */
 if (readmeOrigText != string.Join("\r\n", readmeLines))
@@ -74,13 +83,12 @@ long UnixTime(DateTime utc)
     return (long)(utc.ToUniversalTime() - DateTime.Parse("1970-01-01T00:00:00Z")).TotalSeconds;
 }
 
-void PopulateExample(string keyBase, DateTime now, string hostDomainName, string verifyUrl)
+void PopulateExample(string keyBase, DateTime now, string hostDomainName, string verifyUrl, bool addEasterEgg)
 {
     const int rounds = 1;
 
     /* Build request JSON. */
     var requestJson = new JObject();
-    //requestJson["Version"] = "BILLPG-DRAFT-4-0";
     requestJson["Host"] = hostDomainName;
     requestJson["Now"] = UnixTime(now);
     requestJson["Unus"] = GenerateUnus(keyBase);
@@ -89,7 +97,8 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     ReplaceJson($"<!--{keyBase}_REQUEST-->", requestJson);
 
     /* Encode JSON into bytes. */
-    requestJson[char.ConvertFromUtf32(0x1F95A)] = "https://billpg.com/nggyu";
+    if (addEasterEgg)
+        requestJson[char.ConvertFromUtf32(0x1F95A)] = "https://billpg.com/nggyu";
     string jsonAsString = requestJson.ToString(Newtonsoft.Json.Formatting.None);
     byte[] jsonAsBytes = Encoding.UTF8.GetBytes(jsonAsString);
 
@@ -110,32 +119,37 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     /* Insert the hash of the above JSON into the readme. */
     string hash1066 = HashRequestJsonBytes(jsonAsBytes, rounds);
     int hash1066Index = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_HASH-->"));
-    readmeLines[hash1066Index] = $"- `{hash1066}`<!--{keyBase}_HASH-->";
+    if (hash1066Index > 0)
+        readmeLines[hash1066Index] = $"- `{hash1066}`<!--{keyBase}_HASH-->";
 
     /* Build response JSON. */
     DateTime issuedAt = now.AddSeconds(1);
     var responseJson = new JObject();
-    string jwt = ToBearerToken(new Uri(verifyUrl).Host, hostDomainName, issuedAt, out DateTime expiresAt);
-    responseJson["BearerToken"] = GenerateUnus(keyBase + "ShorterBearerToken").Substring(0,40);
-    responseJson["IssuedAt"] = UnixTime(issuedAt);
-    responseJson["ExpiresAt"] = UnixTime(expiresAt);
+    long issuedAtUnix = UnixTime(issuedAt);
+    responseJson["BearerToken"] = GenerateBearerToken(keyBase);
+    responseJson["IssuedAt"] = issuedAtUnix;
+    responseJson["ExpiresAt"] = issuedAtUnix + 3600;
     ReplaceJson($"<!--{keyBase}_RESPONSE-->", responseJson);
+}
 
-    /* Build a JWT only response. */
-    ReplaceJsonString($"<!--{keyBase}_RESPONSE_JWT_ONLY-->", jwt);
-
-    /* Build a simple token example. */
-    responseJson["BearerToken"] = GenerateUnus(keyBase + "SimpleToken").Substring(0, 40);
-    ReplaceJson($"<!--{keyBase}_RESPONSE_SIMPLE_TOKEN-->", responseJson);
-
-    /* Build a set-cookie example. */
-    int setCookieMarkerIndex = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_SET_COOKIE-->"));
-    if (setCookieMarkerIndex > 0)
+/* Generate a random-looking token that would work as a non-JWT beaerer token. */
+string GenerateBearerToken(string keyBase)
+{
+    /* Loop through six times, adding hyphens. */
+    string token = "";
+    for (int i = 0; i < 6; i++)
     {
-        int setCookieHeaderIndex = readmeLines.FindIndex(setCookieMarkerIndex, src => src.StartsWith("Set-Cookie"));
-        var setCookieValue = GenerateUnus(keyBase + "SetCookie").Substring(0, 40);
-        readmeLines[setCookieHeaderIndex] = $"Set-Cookie: MyCookie={setCookieValue}; Secure; HttpOnly;";
+        /* Hyphen separator, except first time. */
+        if (i > 0)
+            token += "-";
+
+        /* Add some random looking characters. */
+        string random = GenerateUnus(keyBase + "SimpleBearer" + i).Replace("+","").Replace("/", "");
+        token += random.Substring(0, 8);
     }
+
+    /* Completed token. */
+    return token;
 }
 
 string HashRequestJsonBytes(byte[] jsonAsBytes, int rounds)
@@ -163,15 +177,6 @@ void ReplaceJson(string tag, JObject insert)
 
     /* Insert back into code. */
     readmeLines.Insert(openBraceIndex, insert.ToString().Replace("\r\n  ", "\r\n    "));
-}
-
-void ReplaceJsonString(string tag, string value)
-{
-    /* Look for the tag, then look for the string. */
-    int markerIndex = readmeLines.FindIndex(src => src.Contains(tag));
-    if (markerIndex < 0) return;
-    int stringIndex = readmeLines.FindIndex(markerIndex, src => src.StartsWith("\"ey"));
-    readmeLines[stringIndex] = "\"" + value + "\"";
 }
 
 /* Find the file with the given name, starting from this file's folder moving upwards. */
@@ -206,34 +211,6 @@ string GenerateUnus(string v)
     byte[] hash = sha.ComputeHash(System.Text.Encoding.ASCII.GetBytes(v + "Unus"));
     return Convert.ToBase64String(hash);
 }
-
-/* Convert a string into an example JWT. */
-string ToBearerToken(string caller, string issuer, DateTime issuedAt, out DateTime expiresAt)
-{
-    expiresAt = issuedAt.ToUniversalTime().AddHours(1).ToUniversalTime();
-    long iat = UnixTime(issuedAt);
-    long exp = UnixTime(expiresAt);
-
-    string jwtHeader = JWT64Encode(new JObject { ["typ"] = "JWT", ["alg"] = "HS256", [""] = "billpg.com/nggyu" });
-    string jwtBody = JWT64Encode(new JObject { ["sub"] = caller, ["iss"] = issuer, ["iat"] = iat, ["exp"] = exp });
-    string jwtHeaderDotBody = jwtHeader + "." + jwtBody;
-
-    using var hmac = new System.Security.Cryptography.HMACSHA256();
-    hmac.Key = System.Text.Encoding.ASCII.GetBytes("your-256-bit-secret");
-    var hash = hmac.ComputeHash(System.Text.Encoding.ASCII.GetBytes(jwtHeaderDotBody));
-    string jwtSig = JWT64EncodeBytes(hash);
-    string jwtFull = jwtHeaderDotBody + "." + jwtSig;
-    return jwtFull;
-}
-
-string JWT64Encode(JObject j)
-    => JWT64EncodeString(j.ToString(Newtonsoft.Json.Formatting.None));
-
-string JWT64EncodeBytes(byte[] bytes)
-    => Convert.ToBase64String(bytes).Replace('+', '-').Replace('/', '_').TrimEnd('=');
-
-string JWT64EncodeString(string jsonAsString)
-    => JWT64EncodeBytes(System.Text.Encoding.ASCII.GetBytes(jsonAsString));
 
 void SetTextByMarker(List<string> lines, string marker, string line)
 {

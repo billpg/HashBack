@@ -22,8 +22,6 @@ While a recipient of a call *can't* be certain who a caller is, the caller *can*
 
 Now apply that thought to web authentication. The client can be sure (thanks to TLS) who the server is, but the server can't be sure who the client is, much like the analogy with phone calls. This document describes how the same "call me back" step could be used to authenticate a web API request. 
 
-As it would be expensive to do that for every single HTTP request, it is anticipated that this authentication process happen as a once-off to supply the client with a temporary Bearer token or Cookie, which can then be used for subsequent requests until it expires. This is optional and this method could be used for every HTTP request if you so wished.
-
 ## The Exchange
 In a nutshell, a client makes an HTTP/TLS request for a transaction that needs authenticating first.
 
@@ -128,6 +126,49 @@ For your convenience, here is the above 32 byte fixed salt block in a variety of
 - Hex: `71DA620906A5979D2E1CE510425B5B4896F64553D8EB15EFA2E58BA30649AFC9`<!--FIXED_SALT_HEX-->
 - URL: `q%dab%09%06%a5%97%9d.%1c%e5%10B%5b%5bH%96%f6ES%d8%eb%15%ef%a2%e5%8b%a3%06I%af%c9`<!--FIXED_SALT_URL-->
 
+## application/temporal-bearer-token+json
+The above exchange does have the disadvantage of being expensive. While this may be acceptable for a once-off transaction, it would be prohibitively expensive to perform the full exchange for a large number of requests. 
+
+This section describes an optional use of HashBack authentication that addresses this. An API that can be called once-off with a single HashBack transaction, that returns a temporal *Bearer token* that can be used until it expires. The use of an additional header, `Accept: application/temporal-bearer-token+json`, indicates the caller's request. 
+
+For example: <!--BEARER_AUTH_HEADER-->
+```
+GET /api/bearer_token HTTP/1.1
+Host: issuer.example
+Authorization: HashBack
+ eyJIb3N0IjoiYmVhcmVyLXRva2VuLWlzc3Vlci5leGFtcGxlIiwiTm93Ijo2ODI3MTg1MjAsIlVu
+ dXMiOiJKQUxpQ3l6QWp6VTZCQ1B5N0NvenU3TVBWSWRpR1FZaTdra256QnF3MnZ3PSIsIlJvdW5k
+ cyI6MSwiVmVyaWZ5IjoiaHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9oYi8zNzYzNTgudHh0In0=
+Accept: application/temporal-bearer-token+json
+```
+
+The response body includes the requested Bearer token and when that token expires. The JSON will have the following properties.
+
+- `BearerToken`
+  - Required not-nullable string.
+  - This is the requested Bearer token. An opaque string of characters without (necessarily) any internal structure.
+  - Because Bearer tokens are sent in ASCII-only HTTP headers, it must consist only of printable ASCII characters.
+- `IssuedAt`
+  - Optional or nullable integer.
+  - The UTC time this token was issued, expressed as an integer of the number of seconds since the start of 1970.
+  - If `null` or missing, the Issuer has chosen not to supply this information.
+  - This value is supplied for documentation and auditing purposes only. The recipient is not expected to make decisions based on the value of this token.
+- `ExpiresAt`
+  - Optional or nullable integer.
+  - The UTC expiry time of this Bearer token, expressed as an integer of the number of seconds since the start of 1970.
+  - If `null` or missing, the Issuer is not declaring a particular expiry. The token will last until a request is made that actively rejects it.
+  - A non-null value is advisory only. The issuer is neither guaranteeing the token will continue to work until it expires, nor that it will stop working once this expiry time has passed. 
+
+For example:<!--BEARER_RESPONSE-->
+```
+Content-Type: application/temporal-bearer-token+json
+{
+    "BearerToken": "XCQr0XW1-J1wriEeU-Wqf15hS8-0MDhVode-bAg6RYdj-Swjyq1qR",
+    "IssuedAt": 682718521,
+    "ExpiresAt": 682722121
+}
+```
+
 # An extended example.
 **The Rutabaga Company** operates a website with an API designed for their customers to use. They publish a document for their customers that specifies how to use that API. One GET-able end-point is at `https://rutabaga.example/api/bearer_token` which returns a Bearer token in a JSON response if the request header includes a valid HashBack authentication header.
 
@@ -146,7 +187,7 @@ Time passes and Carol needs to make a request to the Rutabaga Company API and ne
 ```
 
 The code calculates the verification hash from this JSON using the process outlined above. The result of hashing the above example request is:
-- `+SdX5J7G+5za6R68pWGQ5awILyBpRwS2fDrpunlnMcg=`<!--CASE_STUDY_HASH-->
+- `6p16Icq2ws+Qoh7OqtZCvhupP45W0MV2n4At1yC0+fE=`<!--CASE_STUDY_HASH-->
 
 To complete the GET request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows, with line-breaks added for clarity.<!--CASE_STUDY_AUTH_HEADER-->
 ```
@@ -156,9 +197,8 @@ User-Agent: Carol's Magnificent Application Server.
 Authorization: HashBack
  eyJIb3N0IjoicnV0YWJhZ2EuZXhhbXBsZSIsIk5vdyI6MTExMTg2MzYwMCwiVW51cyI6IlRtREZH
  ZWt2UStDUmdBTmo5UVBaUXRCbkYwNzdnQWM0QWVSQVNGU0RYbzg9IiwiUm91bmRzIjoxLCJWZXJp
- ZnkiOiJodHRwczovL2Nhcm9sLmV4YW1wbGUvaGFzaGJhY2svNjQ5NjE4NTkudHh0Iiwi8J+lmiI6
- Imh0dHBzOi8vYmlsbHBnLmNvbS9uZ2d5dSJ9
-Accept: application/issued-bearer-token+json
+ ZnkiOiJodHRwczovL2Nhcm9sLmV4YW1wbGUvaGFzaGJhY2svNjQ5NjE4NTkudHh0In0=
+Accept: application/temporal-bearer-token+json
 
 ```
 
@@ -194,10 +234,10 @@ The service performs the same PBKDF2 operation on the JSON request that the Call
 Satisfied the request is genuine, the service generates a Bearer token and returns it to the caller as the response to the initial request, together with when it was issued and its expiry time.<!--CASE_STUDY_RESPONSE-->
 ```
 HTTP/1.1 200 OK
-Content-Type: application/issued-bearer-token+json
+Content-Type: application/temporal-bearer-token+json
 
 {
-    "BearerToken": "9iStrRKcd6OVLoYnAg31zvZ0LBStenOU4IpAGgI1",
+    "BearerToken": "M7HFwZjs-oaRmeCWn-x9P7p3OT-ab56YHh0-5q6qAiR0-u1jjMYc3",
     "IssuedAt": 1111863601,
     "ExpiresAt": 1111867201
 }
@@ -320,7 +360,7 @@ I had considered requiring that the JSON be included in the header as unencoded 
 ## Next Steps
 This document is a draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using PBKDF2 with its fixed salt correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm that authenticity of the authentication request. If you have any comments or notes, please raise an issue on this project's github.
 
-In due course I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform both the role of an authenticating server by downloading your hashes and validating them, as well as perform the role of a client requesting authentication from you and publishing a verification hash for you to download. (and yes, you could point both APIs at each other, just for laughs.)
+In due course I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform both the role of an authenticating server by downloading your hashes and validating them, as well as perform the role of a client requesting authentication from you and publishing a verification hash for you to download. (And yes, you could point both APIs at each other, just for laughs.)
 
 Ultimately, I hope to publish this as an RFC and establish it as a public standard.
 
