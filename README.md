@@ -34,9 +34,7 @@ The header is constructed as follows:
 Authorization: HashBack (BASE64 encoded JSON) 
 ```
 
-The BASE64 encoded block must be a single string with no spaces or end-of-line characters and must include the trailing `=` characters per the rules of BASE64. (The examples in this document split the string into multiple lines for clarity.)
-
-The inside the BASE64 encoded block is a UTF-8 representation of a JSON object with the following properties, all of which are required. These properties are all of string type except `Now` and `Rounds` which are integers. (`Now` will need to be larger than 32 bits to continue working after 2038.) Any additional properties not documented here are ignored, but will nonetheless be hashed as part of the block of BASE64-encoded bytes.
+The BASE64 encoded block must be a single string with no spaces or end-of-line characters and must include the trailing `=` characters per the rules of BASE64. (The examples in this document split the string into multiple lines for clarity.) The bytes inside the BASE64 block are the UTF-8 representation of a JSON object with the properties listed below. All are required and the values are string type unless otherwise noted.
 
 - `Host`
   - The full domain name of the server being called in this request.
@@ -45,15 +43,15 @@ The inside the BASE64 encoded block is a UTF-8 representation of a JSON object w
 - `Now`
   - The current UTC time, expressed as an integer of the number of seconds since the start of 1970.
   - The recipient service should reject this request if timestamp is too far from its current time. This document does not specify a threshold in either direction but instead this is left to the service's configuration. (Finger in the air - ten seconds.)
+  - The integer type should be greater than 32 bits to ensure this exchange will continue to work beyond the year 2038.
 - `Unus`
   - 256 bits of cryptographic-quality randomness, encoded in BASE-64 including trailing `=`.
   - This is to make reversal of the verification hash practically impossible.
   - The other JSON property values listed here are "predictable". The security of this exchange relies on this one value not being predictable.
   - I am English and I would prefer to not to name this property using a particular five letter word starting with N, as it has an unfortunate meaning in my culture.
 - `Rounds`
-  - An integer specifying the number of PBKDF2 rounds used to produce the verification hash. 
+  - An integer specifying the number of PBKDF2 rounds used to produce the verification hash. (See below.)
   - Must be a positive integer, at least 1.
-  - The recipient service may request a different number of rounds if the value supplied is too low or too high. See section describing 400 error responses below for negotiation of this number.
 - `Verify`
   - An `https://` URL belonging to the client where the verification hash may be retrieved with a GET request.
   - The URL must be one that server knows as belonging to a specific user. Exactly which URLs belong to which users is beyond the scope of this document.
@@ -100,7 +98,10 @@ The hashing process takes the following steps.
 
 Note that the hash is performed on the same bytes that were encoded inside the BASE64 block. Because of this, the JSON itself may be flexible with formatting whitespace or JSON character encoding, as long as the JSON object is valid according to the rules above. As the intended audience is another machine, no whitespace and UTF-8 encoding is preferable.
 
-The fixed salt is used to ensure that a valid hash is only meaningful in light of this document, as that salt is not sent over the wire with the request.
+The fixed salt is used to ensure that a valid hash is only meaningful in light of this document, as that salt is not sent over the wire with the request. For your convenience, here is the 32 byte fixed salt block in a variety of encodings:
+- Base64: `cdpiCQall50uHOUQQltbSJb2RVPY6xXvouWLowZJr8k=`<!--FIXED_SALT_B64-->
+- Hex: `71DA620906A5979D2E1CE510425B5B4896F64553D8EB15EFA2E58BA30649AFC9`<!--FIXED_SALT_HEX-->
+- URL: `q%dab%09%06%a5%97%9d.%1c%e5%10B%5b%5bH%96%f6ES%d8%eb%15%ef%a2%e5%8b%a3%06I%af%c9`<!--FIXED_SALT_URL-->
 
 Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The text file itself must be one line with the BASE-64 encoded hash in ASCII as that only line. The file must either be exactly 44 bytes long with no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence.
 
@@ -111,7 +112,7 @@ Once the service has downloaded that verification hash, it should compare it aga
 
 If there is any problem with the authentication process, including errors downloading the verification hash or that the supplied hash doesn't match the expected hash, the server must respond with an applicable error response. This should include sufficient detail to assist a reasonably experienced developer to fix the issue in question.
 
-#### Generation of the fixed salt
+#### Generation of the fixed salt block
 The salt string itself was generated by a PBKDF2 call with a high iteration count. For reference, the following parameters were used:
 - Password: "To my Treacle." (14 bytes, summing to 1239.)<!--FIXED_SALT_PASSWORD-->
 - Salt: "I love you to the moon and back." (32 bytes, summing to 2827.)<!--FIXED_SALT_DEDICATION-->
@@ -119,10 +120,18 @@ The salt string itself was generated by a PBKDF2 call with a high iteration coun
 - Iterations: 477708<!--FIXED_SALT_ITERATIONS-->
 - Output: 256 bits / 32 bytes
 
-For your convenience, here is the above 32 byte fixed salt block in a variety of encodings:
-- Base64: `cdpiCQall50uHOUQQltbSJb2RVPY6xXvouWLowZJr8k=`<!--FIXED_SALT_B64-->
-- Hex: `71DA620906A5979D2E1CE510425B5B4896F64553D8EB15EFA2E58BA30649AFC9`<!--FIXED_SALT_HEX-->
-- URL: `q%dab%09%06%a5%97%9d.%1c%e5%10B%5b%5bH%96%f6ES%d8%eb%15%ef%a2%e5%8b%a3%06I%af%c9`<!--FIXED_SALT_URL-->
+## 401 responses and the WWW-Authenticate header
+HTTP Authentication is typically triggered by the client first attempting to perform a particular transaction without any authentication, but for the response to reject that attempt with a `401` response and a `WWW-Authenticate` header that lists the many available authentication methods the client could use.
+
+For a server to respond when HashBack authentication is available, the `WWW-Authenticate` header must include an `<auth-scheme>` of `HashBack`. A `realm` parameter may be present but this is optional.
+
+For example:
+```
+HTTP/1.1 401 Authentication Required
+WWW-Authentication: HashBack realm="My_Wonderful_Realm"
+```
+
+Clients may skip that initial transaction if it is already known that the server supports HashBack authentication.
 
 ## application/temporal-bearer-token+json
 The above exchange does have the disadvantage of being expensive. While this may be acceptable for a once-off transaction, it would be prohibitively expensive to perform the full exchange for a large number of requests. 
