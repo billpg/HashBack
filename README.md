@@ -23,11 +23,9 @@ While a recipient of a call *can't* be certain who a caller is, the caller *can*
 Now apply that thought to web authentication. The client can be sure (thanks to TLS) who the server is, but the server can't be sure who the client is, much like the analogy with phone calls. This document describes how the same "call me back" step could be used to authenticate a web API request. 
 
 ## The Exchange
-In a nutshell, a client makes an HTTP/TLS request for a transaction that needs authenticating first.
+In a nutshell, a client proves their identity by publishing a small text file on their TLS-secured website. The server downloads that file and thanks to TLS, is reassured that the client is indeed someone who is in control of that website.
 
-For this, the client adds an `Authorization:` header that (among other things) includes a URL on their own (also TLS protected) website. Here, the client has already published a small text file with the hash of that header. Thanks to TLS, the client can be reassured they are talking to the genuine recipient server, but the server doesn't yet know if the request came from the genuine client.
-
-To complete the loop, the server gets that text file in its own separate TLS-protected transaction. Having an open request from the client and being in possession of a correct hash that verifies the client is who they claim to be, the server is reassured that the client is the one making that request.
+To add a little more detail, the client builds a request header with a claim for authentication. That request header is itself hashed and the hash result is published on the client's website. To complete the loop, the server gets that text file in its own separate transaction. Once the server can confirm that the hash published on the client's website matches its own calculated hash for the request header, the server passes the request.
 
 ### The Authorization header
 
@@ -36,7 +34,7 @@ The header is constructed as follows:
 Authorization: HashBack (BASE64 encoded JSON) 
 ```
 
-The BASE64 encoded block must be a single block with no spaces or end-of-line characters and must include the trailing `=` characters per the rules of BASE64.
+The BASE64 encoded block must be a single string with no spaces or end-of-line characters and must include the trailing `=` characters per the rules of BASE64. (The examples in this document split the string into multiple lines for clarity.)
 
 The inside the BASE64 encoded block is a UTF-8 representation of a JSON object with the following properties, all of which are required. These properties are all of string type except `Now` and `Rounds` which are integers. (`Now` will need to be larger than 32 bits to continue working after 2038.) Any additional properties not documented here are ignored, but will nonetheless be hashed as part of the block of BASE64-encoded bytes.
 
@@ -72,7 +70,7 @@ For example:<!--1066_EXAMPLE_REQUEST-->
     "Verify": "https://client.example/hashback_files/my_json_hash.txt"
 }
 ```
-This JSON string is BASE64 encoded and added to the end of the `Authorization:` header. This example adds line-breaks for clarity. In reality, the BASE64 block would be sent as a single block.<!--1066_EXAMPLE_AUTH_HEADER-->
+This JSON string is BASE64 encoded and added to the end of the `Authorization:` header.<!--1066_EXAMPLE_AUTH_HEADER-->
 ```
 Authorization: HashBack
  eyJIb3N0Ijoic2VydmVyLmV4YW1wbGUiLCJOb3ciOjUyOTI5NzIwMCwiVW51cyI6ImlaNWtXUWFC
@@ -189,7 +187,7 @@ Time passes and Carol needs to make a request to the Rutabaga Company API and ne
 The code calculates the verification hash from this JSON using the process outlined above. The result of hashing the above example request is:
 - `6p16Icq2ws+Qoh7OqtZCvhupP45W0MV2n4At1yC0+fE=`<!--CASE_STUDY_HASH-->
 
-To complete the GET request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows, with line-breaks added for clarity.<!--CASE_STUDY_AUTH_HEADER-->
+To complete the GET request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows.<!--CASE_STUDY_AUTH_HEADER-->
 ```
 GET /api/bearer-token HTTP/1.1
 Host: rutabaga.example
@@ -329,9 +327,6 @@ PBKDF2 (which wraps SHA256) is used to allow for additional rounds of hashing to
 I don't think this is necessary (indeed, all of the examples in this document use `"Rounds":1`) because the `Unus` property is already 256 bits of unpredictable cryptographic quality randomness. For an attack exercising knowledge of a verification hash, looping through all possible `Unus` values, is already a colossally impractical exercise, even without additional rounds of PBKDF2. A previous draft of this proposal used a single round of SHA256, but I ultimately switched to PBKDF2 to allow for added rounds without needing a substantially updated new version of this protocol and for all implementations needing significant updates. For now, I'm going to continue using 1 as the default number of rounds. 
 
 As this proposal is still in the public-draft phase, I am open to be persuaded that PBKDF2 is not needed and a single round of SHA256 is quite sufficient thank you very much. I'm also open to be persuaded that the default number of rounds needs to be significantly higher.
-
-### Is the "Bearer Token" response used in the extended example documented anywhere?
-I intend to document this response type as a separate proposal with an applicable `Accept`/`Content-Type` that will go alongside this proposal.
 
 ### Why BASE64 the JSON in the `Authorization` header?
 To ensure there's an unambiguous sequence of bytes to feed into the hash. By transferring the JSON block in an encoded set of bytes, the recipient can simply pass the decoded byte array into the PBKDF2 function as the password parameter.
