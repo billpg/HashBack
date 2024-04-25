@@ -128,7 +128,7 @@ For a server to respond when HashBack authentication is available, the `WWW-Auth
 For example:
 ```
 HTTP/1.1 401 Authentication Required
-WWW-Authentication: HashBack realm="My_Wonderful_Realm"
+WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
 ```
 
 Clients may skip that initial transaction if it is already known that the server supports HashBack authentication.
