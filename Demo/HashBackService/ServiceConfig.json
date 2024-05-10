@@ -1,6 +1,7 @@
 {
   "RootUrl": "http://localhost:3001",
   "ListenPort": 3001,
+  "NowValidationMarginSeconds": 999,
   "RedirectHomeTo": "https://github.com/billpg/HashBack/blob/feat/DemoWebsite/Demo/Docs/Home.md",
   "RedirectHashServiceTo": "https://github.com/billpg/HashBack/blob/feat/DemoWebsite/Demo/Docs/Hashes.md",
   "RedirectIssuerDemoTo": "https://github.com/billpg/HashBack/blob/feat/DemoWebsite/Demo/Docs/IssuerDemo.md",

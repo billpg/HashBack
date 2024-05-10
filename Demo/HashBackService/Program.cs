@@ -33,17 +33,7 @@ hashSvc.OnBadRequestException = ErrorHandler.BadRequestExceptionWithText;
 hashSvc.DocumentationUrl = ServiceConfig.LoadRequiredString("RedirectHashServiceTo");
 hashSvc.ConfigureHttpService(app, "/hashes");
 
-/* Confgure the hash downloader service. */
-var verifyHashLookup = new VerificationHashRetrieval();
-var ip = verifyHashLookup.NameLookupService("xn--8s9h.billpg.com");
-var verifyHashRetr = new VerificationHashRetrieval();
-var verifyResp = verifyHashRetr.HashDownloadService(
-    ip, new Uri("https://xn--8s9h.billpg.com/hashback/123.txt"));
-
-
-
-
-/* Configure the issuer demo. */
+/* Configure the issuer (3.0/3.1) demo. */
 var issuerSvc = new IssuerService();
 string redirectIssuerDemoDocs = ServiceConfig.LoadRequiredString("RedirectIssuerDemoTo");
 issuerSvc.RootUrl = app.Urls.Single();
@@ -51,6 +41,32 @@ issuerSvc.DocumentationUrl = redirectIssuerDemoDocs;
 issuerSvc.OnBadRequest = ErrorHandler.BadRequestExceptionWithJson;
 issuerSvc.OnRetrieveVerificationHash = VerificationHashDownload.Retrieve;
 issuerSvc.ConfigureHttpService(app, "/issuer");
+
+/* Configure the Bearer Token (4.0) Service. */
+var bearerTokenSvc = new BearerTokenService
+{
+    RootUrl = app.Urls.Single(),
+    NowValidationMarginSeconds 
+        = ServiceConfig.LoadOptionalInt("NowValidationMarginSeconds") ?? 10,
+    OnBadRequest = ErrorHandler.BadRequestExceptionWithText,
+    OnReadClock = InternalTools.NowService,
+    OnRetrieveVerifyHash = VerificationHashDownload.Retrieve
+};
+bearerTokenSvc.ConfigureHttpService(app, "/bearerToken");
+
+#if false
+/* Configure the token request service used by the caller demo. */
+var tokenRequesterSvc = new TokenRequesterService();
+
+/* Configure the caller demo. */
+var callerSvc = new CallerService();
+callerSvc.RootUrl = app.Urls.Single();
+callerSvc.DocumentationUrl = ServiceConfig.LoadRequiredString("RedirectCallerDemoTo");
+callerSvc.OnBadRequest = ErrorHandler.BadRequestExceptionWithText;
+callerSvc.HashService = hashSvc;
+callerSvc.TokenRequestService = tokenRequesterSvc;
+callerSvc.ConfigureHttpService(app, "/caller");
+#endif 
 
 /* Set up the custom error handler. */
 app.Use(async (context, next) =>

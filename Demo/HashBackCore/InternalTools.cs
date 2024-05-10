@@ -1,9 +1,12 @@
 ﻿/* Copyright William Godfrey, 2024. All rights reserved.
  * billpg.com
  */
+using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using AddressFamily = System.Net.Sockets.AddressFamily;
 
 namespace billpg.HashBackCore
 {
@@ -38,6 +41,8 @@ namespace billpg.HashBackCore
             => (long)(from.ToUniversalTime().Subtract(UNIX_EPOCH).TotalSeconds);
 
         public static long NowUnixTime => DateTime.UtcNow.ToUnixTime();
+
+        public static readonly OnReadClockFn NowService = () => NowUnixTime;
 
         internal static bool IsClose(long x, long y, int maxDiff)
             => x > (y-maxDiff) && x < (y+maxDiff);
@@ -88,6 +93,44 @@ namespace billpg.HashBackCore
                 return "204SetCookie";
             else
                 return enumValue.ToString();
+        }
+
+        public static IPAddress RemoteIP(this HttpContext context)
+        {
+            /* Pull out the prime remote IP. Complain if missing. */
+            IPAddress? primaryRemote = context.Connection.RemoteIpAddress;
+            if (primaryRemote == null)
+                throw new ApplicationException("RemoteIpAddress is missing.");
+
+            /* If the primary IP isn't localhost, return it. */
+            if (primaryRemote.IsLocalhost() == false)
+                return primaryRemote;
+
+            /* Pull out the X-Forwarded-For header. If missing, return primary. */
+            string? forwardedFor = context.Request.Headers["X-Forwarded-For"].SingleOrDefault();
+            if (forwardedFor == null)
+                return primaryRemote;
+
+            /* Parse the header for the remote IP. If valid, return it. */
+            string proxyIpAsString = forwardedFor.Split(',').Last().Trim();
+            if (IPAddress.TryParse(proxyIpAsString, out var proxyIp))
+                return proxyIp;
+
+            /* Forward-For not valid. Stop everything. */
+            throw new ApplicationException("X-Forwarded-For not valid.");
+        }
+
+        public static bool IsLocalhost(this IPAddress ip)
+        {
+            if (ip.AddressFamily == AddressFamily.InterNetwork &&
+                ip.GetAddressBytes()[0] == 127)
+                return true;
+
+            if (ip.AddressFamily == AddressFamily.InterNetworkV6 &&
+                ip.ToString() == IPAddress.IPv6Loopback.ToString())
+                return true;
+
+            return false;
         }
     }
 }

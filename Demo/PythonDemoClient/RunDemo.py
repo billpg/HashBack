@@ -18,7 +18,62 @@ print(f"HashBack Service URL: {hashback_service_url}")
 verification_hash_url = "http://localhost:3001/hashes"
 print(f"Verifcation Hash URL: {verification_hash_url}")
 
-# Loop through the two available response types.
+# Request without an Authrization header.
+bearer_token_service_url = "http://localhost:3001/bearerToken"
+unauth_resp = requests.get(bearer_token_service_url)
+print(unauth_resp.status_code)
+print(unauth_resp.headers)
+print(unauth_resp.content)
+
+# Build a JSON object for the authorization header.
+hash_id = uuid.uuid1()
+auth_header_json = {
+    "Host": "localhost",
+    "Now": time_ns() // (1000 * 1000 * 1000),
+    "Unus": str(base64.b64encode(os.urandom(256 // 8)), "ascii"),
+    "Rounds": 1,
+    "Verify": f"{verification_hash_url}?ID={hash_id}"
+}
+
+# Convert the auth header JSON into bytes.
+auth_json_as_string = json.dumps(auth_header_json)
+auth_json_as_bytes = bytes(auth_json_as_string, "utf-8")
+auth_json_as_base64 = str(base64.b64encode(auth_json_as_bytes), "ascii")
+auth_header = "HashBack " + auth_json_as_base64
+
+# Find the verification hash using PBKDF2, per the HashBack draft version 4.0.
+auth_hash_as_bytes = hashlib.pbkdf2_hmac(
+    hash_name="SHA256",
+    password=auth_json_as_bytes,
+    salt=base64.b64decode("cdpiCQall50uHOUQQltbSJb2RVPY6xXvouWLowZJr8k="),
+    iterations=1,
+    dklen=32,
+)
+
+# Encode the completed hash.
+auth_hash_as_string = str(base64.b64encode(auth_hash_as_bytes), "ascii")
+
+# Upload the hash to the hash service.
+store_auth_hash_resp = requests.post(
+    verification_hash_url,
+    json={"ID": str(hash_id), "Hash": auth_hash_as_string},
+)
+
+# Validate the response.
+if store_auth_hash_resp.status_code != 200:
+    print(f"Hash Service failure. Status={store_auth_hash_resp.status_code}")
+    print(store_auth_hash_resp.content)
+    exit()
+
+# Send request.
+auth_response = requests.get(bearer_token_service_url, headers={"Authorization": auth_header})
+print(auth_response.status_code)
+print(auth_response.headers)
+print(auth_response.content)
+
+exit()
+
+# Loop through the available response 3.1 types.
 for type_of_response in ["BearerToken", "JWT", "204SetCookie"]:
     print(f"--- {type_of_response} --")
 

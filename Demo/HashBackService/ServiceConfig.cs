@@ -15,6 +15,9 @@ namespace billpg.HashBackService
         private static readonly JObject config = 
             (JObject)JToken.Parse(File.ReadAllText(configFilename));
 
+        internal static int? LoadOptionalInt(string key)
+            => config[key]?.Value<int>();
+
         internal static int LoadRequiredInt(string key)
         {
             int? value = config[key]?.Value<int>();

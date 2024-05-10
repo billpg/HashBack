@@ -95,6 +95,21 @@ namespace billpg.HashBackCore
             return Convert.ToBase64String(hashAsBytes);
         }
 
+        public static string ExpectedHashFourDotZero(IList<byte> authHeaderAsBytes, int rounds)
+        {
+            /* Perform the PBKDF2 argorithm as required by draft spec 4.0.
+             * (Note the fixed salt is made up of the same bytes as with 3.1) */
+            byte[] hashAsBytes = Rfc2898DeriveBytes.Pbkdf2(
+                password: authHeaderAsBytes.ToArray(),
+                salt: VERSION_3_1_FIXED_SALT.ToArray(),
+                hashAlgorithm: HashAlgorithmName.SHA256,
+                iterations: rounds,
+                outputLength: 256 / 8);
+
+            /* Return hash in BASE-64. */
+            return Convert.ToBase64String(hashAsBytes);
+        }
+
         /// <summary>
         /// Generate a string token that could be used as a Unus property value.
         /// </summary>
@@ -131,5 +146,12 @@ namespace billpg.HashBackCore
             return hashAsString.Substring(0, 10);            
         }
 
+        internal static IList<byte> RandomBytes(int byteCount)
+        {
+            using var rnd = RandomNumberGenerator.Create();
+            byte[] randomBytes = new byte[byteCount];
+            rnd.GetBytes(randomBytes);
+            return randomBytes;
+        }
     }
 }

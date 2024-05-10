@@ -144,7 +144,7 @@ namespace billpg.HashBackCore
         /// <param name="hash">Supplied hash to convert.</param>
         /// <param name="expectedByteCount">Exactly how many bytes to expect.</param>
         /// <returns>Byte collection, or null if string is not valid.</returns>
-        internal static IList<byte>? ConvertFromBase64OrNull(string hash, int expectedByteCount)
+        internal static IList<byte>? ConvertFromBase64OrNull(string hash, int? expectedByteCount = null)
         {
             /* Attempt to convert string into bytes. */
             byte[] hashAsBytes;
@@ -159,7 +159,7 @@ namespace billpg.HashBackCore
             }
 
             /* If not expected byte count, return null. */
-            if (hashAsBytes.Length != expectedByteCount)
+            if (expectedByteCount != null && hashAsBytes.Length != expectedByteCount)
                 return null;
 
             /* Passed tests, return bytes in a read-only package. */

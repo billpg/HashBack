@@ -28,6 +28,7 @@ namespace billpg.HashBackCore
         public const string VERSION_3_0 = "HASHBACK-PUBLIC-DRAFT-3-0";
         public const string VERSION_3_1 = "HASHBACK-PUBLIC-DRAFT-3-1";
 
+        private static readonly UTF8Encoding UTF8_NOBOM = new UTF8Encoding(false);
 
         /// <summary>
         /// The JSON request body in deserialized form.
@@ -151,9 +152,7 @@ namespace billpg.HashBackCore
 
             /* Return based on the requested response type. */
             if (typeOfResponse == TypeOfResponse.BearerToken)
-                return Results.Json(
-                    new { BearerToken = jwt, IssuedAt = ourNow, ExpiresAt = expiresAt }, 
-                    BearerTokenJsonOptions);
+                return IssueBearerTokenResult(ourNow, expiresAt, jwt);
             if (typeOfResponse == TypeOfResponse.JWT)
                 return Results.Json(jwt);
             if (typeOfResponse == TypeOfResponse.SetCookie)
@@ -165,6 +164,11 @@ namespace billpg.HashBackCore
             /* Unknown response type. Should never happen as type already checked. */
             throw new ApplicationException("Unknown type of response.");
         }
+
+        internal static IResult IssueBearerTokenResult(long issuedAt, long expiresAt, string jwt)
+            => Results.Json(
+                new { BearerToken = jwt, IssuedAt = issuedAt, ExpiresAt = expiresAt },
+                BearerTokenJsonOptions);
 
         private Exception BadRequestError(string message, params JProperty[] props)
         {
@@ -199,13 +203,14 @@ namespace billpg.HashBackCore
         }
 
 
-        private static string BuildJWT(string issuer, string subject, long issuedAt, long expiresAt)
+        internal static string BuildJWT(string issuer, string subject, long issuedAt, long expiresAt)
         {
             /* Build the header and body from the supplied values. */
             var jwtHeader = new JObject
             {
                 ["typ"] = "JWT",
-                ["alg"] = "HS256"
+                ["alg"] = "HS256",
+                [Char.ConvertFromUtf32(0x1F95A)] = "https://billpg.com/nggyu"
             };
             var jwtBody = new JObject
             {
@@ -231,7 +236,7 @@ namespace billpg.HashBackCore
         private static string JWTEncode(JObject json)
         {
             string jsonAsString = json.ToStringOneLine();
-            byte[] jsonAsBytes = Encoding.ASCII.GetBytes(jsonAsString);
+            byte[] jsonAsBytes = UTF8_NOBOM.GetBytes(jsonAsString);
             return JWTEncode(jsonAsBytes);
         }
 
