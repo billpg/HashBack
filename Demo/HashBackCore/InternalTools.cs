@@ -132,5 +132,11 @@ namespace billpg.HashBackCore
 
             return false;
         }
+
+        public static bool UseTls(this Uri url)
+            => url.Scheme == "https" || EqualsNoCase(url.Scheme, "https");
+
+        public static bool EqualsNoCase(string x, string y)
+            => string.Equals(x, y, StringComparison.InvariantCultureIgnoreCase);
     }
 }

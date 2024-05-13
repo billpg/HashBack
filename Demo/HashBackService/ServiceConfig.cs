@@ -52,5 +52,21 @@ namespace billpg.HashBackService
             return value;
         }
 
+        internal static IList<string> LoadStrings(string key)
+        {
+            JArray? alwaysAllowAsJArray = config[key]?.Value<JArray>();
+            if (alwaysAllowAsJArray == null)
+                return new List<string>().AsReadOnly();
+
+            var result = new List<string>();
+            foreach (var jItem in alwaysAllowAsJArray)
+            {
+                string? value = jItem?.Value<string>();
+                if (value != null)
+                    result.Add(value);
+            }
+
+            return result;
+        }
     }
 }

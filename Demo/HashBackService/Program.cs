@@ -10,8 +10,17 @@ using System.Text;
 using System.Security.Cryptography;
 using System.Linq.Expressions;
 using Microsoft.AspNetCore.Mvc;
-using HashBackService;
 using System.Net;
+
+if (false)
+{
+    var hls = new HostLookupService();
+    var xreq =
+        Spartan.Request
+        .GET(new Uri("https://xn--8s9h.billpg.com/hashback/123.txt"))
+        .WithHeader("Accept", "text/plain");
+    var resp = Spartan.Run(xreq, msg => new ApplicationException(msg), hls.Lookup);
+}  
 
 /* Announce the service starting. */
 Console.WriteLine("Starting HashBackService.");
@@ -33,24 +42,31 @@ hashSvc.OnBadRequestException = ErrorHandler.BadRequestExceptionWithText;
 hashSvc.DocumentationUrl = ServiceConfig.LoadRequiredString("RedirectHashServiceTo");
 hashSvc.ConfigureHttpService(app, "/hashes");
 
+/* Configure the download service. */
+var downloadSvc = new DownloadService();
+downloadSvc.RootUrl = app.Urls.Single();
+downloadSvc.OnDownloadError = ErrorHandler.BadRequestExceptionWithText;
+downloadSvc.AlwaysAllow = ServiceConfig.LoadStrings("AlwaysAllowDownload");
+downloadSvc.ConfigureHttpService(app, "/allowDownload");
+
 /* Configure the issuer (3.0/3.1) demo. */
 var issuerSvc = new IssuerService();
 string redirectIssuerDemoDocs = ServiceConfig.LoadRequiredString("RedirectIssuerDemoTo");
 issuerSvc.RootUrl = app.Urls.Single();
 issuerSvc.DocumentationUrl = redirectIssuerDemoDocs;
 issuerSvc.OnBadRequest = ErrorHandler.BadRequestExceptionWithJson;
-issuerSvc.OnRetrieveVerificationHash = VerificationHashDownload.Retrieve;
+issuerSvc.OnRetrieveVerificationHash = downloadSvc.HashDownload;
 issuerSvc.ConfigureHttpService(app, "/issuer");
 
 /* Configure the Bearer Token (4.0) Service. */
 var bearerTokenSvc = new BearerTokenService
 {
     RootUrl = app.Urls.Single(),
-    NowValidationMarginSeconds 
+    NowValidationMarginSeconds
         = ServiceConfig.LoadOptionalInt("NowValidationMarginSeconds") ?? 10,
     OnBadRequest = ErrorHandler.BadRequestExceptionWithText,
     OnReadClock = InternalTools.NowService,
-    OnRetrieveVerifyHash = VerificationHashDownload.Retrieve
+    OnRetrieveVerifyHash = downloadSvc.HashDownload
 };
 bearerTokenSvc.ConfigureHttpService(app, "/bearerToken");
 

@@ -52,16 +52,13 @@ namespace billpg.HashBackService
             }
         }
 
-        private static readonly UTF8Encoding UTF8NOBOM
-            = new UTF8Encoding(false);
-
         internal static Exception RedirectExceptionToTargetInConfig(string configKey)
             => RedirectException.ToTargetUrl(ServiceConfig.LoadRequiredString(configKey));
 
         internal static Exception BadRequestExceptionWithText(string message)
-            => new ResponseException(400, "text/plain; charset=utf-8", UTF8NOBOM.GetBytes(message));
+            => new ResponseException(400, "text/plain; charset=utf-8", Encoding.UTF8.GetBytes(message));
 
         internal static Exception BadRequestExceptionWithJson(JObject body)
-            => new ResponseException(400, "application/json", UTF8NOBOM.GetBytes(body.ToString()));
+            => new ResponseException(400, "application/json", Encoding.UTF8.GetBytes(body.ToString()));
     }
 }

@@ -17,11 +17,6 @@ namespace billpg.HashBackCore
     public static class CryptoExtensions
     {
         /// <summary>
-        /// Handy copy of UTF8 encoding with no-BOM flagged.
-        /// </summary>
-        private static readonly UTF8Encoding UTF8 = new UTF8Encoding(false);
-
-        /// <summary>
         /// Compute SHA256 hash from bytes.
         /// </summary>
         private static readonly Func<byte[], byte[]> ComputeSha256
@@ -71,7 +66,7 @@ namespace billpg.HashBackCore
 
             /* Turn it into a string of bytes with no spaces. */
             string canonicalAsString = canonical.ToStringOneLine();
-            byte[] canonicalAsBytes = UTF8.GetBytes(canonicalAsString);
+            byte[] canonicalAsBytes = Encoding.UTF8.GetBytes(canonicalAsString);
 
             /* Select the PBKDF2 salt based on version. 
              * (Exception should never happen because CallerRequest.Parse checks.) */
@@ -129,8 +124,8 @@ namespace billpg.HashBackCore
         {
             /* Call PBKDF2 to turn the name and salt into a key. */
             byte[] hashAsBytes = Rfc2898DeriveBytes.Pbkdf2(
-                password: UTF8.GetBytes(user),
-                salt: UTF8.GetBytes(secret),
+                password: Encoding.UTF8.GetBytes(user),
+                salt: Encoding.UTF8.GetBytes(secret),
                 hashAlgorithm: HashAlgorithmName.SHA512,
                 iterations: 3,
                 outputLength: 99);

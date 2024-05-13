@@ -28,8 +28,6 @@ namespace billpg.HashBackCore
         public const string VERSION_3_0 = "HASHBACK-PUBLIC-DRAFT-3-0";
         public const string VERSION_3_1 = "HASHBACK-PUBLIC-DRAFT-3-1";
 
-        private static readonly UTF8Encoding UTF8_NOBOM = new UTF8Encoding(false);
-
         /// <summary>
         /// The JSON request body in deserialized form.
         /// </summary>
@@ -51,8 +49,7 @@ namespace billpg.HashBackCore
             public long ExpiresAt { get; set; }
         }
 
-        public delegate string RetrieveVerificationHashFn(Uri verifyUrl);
-        public RetrieveVerificationHashFn OnRetrieveVerificationHash { get; set; }
+        public OnRetrieveVerifyHashFn OnRetrieveVerificationHash { get; set; }
             = u => throw new NotImplementedException();
 
         public string DocumentationUrl { get; set; } = "https://invalid/";
@@ -202,7 +199,6 @@ namespace billpg.HashBackCore
             return true;
         }
 
-
         internal static string BuildJWT(string issuer, string subject, long issuedAt, long expiresAt)
         {
             /* Build the header and body from the supplied values. */
@@ -236,7 +232,7 @@ namespace billpg.HashBackCore
         private static string JWTEncode(JObject json)
         {
             string jsonAsString = json.ToStringOneLine();
-            byte[] jsonAsBytes = UTF8_NOBOM.GetBytes(jsonAsString);
+            byte[] jsonAsBytes = Encoding.UTF8.GetBytes(jsonAsString);
             return JWTEncode(jsonAsBytes);
         }
 
