@@ -90,7 +90,7 @@ namespace billpg.HashBackCore
             return Convert.ToBase64String(hashAsBytes);
         }
 
-        public static string ExpectedHashFourDotZero(IList<byte> authHeaderAsBytes, int rounds)
+        public static string HashBytesPerFourDotZero(IList<byte> authHeaderAsBytes, int rounds)
         {
             /* Perform the PBKDF2 argorithm as required by draft spec 4.0.
              * (Note the fixed salt is made up of the same bytes as with 3.1) */

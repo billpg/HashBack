@@ -103,7 +103,7 @@ namespace billpg.HashBackCore
                 throw new ApplicationException("RemoteIpAddress is missing.");
 
             /* If the primary IP isn't localhost, return it. */
-            if (primaryRemote.IsLocalhost() == false)
+            if (primaryRemote.IsBogon() == false)
                 return primaryRemote;
 
             /* Pull out the X-Forwarded-For header. If missing, return primary. */
@@ -120,15 +120,19 @@ namespace billpg.HashBackCore
             throw new ApplicationException("X-Forwarded-For not valid.");
         }
 
-        public static bool IsLocalhost(this IPAddress ip)
+        public static bool IsBogon(this IPAddress ip)
         {
+            /* All of 127/8 is localhost. */
             if (ip.AddressFamily == AddressFamily.InterNetwork &&
                 ip.GetAddressBytes()[0] == 127)
                 return true;
 
+            /* "::1" is also localhost. */
             if (ip.AddressFamily == AddressFamily.InterNetworkV6 &&
                 ip.ToString() == IPAddress.IPv6Loopback.ToString())
                 return true;
+
+            //TODO: Check for other bogon ranges.
 
             return false;
         }

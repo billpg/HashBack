@@ -33,20 +33,11 @@ namespace billpg.HashBackCore
             = () => InternalTools.NowUnixTime;
 
         /// <summary>
-        /// Delegate for the BadRequestException handler. Converts a string response body into
-        /// an exception to throw that the shared error handler will know to convert into
-        /// a 400-Bad-Request response.
-        /// </summary>
-        /// <param name="responseText">Test to include as message body.</param>
-        /// <returns>Exception to throw.</returns>
-        public delegate Exception OnBadRequestFn(string responseText);
-
-        /// <summary>
         /// Function to call when an exception is needed that will be caught by the shared
         /// error handler that will become a 400 response with the supplied text as the 
         /// response body.
         /// </summary>
-        public OnBadRequestFn OnBadRequestException { get; set; }
+        public OnErrorFn OnBadRequestException { get; set; }
             = msg => throw new NotImplementedException();
 
         /// <summary>
@@ -141,16 +132,16 @@ namespace billpg.HashBackCore
         /// or NULL if the string is not a valid encoding or not the expected
         /// number of bytes.
         /// </summary>
-        /// <param name="hash">Supplied hash to convert.</param>
+        /// <param name="base64">Supplied hash to convert.</param>
         /// <param name="expectedByteCount">Exactly how many bytes to expect.</param>
         /// <returns>Byte collection, or null if string is not valid.</returns>
-        internal static IList<byte>? ConvertFromBase64OrNull(string hash, int? expectedByteCount = null)
+        internal static IList<byte>? ConvertFromBase64OrNull(string base64, int? expectedByteCount = null)
         {
             /* Attempt to convert string into bytes. */
             byte[] hashAsBytes;
             try
             {
-                hashAsBytes = Convert.FromBase64String(hash);
+                hashAsBytes = Convert.FromBase64String(NormalizeBase64(base64));
             }
             catch (FormatException)
             {
@@ -166,5 +157,26 @@ namespace billpg.HashBackCore
             return hashAsBytes.AsReadOnly();
         }
 
+        private static string NormalizeBase64(string base64)
+        {
+            /* Copy base64 into a StringBuilder so it can be modified. */
+            var base64Norm = new StringBuilder(base64);
+
+            /* Loop through, replacing JWT's - and _ with their normal equivalent. */
+            for (int index = 0; index < base64.Length; index++) 
+            {
+                if (base64[index] == '-')
+                    base64Norm[index] = '+';
+                else if (base64[index] == '_')
+                    base64Norm[index] = '/';
+            }
+
+            /* Keep adding '=' until the length is right. */
+            while (base64Norm.Length % 4 != 0)
+                base64Norm.Append('=');
+
+            /* Return normalized string. */
+            return base64Norm.ToString();
+        }
     }
 }

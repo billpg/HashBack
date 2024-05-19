@@ -5,6 +5,7 @@ using System.Text;
 using Newtonsoft.Json.Linq;
 using System.Threading.Tasks;
 using billpg.HashBackCore;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 
 namespace billpg.HashBackService
 {
@@ -17,6 +18,9 @@ namespace billpg.HashBackService
 
         internal static int? LoadOptionalInt(string key)
             => config[key]?.Value<int>();
+
+        internal static string? LoadOptionalString(string key)
+            => config[key]?.Value<string>();
 
         internal static int LoadRequiredInt(string key)
         {

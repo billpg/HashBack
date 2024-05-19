@@ -31,6 +31,8 @@ int port = ServiceConfig.LoadRequiredInt("ListenPort");
 /* Open a web service. */
 var app = WebApplication.Create();
 app.Urls.Add($"http://localhost:{port}");
+string rootUrlAsString = ServiceConfig.LoadOptionalString("RootUrl") ?? app.Urls.Single();
+Uri rootUrl = new Uri(rootUrlAsString);
 
 /* Redirect home page visits to the documentation. */
 string redirectHome = ServiceConfig.LoadRequiredString("RedirectHomeTo");
@@ -42,17 +44,23 @@ hashSvc.OnBadRequestException = ErrorHandler.BadRequestExceptionWithText;
 hashSvc.DocumentationUrl = ServiceConfig.LoadRequiredString("RedirectHashServiceTo");
 hashSvc.ConfigureHttpService(app, "/hashes");
 
+/* Configure the host lookup service. */
+var hostLookupSvc = new HostLookupService();
+
 /* Configure the download service. */
-var downloadSvc = new DownloadService();
-downloadSvc.RootUrl = app.Urls.Single();
-downloadSvc.OnDownloadError = ErrorHandler.BadRequestExceptionWithText;
-downloadSvc.AlwaysAllow = ServiceConfig.LoadStrings("AlwaysAllowDownload");
+var downloadSvc = new DownloadService
+{
+    RootUrl = rootUrl,
+    OnDownloadError = ErrorHandler.BadRequestExceptionWithText,
+    OnHostLookup = hostLookupSvc.Lookup,
+    AlwaysAllow = ServiceConfig.LoadStrings("AlwaysAllowDownload")
+};
 downloadSvc.ConfigureHttpService(app, "/allowDownload");
 
 /* Configure the issuer (3.0/3.1) demo. */
 var issuerSvc = new IssuerService();
 string redirectIssuerDemoDocs = ServiceConfig.LoadRequiredString("RedirectIssuerDemoTo");
-issuerSvc.RootUrl = app.Urls.Single();
+issuerSvc.RootUrl = rootUrlAsString;
 issuerSvc.DocumentationUrl = redirectIssuerDemoDocs;
 issuerSvc.OnBadRequest = ErrorHandler.BadRequestExceptionWithJson;
 issuerSvc.OnRetrieveVerificationHash = downloadSvc.HashDownload;
@@ -61,7 +69,7 @@ issuerSvc.ConfigureHttpService(app, "/issuer");
 /* Configure the Bearer Token (4.0) Service. */
 var bearerTokenSvc = new BearerTokenService
 {
-    RootUrl = app.Urls.Single(),
+    RootUrl = rootUrl,
     NowValidationMarginSeconds
         = ServiceConfig.LoadOptionalInt("NowValidationMarginSeconds") ?? 10,
     OnBadRequest = ErrorHandler.BadRequestExceptionWithText,

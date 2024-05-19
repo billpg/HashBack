@@ -153,15 +153,22 @@ namespace billpg.HashBackCore
 
         public static Response Run(
             Request req,
-            OnRetrieveErrorFn onRetrieveError,
+            OnErrorFn onRetrieveError,
             OnHostLookupFn onHostLookup,
             OnHostLookupCompletedFn? onHostLookupCompleted = null,
             OnTlsHandshakeCompletedFn? onTlsHandshakeCompleted = null)
         {
+            /* Don't allow an IP address host. */
+            if (IPAddress.TryParse(req.Url.Host, out _))
+                throw onRetrieveError("Host must not be an IP address.");
+
             /* Call the host lookup service for the IP. */
             IPAddress ip = onHostLookup(req.Url.Host);
             if (ip == IPAddress.None)
                 throw onRetrieveError("No such host at " + req.Url.Host);
+
+            /* Don't allow any bogon address unless the host is "localhost". */
+            if (req.Url.Host == "localhost" || ip.IsBogon())
 
             /* Coll the host-lookup-complete and allow it throw an exception. */
             onHostLookupCompleted?.Invoke(req.Url.Host, ip);

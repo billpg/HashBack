@@ -1,7 +1,16 @@
 {
-  "RootUrl": "http://localhost:3001",
+  "xRootUrl": "http://localhost:3001",
   "ListenPort": 3001,
   "NowValidationMarginSeconds": 999,
+  "AlwaysAllowDownload": [
+    "billpg.com",
+    "thesunsetlounge.co.uk",
+    "billpg.me.uk",
+    "bacchae.co.uk",
+    "hash.bacchae.co.uk",
+    "xn--8s9h.billpg.com",
+    "\uD83E\uDD89.billpg.com",
+  ],
   "RedirectHomeTo": "https://github.com/billpg/HashBack/blob/feat/DemoWebsite/Demo/Docs/Home.md",
   "RedirectHashServiceTo": "https://github.com/billpg/HashBack/blob/feat/DemoWebsite/Demo/Docs/Hashes.md",
   "RedirectIssuerDemoTo": "https://github.com/billpg/HashBack/blob/feat/DemoWebsite/Demo/Docs/IssuerDemo.md",
