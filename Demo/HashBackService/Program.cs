@@ -66,6 +66,16 @@ issuerSvc.OnBadRequest = ErrorHandler.BadRequestExceptionWithJson;
 issuerSvc.OnRetrieveVerificationHash = downloadSvc.HashDownload;
 issuerSvc.ConfigureHttpService(app, "/issuer");
 
+/* Configure the Authorization header (4.0) validation service. */
+var authHeaderSvc = new AuthorizationHeaderService
+{
+    RootUrl = rootUrl,
+    OnBadRequest = ErrorHandler.BadRequestExceptionWithText,   
+    OnRetrieveVerifyHash = downloadSvc.HashDownload,
+    OnReadClock = InternalTools.NowService,
+    ClockMarginSeconds = 999
+};
+
 /* Configure the Bearer Token (4.0) Service. */
 var bearerTokenSvc = new BearerTokenService
 {
@@ -73,12 +83,18 @@ var bearerTokenSvc = new BearerTokenService
     NowValidationMarginSeconds
         = ServiceConfig.LoadOptionalInt("NowValidationMarginSeconds") ?? 10,
     OnBadRequest = ErrorHandler.BadRequestExceptionWithText,
+    OnAuthorizationHeader = authHeaderSvc.Handle,
     OnReadClock = InternalTools.NowService,
     OnRetrieveVerifyHash = downloadSvc.HashDownload
 };
 bearerTokenSvc.ConfigureHttpService(app, "/bearerToken");
 
 #if false
+/* Configure the "Hello" Service, that also takes Hashback 4.0. */
+var helloSvc = new HelloService();
+helloSvc.RootUrl = rootUrl;
+
+
 /* Configure the token request service used by the caller demo. */
 var tokenRequesterSvc = new TokenRequesterService();
 

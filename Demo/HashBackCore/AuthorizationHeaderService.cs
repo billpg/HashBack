@@ -9,15 +9,26 @@ using System.Threading.Tasks;
 
 namespace billpg.HashBackCore
 {
-    internal class AuthorizationHeader
+    public class AuthorizationHeaderService
     {
-        internal static string Handle(
-            string authHeader,
+        public Uri RootUrl { get; set; } = null!;
+        public int ClockMarginSeconds { get; set; } = 10;
+        public int IssuedTokenLifespanSeconds { get; set; } = 1000;
+        public OnErrorFn OnBadRequest { get; set; }
+            = msg => throw new NotImplementedException();
+        public OnReadClockFn OnReadClock { get; set; }
+            = () => throw new NotImplementedException();
+        public OnRetrieveVerifyHashFn OnRetrieveVerifyHash { get; set; }
+            = url => throw new NotImplementedException();
+
+        public OnAuthorizationHeaderFn Handle => this.HandleInternal;
+        private string HandleInternal(
+            string authHeader/*,
             OnErrorFn OnBadRequest,
             OnRetrieveVerifyHashFn OnRetrieveVerifyHash,
             long serverNow,
             Uri rootUrl,
-            int clockMarginSeconds)
+            int clockMarginSeconds*/)
         {
             /* Parse the Authorization header. Must have at least two parts. */
             var authBySpace =
@@ -34,13 +45,14 @@ namespace billpg.HashBackCore
 
             /* Is this a HashBack or Bearer header? */
             if (authType == "HashBack")
-                return HashBack();
+                return HashBack(authPayload);
             else if (authType == "Bearer")
-                return Bearer();
+                return Bearer(authPayload);
             else
                 throw OnBadRequest("Unknown Authorization type.");
+        }
 
-            string HashBack()
+            string HashBack(string authPayload)
             {
                 /* Convert the payload from BASE-64 to bytes. */
                 var jsonAsBytes = ParseBase64OrNull(authPayload);
@@ -56,15 +68,16 @@ namespace billpg.HashBackCore
                 string? authHost = authJson["Host"]?.Value<string>();
                 if (authHost == null)
                     throw OnBadRequest("Missing Host property in JSON.");
-                if (authHost != rootUrl.Host)
-                    throw OnBadRequest("Wrong Host property in JSON. Expected=" + rootUrl.Host);
+                if (authHost != RootUrl.Host)
+                    throw OnBadRequest("Wrong Host property in JSON. Expected=" + RootUrl.Host);
 
                 /* Check the Now property. */
+                long serverNow = OnReadClock();
                 long? clientNow = authJson["Now"]?.Value<long>();
                 if (clientNow == null)
                     throw OnBadRequest("Missing Now property in JSON.");
-                if (clientNow < serverNow - clockMarginSeconds ||
-                    clientNow > serverNow + clockMarginSeconds)
+                if (clientNow < serverNow - ClockMarginSeconds ||
+                    clientNow > serverNow + ClockMarginSeconds)
                     throw OnBadRequest("Now property is too far from now. Expected=" + serverNow);
 
                 /* Check Unus. */
@@ -108,11 +121,11 @@ namespace billpg.HashBackCore
                 return verifyAsUrl.Host;
             }
 
-            string Bearer()
+            string Bearer(string authPayload)
             {
                 return "woo";
             }
-        }
+        
 
         private static IList<byte>? ParseBase64OrNull(string payload)
         {

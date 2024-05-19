@@ -14,4 +14,5 @@ namespace billpg.HashBackCore
     public delegate IPAddress OnHostLookupFn(string host);
     public delegate void OnHostLookupCompletedFn(string host, IPAddress ip);
     public delegate void OnTlsHandshakeCompletedFn(string host, X509Certificate2 tlsCertificate);
+    public delegate string OnAuthorizationHeaderFn(string authHeader);
 }
