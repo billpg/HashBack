@@ -74,7 +74,7 @@ namespace billpg.HashBackCore
                 throw OnDownloadError("Requested URL must be 443.");
 
             /* Check the domain is part of the allowed list.
-             * TODO: Wrie a way for the public to add themselves. */
+             * TODO: Write a way for the public to add themselves. */
             if (this.AlwaysAllow.Contains(url.Host) == false)
                 throw OnDownloadError(
                     $"The host {url.Host} is not on the list of allowed domains.\r\n"
