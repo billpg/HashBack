@@ -22,13 +22,7 @@ namespace billpg.HashBackCore
             = url => throw new NotImplementedException();
 
         public OnAuthorizationHeaderFn Handle => this.HandleInternal;
-        private string HandleInternal(
-            string authHeader/*,
-            OnErrorFn OnBadRequest,
-            OnRetrieveVerifyHashFn OnRetrieveVerifyHash,
-            long serverNow,
-            Uri rootUrl,
-            int clockMarginSeconds*/)
+        private (string subject, long serverNow) HandleInternal(string authHeader)
         {
             /* Parse the Authorization header. Must have at least two parts. */
             var authBySpace =
@@ -45,14 +39,14 @@ namespace billpg.HashBackCore
 
             /* Is this a HashBack or Bearer header? */
             if (authType == "HashBack")
-                return HashBack(authPayload);
+                return ParseHashBackAuthHeader(authPayload);
             else if (authType == "Bearer")
-                return Bearer(authPayload);
+                return ValidateJWT(authPayload);
             else
                 throw OnBadRequest("Unknown Authorization type.");
         }
 
-            string HashBack(string authPayload)
+        (string subject, long serverNow) ParseHashBackAuthHeader(string authPayload)
             {
                 /* Convert the payload from BASE-64 to bytes. */
                 var jsonAsBytes = ParseBase64OrNull(authPayload);
@@ -118,14 +112,64 @@ namespace billpg.HashBackCore
                     throw OnBadRequest("Downloaded verification hash did not match the expected hash.");
 
                 /* They matched. Return the verified caller's domain. */
-                return verifyAsUrl.Host;
-            }
+            return (verifyAsUrl.Host, serverNow);
+        }
 
-            string Bearer(string authPayload)
-            {
-                return "woo";
-            }
-        
+        (string subject, long serverNow) ValidateJWT(string jwt)
+        {
+            /* Resuable error message for a bad bearer-token. */
+            const string notValidError = "Bearer token is not valid.";
+
+            /* JWT must be in three dot-separated parts. */
+            string[] jwtByDot = jwt.Split('.');
+            if (jwtByDot.Length != 3)
+                throw OnBadRequest(notValidError);
+
+            /* Find the expected signature by hashing the header and body. */
+            var expectedSignature = JWT.Sign(jwtByDot[0] + "." + jwtByDot[1]);
+
+            /* Reject if the supplied signature doesn't match. */
+            if (jwtByDot[2] != expectedSignature)
+                throw OnBadRequest(notValidError);
+
+            /* Parse the header and body. */
+            JObject? headerAsJson = ParseBase64AsJsonOrNull(jwtByDot[0]);
+            JObject? bodyAsJson = ParseBase64AsJsonOrNull(jwtByDot[1]);
+            if (headerAsJson == null || bodyAsJson == null)
+                throw OnBadRequest(notValidError);
+
+            /* Check the expiry. */
+            long? expiresAt = bodyAsJson["exp"]?.Value<long>();
+            if (expiresAt == null)
+                throw OnBadRequest(notValidError);
+            long serverNow = this.OnReadClock();
+            if (serverNow > expiresAt)
+                throw OnBadRequest("Bearer token has expired.");
+
+            /* Check the "aud" claim matches our root url. */
+            var audience = bodyAsJson["aud"]?.Value<string>();
+            if (audience == null || audience != RootUrl.Host)
+                throw OnBadRequest(notValidError);
+
+            /* Pull out the "sub" claim. */
+            var subject = bodyAsJson["sub"]?.Value<string>();
+            if (subject == null)
+                throw OnBadRequest(notValidError);
+
+            /* Return validated subject claim. */
+            return (subject, serverNow);
+        }
+
+        private static JObject? ParseBase64AsJsonOrNull(string payload)
+        {
+            /* First decode BASE-64 to bytes. */
+            var payloadAsBytes = ParseBase64OrNull(payload);
+            if (payloadAsBytes == null)
+                return null;
+
+            /* Parse bytes as JSON. Will return null if not valid. */
+            return ParseJsonOrNull(payloadAsBytes);
+        }
 
         private static IList<byte>? ParseBase64OrNull(string payload)
         {

@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using static billpg.HashBackCore.InternalTools;
@@ -145,7 +146,7 @@ namespace billpg.HashBackCore
 
             /* Build a JWT. */
             long expiresAt = ourNow + 3600;
-            string jwt = BuildJWT(issuerUrl.Host, verifyUrl.Host, ourNow, expiresAt);
+            string jwt = JWT.Build(issuerUrl.Host, verifyUrl.Host, ourNow, expiresAt);
 
             /* Return based on the requested response type. */
             if (typeOfResponse == TypeOfResponse.BearerToken)
@@ -199,51 +200,6 @@ namespace billpg.HashBackCore
             return true;
         }
 
-        internal static string BuildJWT(string issuer, string subject, long issuedAt, long expiresAt)
-        {
-            /* Build the header and body from the supplied values. */
-            var jwtHeader = new JObject
-            {
-                ["typ"] = "JWT",
-                ["alg"] = "HS256",
-                [Char.ConvertFromUtf32(0x1F95A)] = "https://billpg.com/nggyu"
-            };
-            var jwtBody = new JObject
-            {
-                ["iss"] = issuer,
-                ["sub"] = subject,
-                ["iat"] = issuedAt,
-                ["exp"] = expiresAt,
-                ["this-token-is-trustworthy"] = false
-            };
-
-            /* Encode the header and body. */
-            string jwtHeaderDotBody = JWTEncode(jwtHeader) + "." + JWTEncode(jwtBody);
-
-            /* Sign the header and body with HMAC. */
-            using var hmac = new System.Security.Cryptography.HMACSHA256();
-            hmac.Key = Encoding.ASCII.GetBytes("your-256-bit-secret");
-            var hash = hmac.ComputeHash(Encoding.ASCII.GetBytes(jwtHeaderDotBody));
-
-            /* Return completed token. */
-            return jwtHeaderDotBody + "." + JWTEncode(hash);
-        }
-
-        private static string JWTEncode(JObject json)
-        {
-            string jsonAsString = json.ToStringOneLine();
-            byte[] jsonAsBytes = Encoding.UTF8.GetBytes(jsonAsString);
-            return JWTEncode(jsonAsBytes);
-        }
-
-        private static string JWTEncode(IList<byte> byteBlock)
-        {
-            return
-                Convert.ToBase64String(byteBlock.ToArray())
-                .Replace('+', '-')
-                .Replace('/', '_')
-                .TrimEnd('=');
-        }
     }
 }
 

@@ -19,7 +19,7 @@ verification_hash_url = "http://localhost:3001/hashes"
 print(f"Verifcation Hash URL: {verification_hash_url}")
 
 # Request without an Authrization header.
-bearer_token_service_url = "http://localhost:3001/bearerToken"
+bearer_token_service_url = "http://localhost:3001/tokens"
 unauth_resp = requests.get(bearer_token_service_url)
 print(unauth_resp.status_code)
 print(unauth_resp.headers)
@@ -32,7 +32,7 @@ auth_header_json = {
     "Now": time_ns() // (1000 * 1000 * 1000),
     "Unus": str(base64.b64encode(os.urandom(256 // 8)), "ascii"),
     "Rounds": 1,
-    "Verify": f"{verification_hash_url}?ID={hash_id}"
+    "Verify": f"{verification_hash_url}?ID={hash_id}",
 }
 
 # Convert the auth header JSON into bytes.
@@ -66,10 +66,26 @@ if store_auth_hash_resp.status_code != 200:
     exit()
 
 # Send request.
-auth_response = requests.get(bearer_token_service_url, headers={"Authorization": auth_header})
-print(auth_response.status_code)
-print(auth_response.headers)
-print(auth_response.content)
+auth_response = requests.get(
+    bearer_token_service_url, headers={"Authorization": auth_header}
+)
+if auth_response.status_code != 200:
+    print(f"Hash Service failure. Status={auth_response.status_code}")
+    print(auth_response.content)
+    exit()
+temporal_bearer_token = auth_response.json()["BearerToken"]
+print(f"Token: {temporal_bearer_token}")
+
+# Use bearer token.
+hello_service_url = "http://localhost:3001/hello"
+hello_response = requests.get(
+    hello_service_url, headers={"Authorization": f"Bearer {temporal_bearer_token}"}
+)
+if hello_response.status_code != 200:
+    print(f"Hello Service failure. Status={hello_response.status_code}")
+    print(hello_response.content)
+    exit()
+print(hello_response.content)
 
 exit()
 
@@ -155,7 +171,9 @@ for type_of_response in ["BearerToken", "JWT", "204SetCookie"]:
         print("HashBack Issuer Service response:")
         response_as_json = hashback_resp.json()
         for response_property_name in response_as_json:
-            print(f"  {response_property_name} = {response_as_json[response_property_name]}")
+            print(
+                f"  {response_property_name} = {response_as_json[response_property_name]}"
+            )
 
     if type_of_response == "JWT":
         print(f"JWT: {hashback_resp.json()}")

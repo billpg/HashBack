@@ -32,34 +32,30 @@ namespace billpg.HashBackCore
         }
 
         private IResult GetHandler(
-            [FromHeader(Name = "Authorization")] string? authHeader,
-            [FromHeader(Name = "Accept")] string? acceptHeader,
-            HttpContext context)
+            HttpContext context,
+            [FromHeader(Name = "Authorization")] string? authHeader)
         {
             /* Respond to queries without an Authorizaton header with a 401. */
             if (string.IsNullOrEmpty(authHeader))
-            {
-                context.Response.Headers.Append("WWW-Authenticate", "HashBack");
-                return Results.Text(content: "Missing Authorization header.", statusCode: 401);
-            }
-
-            /* If Accept header is missing, add default. */
-            if (string.IsNullOrEmpty(acceptHeader))
-                acceptHeader = "text/plain";
-
-            /* Pull out the remote IP and check block-list. */
-            IPAddress remoteIp = context.RemoteIP();
-            //TODO: Check the block list.
+                return Set401Response(context);
 
             /* Handle the Authorization header. This will either throw or return the 
              * validated subject. */
-            long serverNow = OnReadClock();
-            string validatedVerifyDomain = OnAuthorizationHeader(authHeader);
+            (string subject, long serverNow) = OnAuthorizationHeader(authHeader);
 
             /* They match. Return an issued bearer token. */
             long expiresAt = serverNow + IssuedTokenLifespanSeconds;
-            string jwt = IssuerService.BuildJWT(RootUrl.Host, validatedVerifyDomain, serverNow, expiresAt);
+            string jwt = JWT.Build(RootUrl.Host, subject, serverNow, expiresAt);
             return IssuerService.IssueBearerTokenResult(serverNow, expiresAt, jwt);
+        }
+
+        internal static IResult Set401Response(HttpContext context)
+        {
+            context.Response.Headers.Append("WWW-Authenticate", "HashBack");
+            context.Response.Headers.Append("WWW-Authenticate", "Bearer");
+            return Results.Text(
+                content: "Missing Authorization header.",
+                statusCode: 401);
         }
     }
 }

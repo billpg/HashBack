@@ -55,7 +55,7 @@ var downloadSvc = new DownloadService
     OnHostLookup = hostLookupSvc.Lookup,
     AlwaysAllow = ServiceConfig.LoadStrings("AlwaysAllowDownload")
 };
-downloadSvc.ConfigureHttpService(app, "/allowDownload");
+//downloadSvc.ConfigureHttpService(app, "/allowDownload");
 
 /* Configure the issuer (3.0/3.1) demo. */
 var issuerSvc = new IssuerService();
@@ -87,14 +87,16 @@ var bearerTokenSvc = new BearerTokenService
     OnReadClock = InternalTools.NowService,
     OnRetrieveVerifyHash = downloadSvc.HashDownload
 };
-bearerTokenSvc.ConfigureHttpService(app, "/bearerToken");
+bearerTokenSvc.ConfigureHttpService(app, "/tokens");
 
-#if false
 /* Configure the "Hello" Service, that also takes Hashback 4.0. */
 var helloSvc = new HelloService();
 helloSvc.RootUrl = rootUrl;
+helloSvc.OnAuthorizationHeader = authHeaderSvc.Handle;
+helloSvc.ConfigureHttpService(app, "/hello");
 
 
+#if false
 /* Configure the token request service used by the caller demo. */
 var tokenRequesterSvc = new TokenRequesterService();
 
