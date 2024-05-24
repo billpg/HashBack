@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Server.HttpSys;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -57,13 +58,6 @@ namespace HashBackCore_Tests
                 VerifyUrl = "https://caller.invalid/123.txt"
             };
 
-            /* Set the expected JWT response to come out. */
-            string expectedJwt =
-                "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJ0ZXN0LmludmF" +
-                "saWQiLCJzdWIiOiJjYWxsZXIuaW52YWxpZCIsImlhdCI6NTAwMDAwMTAwMCw" +
-                "iZXhwIjo1MDAwMDA0NjAwLCJ0aGlzLXRva2VuLWlzLXRydXN0d29ydGh5Ijp" +
-                "mYWxzZX0.Ud8MHfPHEKvfJAHX7HUIcWmxA1zmHYpIQpaUk8XexZA";
-
             /* Set up the IssuerService with a hash-downloader that returns the 
              * expected hash for the above request body. */
             var svc = NewIssuerService(expectedHash);
@@ -81,7 +75,8 @@ namespace HashBackCore_Tests
                 NoContent? noContentResp = resp as NoContent;
                 Assert.IsNotNull(noContentResp);
                 Assert.AreEqual(204, noContentResp.StatusCode);
-                mockContext.AssertResponseCookieSet("HashBack", expectedJwt);
+                string? cookieValue = mockContext.GetCookieAdded("HashBack");
+                AssertJwt(cookieValue);
                 return;
             }
 
@@ -98,7 +93,7 @@ namespace HashBackCore_Tests
                 long expiresAt = (long)TestCommon.GetPublicPropertyValue(respValue, "ExpiresAt").AssertNotNull();
 
                 /* Test response values. */
-                Assert.AreEqual(expectedJwt, bearerToken);
+                AssertJwt(bearerToken);
                 Assert.AreEqual(5000001000, issuedAt);
                 Assert.AreEqual(5000004600, expiresAt);
             }
@@ -106,8 +101,43 @@ namespace HashBackCore_Tests
             /* Test per the requirements of a JWT response. */
             if (responseType == "JWT")
             {
-                Assert.AreEqual(expectedJwt, respValue);
+                AssertJwt(respValue as string);
             }
+        }
+
+        private void AssertJwt(string? jwt)
+        {
+            /* Check basic characteristics. */
+            Assert.IsNotNull(jwt);
+
+            /* Split the JWt into three parts. */
+            var jwtByDot = jwt.Split('.');
+            Assert.AreEqual(3, jwtByDot.Length);
+
+            /* The first part is fixed. */
+            Assert.AreEqual(
+                "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIvCfp" +
+                "ZoiOiJodHRwczovL2JpbGxwZy5jb20vbmdneXUifQ", 
+                jwtByDot[0]);
+
+            /* Parse second part (with a varying UUID) back into JSON. */
+            JObject jwtAsJson = JObject.Parse(
+                Encoding.ASCII.GetString(Convert.FromBase64String(jwtByDot[1])));
+
+            /* Check the UUID is a valid one and replace it with a fixed one. */
+            var jti = jwtAsJson["jti"]?.Value<string>();
+            Assert.IsNotNull(jti);
+            try { new Guid(jti); } catch { Assert.Fail("jti property is not a valid UUID."); }
+            jwtAsJson["jti"] = "";
+
+            /* Check the middle (with the varying part now fixed) is as expected. */
+            Assert.AreEqual(
+                "{_jti_:__,_sub_:_caller.invalid_,_iss_:_test.invalid_,_aud_:" +
+                "_test.invalid_,_iat_:5000001000,_nbf_:5000000999,_exp_:5000004600}", 
+                jwtAsJson.ToStringOneLine().Replace('\"', '_'));
+
+            /* The signature is a fixed length. */
+            Assert.AreEqual(43, jwtByDot[2].Length);
         }
     }
 }

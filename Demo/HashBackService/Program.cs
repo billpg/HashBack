@@ -80,12 +80,8 @@ var authHeaderSvc = new AuthorizationHeaderService
 var bearerTokenSvc = new BearerTokenService
 {
     RootUrl = rootUrl,
-    NowValidationMarginSeconds
-        = ServiceConfig.LoadOptionalInt("NowValidationMarginSeconds") ?? 10,
-    OnBadRequest = ErrorHandler.BadRequestExceptionWithText,
-    OnAuthorizationHeader = authHeaderSvc.Handle,
-    OnReadClock = InternalTools.NowService,
-    OnRetrieveVerifyHash = downloadSvc.HashDownload
+    TokenExpirySeconds = 999,
+    OnAuthorizationHeader = authHeaderSvc.Handle
 };
 bearerTokenSvc.ConfigureHttpService(app, "/tokens");
 

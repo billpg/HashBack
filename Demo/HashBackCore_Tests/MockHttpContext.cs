@@ -87,10 +87,7 @@ namespace HashBackCore_Tests
             Assert.AreEqual(expectedValue, headerValues.Single());
         }
 
-        public void AssertResponseCookieSet(string name, string expectedValue)
-        {
-            var cookieValue = this.ResponseCookies.Data.GetValueOrDefault(name);
-            Assert.AreEqual(expectedValue, cookieValue);
-        }
+        public string? GetCookieAdded(string name)
+            => this.ResponseCookies.Data.GetValueOrDefault(name);        
     }
 }

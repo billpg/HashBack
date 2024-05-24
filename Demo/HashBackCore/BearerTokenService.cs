@@ -15,14 +15,7 @@ namespace billpg.HashBackCore
     public class BearerTokenService
     {
         public Uri RootUrl { get; set; } = null!;
-        public int NowValidationMarginSeconds { get; set; } = 10;
-        public int IssuedTokenLifespanSeconds { get; set; } = 1000;
-        public OnErrorFn OnBadRequest { get; set; }
-            = msg => throw new NotImplementedException();
-        public OnReadClockFn OnReadClock { get; set; }
-            = () => throw new NotImplementedException();
-        public OnRetrieveVerifyHashFn OnRetrieveVerifyHash { get; set; }
-            = url => throw new NotImplementedException();
+        public int TokenExpirySeconds { get; set; } = 999;
         public OnAuthorizationHeaderFn OnAuthorizationHeader { get; set; }
             = header => throw new NotImplementedException();
 
@@ -44,7 +37,7 @@ namespace billpg.HashBackCore
             (string subject, long serverNow) = OnAuthorizationHeader(authHeader);
 
             /* They match. Return an issued bearer token. */
-            long expiresAt = serverNow + IssuedTokenLifespanSeconds;
+            long expiresAt = serverNow + TokenExpirySeconds;
             string jwt = JWT.Build(RootUrl.Host, subject, serverNow, expiresAt);
             return IssuerService.IssueBearerTokenResult(serverNow, expiresAt, jwt);
         }

@@ -49,7 +49,18 @@ namespace HashBackCore_Tests
 
         [TestMethod]
         public void HashService_RoundTrip()
+            => RoundTripInternal(trimEqualsOnAdd: false);
+
+        [TestMethod]
+        public void HashService_RoundTrip_NoEqualsOnAdd()
+            => RoundTripInternal(trimEqualsOnAdd: true);
+
+        private void RoundTripInternal(bool trimEqualsOnAdd)
         {
+            /* Function to trim the equals from the end of a string. */
+            string TrimEquals(string withEquals)
+                => trimEqualsOnAdd ? withEquals.TrimEnd('=') : withEquals;
+
             /* Start new hash service object. */
             HashService svc = BuildService();
 
@@ -60,7 +71,7 @@ namespace HashBackCore_Tests
             var mockContextForAdd = new MockHttpContext(useClientIP: ipForAdd);
             object? addHashReturn = AddHashMethodInfo.Invoke(
                 svc, 
-                [new AddHashRequestBody { ID = id.ToString(), Hash = hashAdded },
+                [new AddHashRequestBody { ID = id.ToString(), Hash = TrimEquals(hashAdded)},
                 mockContextForAdd.Context]);
             Assert.IsInstanceOfType(addHashReturn, typeof(string));
             string addHashResponse = (addHashReturn as string).AssertNotNull();
@@ -149,13 +160,6 @@ namespace HashBackCore_Tests
             => HashService_AddHashError_Internal(
                 $"{Guid.NewGuid()}",
                 "",
-                "Hash must be 256 bits of BASE64.");
-
-        [TestMethod]
-        public void HashService_AddHash_BadHash_NoEquals()
-            => HashService_AddHashError_Internal(
-                $"{Guid.NewGuid()}",
-                CryptoExtensions.GenerateUnus().TrimEnd('='),
                 "Hash must be 256 bits of BASE64.");
 
         [TestMethod]

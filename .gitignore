@@ -2,3 +2,6 @@
 .vs
 bin
 obj
+/Demo/PythonDemoClient/Lib
+/Demo/PythonDemoClient/Scripts
+Demo/PythonDemoClient/pyvenv.cfg
