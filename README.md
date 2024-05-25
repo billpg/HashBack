@@ -4,6 +4,8 @@ A web authentication exchange where a caller proves their identity by publishing
 This version of the document is a **public-draft** for review and discussion tagged as `HASHBACK-PUBLIC-DRAFT-3-1`.
 If you have any comments or notes, please open an issue on this project's public github.
 
+[A draft version 4.0 is under development.](https://github.com/billpg/HashBack/tree/draft_4.0)
+
 This document is Copyright William Godfrey, 2024. You may use its contents under the terms of the Creative-Commons Attribution license.
 
 ## The elevator pitch.
