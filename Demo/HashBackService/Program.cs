@@ -109,6 +109,12 @@ callerSvc.ConfigureHttpService(app, "/caller");
 /* Set up the custom error handler. */
 app.Use(async (context, next) =>
 {
+    IPAddress xForwardedFor = context.RemoteIP();
+    if (xForwardedFor.ToString() != "2a00:23c6:550a:4001:2c5c:41e5:db3b:d518")
+    {
+
+    }
+
     try { await next(context); }
     catch (Exception ex)
     { ErrorHandler.Handle(ex, context); }

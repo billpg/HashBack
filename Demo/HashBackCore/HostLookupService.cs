@@ -34,10 +34,10 @@ namespace billpg.HashBackCore
         {
             /* Perform the DNS lookup. Note that this function does the right thing with 
              * IDN domains. Also note that the OS will cache responses so we don't have to. */
-            IPAddress[] addrs;
+            List<IPAddress> addrs;
             try
             {
-                addrs = Dns.GetHostAddresses(host);
+                addrs = Dns.GetHostAddresses(host).ToList();
             }
             /* Catch only NXDOMAIN responses and return "None" for this error only. */
             catch (SocketException ex) when (ex.SocketErrorCode == SocketError.HostNotFound)
@@ -45,12 +45,18 @@ namespace billpg.HashBackCore
                 return IPAddress.None;
             }
 
+            /* If there are a mixture of IPv4 and IPv6, delete the IPv4s. */
+            static bool IsIPv4(IPAddress ip) => ip.AddressFamily == AddressFamily.InterNetwork;
+            static bool IsIPv6(IPAddress ip) => ip.AddressFamily == AddressFamily.InterNetworkV6;
+            if (addrs.Any(IsIPv4) && addrs.Any(IsIPv6))
+                addrs.RemoveAll(IsIPv4);
+
             /* Handle simple zero and one cases. */
-            if (addrs.Length == 0) return IPAddress.None;
-            if (addrs.Length == 1) return addrs[0];
+            if (addrs.Count == 0) return IPAddress.None;
+            if (addrs.Count == 1) return addrs[0];
 
             /* If multiple addresses, pick one based on the rotating counter. */
-            return addrs[multipleOptionSelector(addrs.Length)];
+            return addrs[multipleOptionSelector(addrs.Count)];
         }
     }
 }

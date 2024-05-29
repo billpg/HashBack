@@ -108,7 +108,8 @@ namespace billpg.HashBackCore
                 AppendAscii($"{this.Method} {this.Url.PathAndQuery} HTTP/1.1");
 
                 /* Our headers. */
-                AppendAscii($"Host: {this.Url.Host}");
+                var idn = new System.Globalization.IdnMapping();
+                AppendAscii($"Host: {idn.GetAscii(this.Url.Host)}");
                 AppendAscii("Connection: close" );
                 AppendAscii("Accept-Encoding: identity");
                 AppendAscii(

@@ -23,7 +23,7 @@ namespace billpg.HashBackCore
                 ["jti"] = Guid.NewGuid().ToString(),
                 ["sub"] = subject,
                 ["iss"] = issuer,
-                ["aud"] = issuer,
+                //["aud"] = issuer,
                 ["iat"] = issuedAt,
                 ["nbf"] = issuedAt - 1,
                 ["exp"] = expiresAt
@@ -63,7 +63,7 @@ namespace billpg.HashBackCore
             {
                 /* Replace the + amd / with JWT's equivalents. */
                 var atIndex = base64[i];
-                if (atIndex == '-') 
+                if (atIndex == '+') 
                     base64[i] = '-';
                 if (atIndex == '/') 
                     base64[i] = '_';
