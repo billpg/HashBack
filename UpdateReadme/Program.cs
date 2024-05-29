@@ -89,6 +89,7 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
 
     /* Build request JSON. */
     var requestJson = new JObject();
+    requestJson["Version"] = "BILLPG_DRAFT_4.0";
     requestJson["Host"] = hostDomainName;
     requestJson["Now"] = UnixTime(now);
     requestJson["Unus"] = GenerateUnus(keyBase);

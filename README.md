@@ -36,6 +36,9 @@ Authorization: HashBack (BASE64 encoded JSON)
 
 The BASE64 encoded block must be a single string with no spaces or end-of-line characters and must include the trailing `=` characters per the rules of BASE64. (The examples in this document split the string into multiple lines for clarity.) The bytes inside the BASE64 block are the UTF-8 representation of a JSON object with the properties listed below. All are required and the values are string type unless otherwise noted.
 
+- `Version`
+  - A string indicating the version of this exchange in use.
+  - This version is indicated by the string `"BILLPG_DRAFT_4.0"`.
 - `Host`
   - The full domain name of the server being called in this request.
   - Because load balancers and CDN systems might modify the `Host:` header, a copy is included here so there's no doubt exactly which string was used in the verification hash.
@@ -61,6 +64,7 @@ If either or both of the two properties that include domain names (`Host` and `V
 For example:<!--1066_EXAMPLE_REQUEST-->
 ```
 {
+    "Version": "BILLPG_DRAFT_4.0",
     "Host": "server.example",
     "Now": 529297200,
     "Unus": "iZ5kWQaBRd3EaMtJpC4AS40JzfFgSepLpvPxMTAbt6w=",
@@ -71,10 +75,11 @@ For example:<!--1066_EXAMPLE_REQUEST-->
 This JSON string is BASE64 encoded and added to the end of the `Authorization:` header.<!--1066_EXAMPLE_AUTH_HEADER-->
 ```
 Authorization: HashBack
- eyJIb3N0Ijoic2VydmVyLmV4YW1wbGUiLCJOb3ciOjUyOTI5NzIwMCwiVW51cyI6ImlaNWtXUWFC
- UmQzRWFNdEpwQzRBUzQwSnpmRmdTZXBMcHZQeE1UQWJ0Nnc9IiwiUm91bmRzIjoxLCJWZXJpZnki
- OiJodHRwczovL2NsaWVudC5leGFtcGxlL2hhc2hiYWNrX2ZpbGVzL215X2pzb25faGFzaC50eHQi
- LCLwn6WaIjoiaHR0cHM6Ly9iaWxscGcuY29tL25nZ3l1In0=
+ eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMCIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v
+ dyI6NTI5Mjk3MjAwLCJVbnVzIjoiaVo1a1dRYUJSZDNFYU10SnBDNEFTNDBKemZGZ1NlcExwdlB4
+ TVRBYnQ2dz0iLCJSb3VuZHMiOjEsIlZlcmlmeSI6Imh0dHBzOi8vY2xpZW50LmV4YW1wbGUvaGFz
+ aGJhY2tfZmlsZXMvbXlfanNvbl9oYXNoLnR4dCIsIvCfpZoiOiJodHRwczovL2JpbGxwZy5jb20v
+ bmdneXUifQ==
 ```
 
 ### Verification Hash Calculation and Publication
@@ -106,7 +111,7 @@ The fixed salt is used to ensure that a valid hash is only meaningful in light o
 Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The text file itself must be one line with the BASE-64 encoded hash in ASCII as that only line. The file must either be exactly 44 bytes long with no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence.
 
 The expected hash of the above example is: 
-- `8p5svUN2HUM47jy7TEe3MsVmQljQncXnsn+daEsO1aY=`<!--1066_EXAMPLE_HASH-->
+- `9Qe9cXJ7AAzfnByI7JnWC70l9W+KB7wFOZEjXHZ33kY=`<!--1066_EXAMPLE_HASH-->
 
 Once the service has downloaded that verification hash, it should compare it against the result of hashing the bytes inside the BASE64 block. If the two hashes match, the server may be reassured that the client is indeed the user identified by the URL from where the hash was downloaded and proceed to process the remainder of the request.
 
@@ -143,9 +148,10 @@ For example: <!--BEARER_AUTH_HEADER-->
 GET /api/bearer_token HTTP/1.1
 Host: issuer.example
 Authorization: HashBack
- eyJIb3N0IjoiYmVhcmVyLXRva2VuLWlzc3Vlci5leGFtcGxlIiwiTm93Ijo2ODI3MTg1MjAsIlVu
- dXMiOiJKQUxpQ3l6QWp6VTZCQ1B5N0NvenU3TVBWSWRpR1FZaTdra256QnF3MnZ3PSIsIlJvdW5k
- cyI6MSwiVmVyaWZ5IjoiaHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9oYi8zNzYzNTgudHh0In0=
+ eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMCIsIkhvc3QiOiJiZWFyZXItdG9rZW4taXNzdWVy
+ LmV4YW1wbGUiLCJOb3ciOjY4MjcxODUyMCwiVW51cyI6IkpBTGlDeXpBanpVNkJDUHk3Q296dTdN
+ UFZJZGlHUVlpN2trbnpCcXcydnc9IiwiUm91bmRzIjoxLCJWZXJpZnkiOiJodHRwczovL2NsaWVu
+ dC5leGFtcGxlL2hiLzM3NjM1OC50eHQifQ==
 Accept: application/temporal-bearer-token+json
 ```
 
@@ -185,6 +191,7 @@ Content-Type: application/temporal-bearer-token+json
 Time passes and Carol needs to make a request to the Rutabaga Company API and needs a Bearer token. Her code builds a JSON object in memory:<!--CASE_STUDY_REQUEST-->
 ```
 {
+    "Version": "BILLPG_DRAFT_4.0",
     "Host": "rutabaga.example",
     "Now": 1111863600,
     "Unus": "TmDFGekvQ+CRgANj9QPZQtBnF077gAc4AeRASFSDXo8=",
@@ -194,7 +201,7 @@ Time passes and Carol needs to make a request to the Rutabaga Company API and ne
 ```
 
 The code calculates the verification hash from this JSON using the process outlined above. The result of hashing the above example request is:
-- `6p16Icq2ws+Qoh7OqtZCvhupP45W0MV2n4At1yC0+fE=`<!--CASE_STUDY_HASH-->
+- `1kL3PhDiiPLu+uUmVrz6GTJ5dpIRmvEOENem1dwx3yg=`<!--CASE_STUDY_HASH-->
 
 To complete the GET request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows.<!--CASE_STUDY_AUTH_HEADER-->
 ```
@@ -202,9 +209,10 @@ GET /api/bearer-token HTTP/1.1
 Host: rutabaga.example
 User-Agent: Carol's Magnificent Application Server.
 Authorization: HashBack
- eyJIb3N0IjoicnV0YWJhZ2EuZXhhbXBsZSIsIk5vdyI6MTExMTg2MzYwMCwiVW51cyI6IlRtREZH
- ZWt2UStDUmdBTmo5UVBaUXRCbkYwNzdnQWM0QWVSQVNGU0RYbzg9IiwiUm91bmRzIjoxLCJWZXJp
- ZnkiOiJodHRwczovL2Nhcm9sLmV4YW1wbGUvaGFzaGJhY2svNjQ5NjE4NTkudHh0In0=
+ eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMCIsIkhvc3QiOiJydXRhYmFnYS5leGFtcGxlIiwi
+ Tm93IjoxMTExODYzNjAwLCJVbnVzIjoiVG1ERkdla3ZRK0NSZ0FOajlRUFpRdEJuRjA3N2dBYzRB
+ ZVJBU0ZTRFhvOD0iLCJSb3VuZHMiOjEsIlZlcmlmeSI6Imh0dHBzOi8vY2Fyb2wuZXhhbXBsZS9o
+ YXNoYmFjay82NDk2MTg1OS50eHQifQ==
 Accept: application/temporal-bearer-token+json
 
 ```
