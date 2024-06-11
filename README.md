@@ -20,15 +20,27 @@ Did you notice what **didn't** happen? No-one needed a password, cryptographic t
 
 While a recipient of a call *can't* be certain who a caller is, the caller *can* be certain of who they are calling. By both parties calling each other, both can be reassured of each other's identity.
 
-Now apply that thought to web authentication. The client can be sure (thanks to TLS) who the server is, but the server can't be sure who the client is, much like the analogy with phone calls. This document describes how the same "call me back" step could be used to authenticate a web API request. 
+Now apply that thought to web authentication. The client can be sure (thanks to TLS) who the server is, but the server can't be sure who the client is, much like the analogy with phone calls. This document describes how the same "call me back" step could be used to authenticate a web API request.
+
+## What is the problem this is meant to fix?
+
+If you're running a service out in the cloud which interacts with an external service, you probably have cryptographic keys or a password or token squirreled away somewhere. This is probably encrypted or stored in a purpose built repository of secret keys and tokens. Either way, your code will need to unlock that material whenever it needs to interact with that external service.
+
+This repository of secrets will need to be managed. The service won't be able to manage these things for itself because it'll need to identify itself to the service that issues these tokens, moving the problem one layer away without eliminating the problem itself. Either that or you make the decision that these secret tokens stay valid for long periods of time.
+
+Repositories of secret tokens or keys. They have to be so secure that passers by can't access them, but so available that your code running in cloud can. 
 
 ## The Exchange
 In a nutshell, a client proves their identity by publishing a small text file on their TLS-secured website. The server downloads that file and thanks to TLS, is reassured that the client is indeed someone who is in control of that website.
 
 To add a little more detail, the client builds a request header with a claim for authentication. That request header is itself hashed and the hash result is published on the client's website. To complete the loop, the server gets that text file in its own separate transaction. Once the server can confirm that the hash published on the client's website matches its own calculated hash for the request header, the server passes the request.
 
-### The Authorization header
+### Ahead of time.
+Before any of this can take place, the client's administrator (in their administrator role) will need to affirm to the remote server exactly what range of URLs the client has sole control over and wishes to use for HashBack authentication. Ideally, this would be a single fixed URL with a single query string parameter as only variation allowed. This URL must use TLS via the HTTPS scheme.
 
+This exchange relies on the server having a clear mapping of which URLs belong to which clients, so it is important the range is not too broad.
+
+### The Authorization header
 The header is constructed as follows:
 ```
 Authorization: HashBack (BASE64 encoded JSON) 
@@ -49,8 +61,7 @@ The BASE64 encoded block must be a single string with no spaces or end-of-line c
   - The integer type should be greater than 32 bits to ensure this exchange will continue to work beyond the year 2038.
 - `Unus`
   - 256 bits of cryptographic-quality randomness, encoded in BASE-64 including trailing `=`.
-  - This is to make reversal of the verification hash practically impossible.
-  - The other JSON property values listed here are "predictable". The security of this exchange relies on this one value not being predictable.
+  - This is to make reversal of the verification hash practically impossible. The other JSON property values listed here are "predictable". The security of this exchange relies on this one value not being predictable.
   - I am English and I would prefer to not to name this property using a particular five letter word starting with N, as it has an unfortunate meaning in my culture.
 - `Rounds`
   - An integer specifying the number of PBKDF2 rounds used to produce the verification hash. (See below.)
@@ -78,8 +89,7 @@ Authorization: HashBack
  eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMCIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v
  dyI6NTI5Mjk3MjAwLCJVbnVzIjoiaVo1a1dRYUJSZDNFYU10SnBDNEFTNDBKemZGZ1NlcExwdlB4
  TVRBYnQ2dz0iLCJSb3VuZHMiOjEsIlZlcmlmeSI6Imh0dHBzOi8vY2xpZW50LmV4YW1wbGUvaGFz
- aGJhY2tfZmlsZXMvbXlfanNvbl9oYXNoLnR4dCIsIvCfpZoiOiJodHRwczovL2JpbGxwZy5jb20v
- bmdneXUifQ==
+ aGJhY2tfZmlsZXMvbXlfanNvbl9oYXNoLnR4dCJ9
 ```
 
 ### Verification Hash Calculation and Publication
@@ -111,7 +121,7 @@ The fixed salt is used to ensure that a valid hash is only meaningful in light o
 Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The text file itself must be one line with the BASE-64 encoded hash in ASCII as that only line. The file must either be exactly 44 bytes long with no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence.
 
 The expected hash of the above example is: 
-- `9Qe9cXJ7AAzfnByI7JnWC70l9W+KB7wFOZEjXHZ33kY=`<!--1066_EXAMPLE_HASH-->
+- `Fy2bFY9NWxVqeUeb7pcO11AnVp68Ws6wOi8MaaZEGuM=`<!--1066_EXAMPLE_HASH-->
 
 Once the service has downloaded that verification hash, it should compare it against the result of hashing the bytes inside the BASE64 block. If the two hashes match, the server may be reassured that the client is indeed the user identified by the URL from where the hash was downloaded and proceed to process the remainder of the request.
 
@@ -145,45 +155,50 @@ This section describes an optional use of HashBack authentication that addresses
 
 For example: <!--BEARER_AUTH_HEADER-->
 ```
-GET /api/bearer_token HTTP/1.1
-Host: issuer.example
+GET /api/tokens?startIn=1000&lifeSpan=3600 HTTP/1.1
+Host: xn--tokensus-5fh.example
 Authorization: HashBack
- eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMCIsIkhvc3QiOiJiZWFyZXItdG9rZW4taXNzdWVy
- LmV4YW1wbGUiLCJOb3ciOjY4MjcxODUyMCwiVW51cyI6IkpBTGlDeXpBanpVNkJDUHk3Q296dTdN
- UFZJZGlHUVlpN2trbnpCcXcydnc9IiwiUm91bmRzIjoxLCJWZXJpZnkiOiJodHRwczovL2NsaWVu
- dC5leGFtcGxlL2hiLzM3NjM1OC50eHQifQ==
+ eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMCIsIkhvc3QiOiJ0b2tlbnPRj3VzLmV4YW1wbGUi
+ LCJOb3ciOjY4MjcxODUyMCwiVW51cyI6IkpBTGlDeXpBanpVNkJDUHk3Q296dTdNUFZJZGlHUVlp
+ N2trbnpCcXcydnc9IiwiUm91bmRzIjoxLCJWZXJpZnkiOiJ0aGlzLWlzLW5vdC11c2VkIn0=
 Accept: application/temporal-bearer-token+json
 ```
 
-The response body includes the requested Bearer token and when that token expires. The JSON will have the following properties.
+The response body includes the requested Bearer token and optional metadata about that token. The JSON will have the following properties. Those expressing a time will be an integer time in Unix "1970" format. Only `BearerToken` is required to have a string (and not-null) value.
 
 - `BearerToken`
-  - Required not-nullable string.
   - This is the requested Bearer token. An opaque string of characters without (necessarily) any internal structure.
   - Because Bearer tokens are sent in ASCII-only HTTP headers, it must consist only of printable ASCII characters.
+- `Id`
+  - The ID of this issued token. If used, must have a string value. The value should be publishable without revealing or weakening the bearer token.
+  - May be useful for auditing and so a token may be identificed without revealing it.
 - `IssuedAt`
-  - Optional or nullable integer.
-  - The UTC time this token was issued, expressed as an integer of the number of seconds since the start of 1970.
-  - If `null` or missing, the Issuer has chosen not to supply this information.
-  - This value is supplied for documentation and auditing purposes only. The recipient is not expected to make decisions based on the value of this token.
+  - The UTC time this token was issued.
+- `NotBefore`
+  - The UTC time that this token becomes (or became) valid.
+  - This may be useful if a token is requested in advance to be used in the future. 
 - `ExpiresAt`
-  - Optional or nullable integer.
-  - The UTC expiry time of this Bearer token, expressed as an integer of the number of seconds since the start of 1970.
-  - If `null` or missing, the Issuer is not declaring a particular expiry. The token will last until a request is made that actively rejects it.
-  - A non-null value is advisory only. The issuer is neither guaranteeing the token will continue to work until it expires, nor that it will stop working once this expiry time has passed. 
+  - The UTC time this Bearer token is due to expire.
+- `DeleteUrl`
+  - An optional string URL that may be `DELETE`'d to cause this bearer token to become invalid.
+  - If used, the DELETE operation must include the bearer token that's about to be invalidated in an `Authorization` header.
+
 
 For example:<!--BEARER_RESPONSE-->
 ```
 Content-Type: application/temporal-bearer-token+json
 {
-    "BearerToken": "XCQr0XW1-J1wriEeU-Wqf15hS8-0MDhVode-bAg6RYdj-Swjyq1qR",
+    "Id": "e706d02e-6871-4016-87c3-d8ebaac44fcd",
+    "BearerToken": "XCQr0XW1.J1wriEeU.Wqf15hS8.0MDhVode.bAg6RYdj.Swjyq1qR",
+    "NotBefore": 682719521,
     "IssuedAt": 682718521,
-    "ExpiresAt": 682722121
+    "ExpiresAt": 682723121,
+    "DeleteUrl": "https://tokens\u044Fus.example/tokens?id=e706d02e-6871-4016-87c3-d8ebaac44fcd"
 }
 ```
 
 # An extended example.
-**The Rutabaga Company** operates a website with an API designed for their customers to use. They publish a document for their customers that specifies how to use that API. One GET-able end-point is at `https://rutabaga.example/api/bearer_token` which returns a Bearer token in a JSON response if the request header includes a valid HashBack authentication header.
+**The Rutabaga Company** operates a website with an API designed for their customers to use. They publish a document for their customers that specifies how to use that API. One GET-able end-point is at `https://rutabaga.example/api/bearer_token` which returns a Bearer token in exchange for passing HashBack authentication. This end-points supports a number of query string parameters allowing the caller to request a particular desired life-span for the bearer token and if the request is for a token that will be used in a near future only.
 
 **Carol** is a customer of the Rutabaga Company. She's recently signed up and logged into their customer portal. On her authentication page under the *HashBack Authentication* section, she's configured her account affirming that `https://carol.example/hashback/` is a folder under her sole control and where her verification hashes will be saved.
 
@@ -196,28 +211,27 @@ Time passes and Carol needs to make a request to the Rutabaga Company API and ne
     "Now": 1111863600,
     "Unus": "TmDFGekvQ+CRgANj9QPZQtBnF077gAc4AeRASFSDXo8=",
     "Rounds": 1,
-    "Verify": "https://carol.example/hashback/64961859.txt"
+    "Verify": "https://carol.example/api/hashback?ID=19b058de-47ec-4462-82c9-71e143d148e3"
 }
 ```
 
 The code calculates the verification hash from this JSON using the process outlined above. The result of hashing the above example request is:
-- `1kL3PhDiiPLu+uUmVrz6GTJ5dpIRmvEOENem1dwx3yg=`<!--CASE_STUDY_HASH-->
+- `PoFcC2Von3O5gvuR4BDoZBioFjixF0sICV8aNVpB8Nk=`<!--CASE_STUDY_HASH-->
 
 To complete the GET request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows.<!--CASE_STUDY_AUTH_HEADER-->
 ```
-GET /api/bearer-token HTTP/1.1
+GET /api/bearer-token?StartIn=1000&lifeSpan=3600 HTTP/1.1
 Host: rutabaga.example
 User-Agent: Carol's Magnificent Application Server.
+Accept: application/temporal-bearer-token+json
 Authorization: HashBack
  eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMCIsIkhvc3QiOiJydXRhYmFnYS5leGFtcGxlIiwi
  Tm93IjoxMTExODYzNjAwLCJVbnVzIjoiVG1ERkdla3ZRK0NSZ0FOajlRUFpRdEJuRjA3N2dBYzRB
- ZVJBU0ZTRFhvOD0iLCJSb3VuZHMiOjEsIlZlcmlmeSI6Imh0dHBzOi8vY2Fyb2wuZXhhbXBsZS9o
- YXNoYmFjay82NDk2MTg1OS50eHQifQ==
-Accept: application/temporal-bearer-token+json
-
+ ZVJBU0ZTRFhvOD0iLCJSb3VuZHMiOjEsIlZlcmlmeSI6Imh0dHBzOi8vY2Fyb2wuZXhhbXBsZS9h
+ cGkvaGFzaGJhY2s/SUQ9MTliMDU4ZGUtNDdlYy00NDYyLTgyYzktNzFlMTQzZDE0OGUzIn0=
 ```
 
-The hash is saved as a text file to her web server using the random filename selected earlier. With this in place, the request for a Bearer token including the header can be sent to the API. The HTTP client library used to make the request will perform the necessary TLS handshake as part of making the connection.
+Because the hash needs only to be stored for a few seconds, The hash is recoded in the sever's own memory cache. With this in place, the request for a Bearer token including the header can be sent to the API. The HTTP client library used to make the request will perform the necessary TLS handshake as part of making the connection.
 
 ## Checking the request
 The Rutabaga Company website receives this request and validates the request body, performing the following checks:
@@ -252,9 +266,12 @@ HTTP/1.1 200 OK
 Content-Type: application/temporal-bearer-token+json
 
 {
-    "BearerToken": "M7HFwZjs-oaRmeCWn-x9P7p3OT-ab56YHh0-5q6qAiR0-u1jjMYc3",
+    "Id": "f2d4e71f-b3ca-43ac-8c05-2e81df8782dc",
+    "BearerToken": "M7HFwZjs.oaRmeCWn.x9P7p3OT.ab56YHh0.5q6qAiR0.u1jjMYc3",
+    "NotBefore": 1111864601,
     "IssuedAt": 1111863601,
-    "ExpiresAt": 1111867201
+    "ExpiresAt": 1111868201,
+    "DeleteUrl": "https://rutabaga.example/tokens?id=f2d4e71f-b3ca-43ac-8c05-2e81df8782dc"
 }
 ```
 
@@ -345,10 +362,32 @@ I don't think this is necessary (indeed, all of the examples in this document us
 
 As this proposal is still in the public-draft phase, I am open to be persuaded that PBKDF2 is not needed and a single round of SHA256 is quite sufficient thank you very much. I'm also open to be persuaded that the default number of rounds needs to be significantly higher.
 
+### Why use a hash at all? Why not make the request a URL and the string expected at that URL?
+(I am grateful to m'colleague Rob Armitage for asking this question.)
+
+It is neccessary for the file retrieved from the client's website to be a hash (instead of a random string) to prevent an attack when a valid quthorization request is fraudulently passed along to a third party. For example:
+
+A-to-B: "I am server A. To prove it, I have placed "ABC" at https://A.example/123.txt."
+B-to-C: "I am server A. To prove it, I have placed "ABC" at https://A.example/123.txt."
+C-to-A: "GET https://A.example/123.txt", to which A will return "ABC".
+C-to-B: "You are successfully authorized."
+
+From A's point of view, they made a valid request and the request resulted in a single expected GET to the verification URL, presumably from B. As far as A is concerned, there's nothing untoward going on at all. By requiring a hash of the authorization header and checking that the 'Host' property is correct, this passing-along attack is prevented.
+
 ### Why BASE64 the JSON in the `Authorization` header?
 To ensure there's an unambiguous sequence of bytes to feed into the hash. By transferring the JSON block in an encoded set of bytes, the recipient can simply pass the decoded byte array into the PBKDF2 function as the password parameter.
 
 I had considered requiring that the JSON be included in the header as unencoded ASCII, without any whitespace characters and IDN domains using JSON's `\u` notation. Can I, in practice, use an `Authorization` header with all of characters JSON uses? I am open to be persuaded that this would be preferable to using BASE64. 
+
+### How does this compare to "ACME"? (RFC 8555)
+ACME, the exchange that makes "Let's Encrypt" work, has a lot in common with HashBack, including the "call-me-back" verification step at the core of HashBack. (So much so, I really can't claim to have invented this exchange (any more) but I will claim to have independently discovered it.)
+
+As I write this, I am investigating if the ACME verification step (including both http and dns methods) could be repurposed for HashBack authentication. If it could and without too much modification, this might become draft version 4.1. 
+
+But as far this draft (4.0) is concerned, HashBack is simpler it requires only two HTTPS transations because HashBack does not require a server challenge. (ACME requires an initial transaction in which the client initiates the certificate issue and the server responds with a challenge.)
+
+### Shouldn't you have a server challenge like ACME?
+This is something I'd like an expert to confirm, but I don't think it needs one. The request is sent over TLS, which prevents an attacker seeing the request itself and also replaying it. The `Host` header prevents "passing along" attacks as described above.
 
 ### What are the previous public drafts?
 

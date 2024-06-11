@@ -50,22 +50,19 @@ PopulateExample(
     "1066_EXAMPLE",
     DateTime.Parse("1986-10-09T23:00:00-04:00"),
     "server.example",
-    "https://client.example/hashback_files/my_json_hash.txt", 
-    true);
+    "https://client.example/hashback_files/my_json_hash.txt");
 
 PopulateExample(
     "CASE_STUDY",
     DateTime.Parse("2005-03-26T19:00:00Z"),
     "rutabaga.example",
-    "https://carol.example/hashback/64961859.txt", 
-    false);
+    "https://carol.example/api/hashback?ID=" + GenerateGuid("CarolQueryStringID"));
 
 PopulateExample(
     "BEARER",
     DateTime.Parse("1991-08-20T23:02:00+03:00"),
-    "bearer-token-issuer.example",
-    "https://client.example/hb/376358.txt", 
-    false);
+    "tokens\u044fus.example",
+    "this-is-not-used");
 
 /* If README has changed, rewrite back. */
 if (readmeOrigText != string.Join("\r\n", readmeLines))
@@ -83,7 +80,7 @@ long UnixTime(DateTime utc)
     return (long)(utc.ToUniversalTime() - DateTime.Parse("1970-01-01T00:00:00Z")).TotalSeconds;
 }
 
-void PopulateExample(string keyBase, DateTime now, string hostDomainName, string verifyUrl, bool addEasterEgg)
+void PopulateExample(string keyBase, DateTime now, string hostDomainName, string verifyUrl)
 {
     const int rounds = 1;
 
@@ -98,8 +95,6 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     ReplaceJson($"<!--{keyBase}_REQUEST-->", requestJson);
 
     /* Encode JSON into bytes. */
-    if (addEasterEgg)
-        requestJson[char.ConvertFromUtf32(0x1F95A)] = "https://billpg.com/nggyu";
     string jsonAsString = requestJson.ToString(Newtonsoft.Json.Formatting.None);
     byte[] jsonAsBytes = Encoding.UTF8.GetBytes(jsonAsString);
 
@@ -107,6 +102,14 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     int authHeaderIndex = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_AUTH_HEADER-->"));
     if (authHeaderIndex > 0)
     {
+        /* The HTTP Host: header requies xn-- notation for domains. */
+        int hostHeaderIndex = readmeLines.FindIndex(authHeaderIndex, src => src.StartsWith("Host:"));
+        if (hostHeaderIndex > 0 && hostHeaderIndex < readmeLines.Count)
+        {
+            string xnHostDomain = new System.Globalization.IdnMapping().GetAscii(hostDomainName);
+            readmeLines[hostHeaderIndex] = $"Host: {xnHostDomain}";
+        }
+
         int authHeaderStartIndex = readmeLines.FindIndex(authHeaderIndex, src => src.StartsWith("Authorization"));
         int authHeaderEndIndx = readmeLines.FindIndex(authHeaderStartIndex+1, src => src.StartsWith(" ") == false);
         readmeLines.RemoveRange(authHeaderStartIndex+1, authHeaderEndIndx - authHeaderStartIndex - 1);
@@ -127,22 +130,35 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     DateTime issuedAt = now.AddSeconds(1);
     var responseJson = new JObject();
     long issuedAtUnix = UnixTime(issuedAt);
+    Guid tokenId = GenerateGuid($"TokenId_{keyBase}");
+    responseJson["Id"] = tokenId;
     responseJson["BearerToken"] = GenerateBearerToken(keyBase);
+    responseJson["NotBefore"] = issuedAtUnix + 1000;
     responseJson["IssuedAt"] = issuedAtUnix;
-    responseJson["ExpiresAt"] = issuedAtUnix + 3600;
+    responseJson["ExpiresAt"] = issuedAtUnix + 1000 + 3600;
+    responseJson["DeleteUrl"] = $"https://{hostDomainName}/tokens?id={tokenId}";
     ReplaceJson($"<!--{keyBase}_RESPONSE-->", responseJson);
 }
 
-/* Generate a random-looking token that would work as a non-JWT beaerer token. */
+Guid GenerateGuid(string key)
+{
+    string shortBase64 = GenerateUnus(key).Substring(21) + "=";
+    byte[] keyAsBytes = Convert.FromBase64String(shortBase64);
+    keyAsBytes[7] = (byte)(keyAsBytes[7] & ~0xF0 | 0x40);
+    keyAsBytes[8] = (byte)(keyAsBytes[8] & ~0xF0 | 0x80);
+    return new Guid(keyAsBytes);
+}
+
+/* Generate a random-looking token that would work as a non-JWT bearer token. */
 string GenerateBearerToken(string keyBase)
 {
     /* Loop through six times, adding hyphens. */
     string token = "";
     for (int i = 0; i < 6; i++)
     {
-        /* Hyphen separator, except first time. */
+        /* Dot separator, except first time. */
         if (i > 0)
-            token += "-";
+            token += ".";
 
         /* Add some random looking characters. */
         string random = GenerateUnus(keyBase + "SimpleBearer" + i).Replace("+","").Replace("/", "");
@@ -168,7 +184,19 @@ string HashRequestJsonBytes(byte[] jsonAsBytes, int rounds)
 }
 
 void ReplaceJson(string tag, JObject insert)
-{ 
+{
+    /* Turn the JSON object into a Json string with only ascii. */
+    StringBuilder jsonAsString = new StringBuilder(insert.ToString().Replace("\r\n  ", "\r\n    "));
+    for (int jsonIndex = jsonAsString.Length-1; jsonIndex > 0; jsonIndex--)
+    {
+        char ch = jsonAsString[jsonIndex];
+        if (ch > 126)
+        {
+            jsonAsString.Remove(jsonIndex, 1);
+            jsonAsString.Insert(jsonIndex, $"\\u{(int)ch:X4}");
+        }
+    }
+
     /* Look for the "1066" example JSON. */
     int markerIndex = readmeLines.FindIndex(src => src.Contains(tag));
     if (markerIndex < 0) return;
@@ -177,7 +205,7 @@ void ReplaceJson(string tag, JObject insert)
     readmeLines.RemoveRange(openBraceIndex, closeBraceIndex - openBraceIndex + 1);
 
     /* Insert back into code. */
-    readmeLines.Insert(openBraceIndex, insert.ToString().Replace("\r\n  ", "\r\n    "));
+    readmeLines.Insert(openBraceIndex, jsonAsString.ToString());
 }
 
 /* Find the file with the given name, starting from this file's folder moving upwards. */
