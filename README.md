@@ -62,6 +62,7 @@ The BASE64 encoded block must be a single string with no spaces or end-of-line c
 - `Unus`
   - 256 bits of cryptographic-quality randomness, encoded in BASE-64 including trailing `=`.
   - This is to make reversal of the verification hash practically impossible. The other JSON property values listed here are "predictable". The security of this exchange relies on this one value not being predictable.
+  - The value must be unique for each request. Servers should reject any reused value within the allowed drift it places on the `Now` value.
   - I am English and I would prefer to not to name this property using a particular five letter word starting with N, as it has an unfortunate meaning in my culture.
 - `Rounds`
   - An integer specifying the number of PBKDF2 rounds used to produce the verification hash. (See below.)
@@ -171,7 +172,7 @@ The response body includes the requested Bearer token and optional metadata abou
   - Because Bearer tokens are sent in ASCII-only HTTP headers, it must consist only of printable ASCII characters.
 - `Id`
   - The ID of this issued token. If used, must have a string value. The value should be publishable without revealing or weakening the bearer token.
-  - May be useful for auditing and so a token may be identificed without revealing it.
+  - May be useful for auditing and to allow a token to be identified without revealing it.
 - `IssuedAt`
   - The UTC time this token was issued.
 - `NotBefore`
@@ -231,7 +232,7 @@ Authorization: HashBack
  cGkvaGFzaGJhY2s/SUQ9MTliMDU4ZGUtNDdlYy00NDYyLTgyYzktNzFlMTQzZDE0OGUzIn0=
 ```
 
-Because the hash needs only to be stored for a few seconds, The hash is recoded in the sever's own memory cache. With this in place, the request for a Bearer token including the header can be sent to the API. The HTTP client library used to make the request will perform the necessary TLS handshake as part of making the connection.
+Because the hash needs only to be stored for a few seconds, The hash is recoded in the server's own memory cache. With this in place, the request for a Bearer token including the header can be sent to the API. The HTTP client library used to make the request will perform the necessary TLS handshake as part of making the connection.
 
 ## Checking the request
 The Rutabaga Company website receives this request and validates the request body, performing the following checks:
@@ -239,7 +240,7 @@ The Rutabaga Company website receives this request and validates the request bod
 - The `Authorization` header is `HashBack` type with a BASE64-encoded JSON payload.  :heavy_check_mark:
 - The `Host` value is a domain it owns - `rutabaga.example`.  :heavy_check_mark:
 - The `Now` time-stamp is reasonably close to the server's internal clock.  :heavy_check_mark:
-- The `Unus` value represents 256 bits encoded in base-64.  :heavy_check_mark:
+- The `Unus` value represents 256 bits encoded in base-64 and this value has never been seen before.  :heavy_check_mark:
 - The `Rounds` value is within its acceptable 1-99 rounds.  :heavy_check_mark:
 - The `Verify` value is an HTTPS URL belonging to a known user - *Carol*.  :heavy_check_mark:
 
@@ -309,7 +310,7 @@ If you want to allow for self-signed TLS certificates, since this exchange relie
 ### What if an attacker has a TLS certificate signed by a trusted CA?
 Then the attacker has broken TLS itself and we have bigger problems.
 
-If this is a serious concern, then you could keep your own collection of trusted TLS certificates and refuse of recognize any TLS ceritifcates not on your list. You'd effectively be running your own CA if you can't trust the ones built into your HTTP library.
+If this is a serious concern, then you could keep your own collection of trusted TLS certificates and refuse of recognize any TLS certificates not on your list. You'd effectively be running your own CA if you can't trust the ones built into your HTTP library.
 
 ### What if an attacker sends a fake Authorization header?
 The recipient will attempt to retrieve a verification hash file from the real client's website. As there won't be a verification hash that matches the fake header, the attempt will fail.
@@ -365,7 +366,7 @@ As this proposal is still in the public-draft phase, I am open to be persuaded t
 ### Why use a hash at all? Why not make the request a URL and the string expected at that URL?
 (I am grateful to m'colleague Rob Armitage for asking this question.)
 
-It is neccessary for the file retrieved from the client's website to be a hash (instead of a random string) to prevent an attack when a valid quthorization request is fraudulently passed along to a third party. For example:
+It is necessary for the file retrieved from the client's website to be a hash (instead of a random string) to prevent an attack when a valid authorization request is fraudulently passed along to a third party. For example:
 
 A-to-B: "I am server A. To prove it, I have placed "ABC" at https://A.example/123.txt."
 B-to-C: "I am server A. To prove it, I have placed "ABC" at https://A.example/123.txt."
@@ -377,14 +378,12 @@ From A's point of view, they made a valid request and the request resulted in a 
 ### Why BASE64 the JSON in the `Authorization` header?
 To ensure there's an unambiguous sequence of bytes to feed into the hash. By transferring the JSON block in an encoded set of bytes, the recipient can simply pass the decoded byte array into the PBKDF2 function as the password parameter.
 
-I had considered requiring that the JSON be included in the header as unencoded ASCII, without any whitespace characters and IDN domains using JSON's `\u` notation. Can I, in practice, use an `Authorization` header with all of characters JSON uses? I am open to be persuaded that this would be preferable to using BASE64. 
-
 ### How does this compare to "ACME"? (RFC 8555)
 ACME, the exchange that makes "Let's Encrypt" work, has a lot in common with HashBack, including the "call-me-back" verification step at the core of HashBack. (So much so, I really can't claim to have invented this exchange (any more) but I will claim to have independently discovered it.)
 
-As I write this, I am investigating if the ACME verification step (including both http and dns methods) could be repurposed for HashBack authentication. If it could and without too much modification, this might become draft version 4.1. 
+As I write this, I am investigating if the ACME verification step (including both HTTP and DNS methods) could be repurposed for HashBack authentication. If it could and without too much modification, this might become draft version 4.1. 
 
-But as far this draft (4.0) is concerned, HashBack is simpler it requires only two HTTPS transations because HashBack does not require a server challenge. (ACME requires an initial transaction in which the client initiates the certificate issue and the server responds with a challenge.)
+But as far this draft (4.0) is concerned, HashBack is simpler it requires only two HTTPS transactions because HashBack does not require a server challenge. (ACME requires an initial transaction in which the client initiates the certificate issue and the server responds with a challenge.)
 
 ### Shouldn't you have a server challenge like ACME?
 This is something I'd like an expert to confirm, but I don't think it needs one. The request is sent over TLS, which prevents an attacker seeing the request itself and also replaying it. The `Host` header prevents "passing along" attacks as described above.
@@ -400,13 +399,12 @@ This is something I'd like an expert to confirm, but I don't think it needs one.
 - [Public Draft 3.0](https://github.com/billpg/HashBack/blob/bf7e2ff1876e9673b04bffb7d70766a10d326976/README.md)
   - Substantial refactoring. The client makes a POST request with a JSON body and puts a hash of that JSON body on their website. The server fetches that hash and compares it to their own expected hash. The POST response is always a Bearer token.
   - Added a "dot zero" to allow for minor updates, reserving 4.0 for another substantial refactor.
-  - Changed name to "HashBack" Authentication, reflecting that a token is only one possible outcome and the verification hash is the big idea.
+  - Changed name to "HashBack" Authentication, as a play on "Call Back".
 - [Public Draft 3.1](https://github.com/billpg/HashBack/blob/d8886ce0cebb159f6484186f5b6ccd750d0dd97c/README.md)
   - The "fixed salt" is now the result of running RBKDF2 but without processing the result into capitals letters. This means I no longer need to link to some "attached" C# code and can simply record the input parameters. (The original motivation of having only capital letters in the salt was to support implementations that only accept ASCII strings, but all implementations I could find will accept arbitrary blocks of bytes as input.)
   - Added "204SetCookie" as a third response type. Might be useful for a browser making the POST request.
 - Public Draft 4.0 (This document)
-  - The JSON request is sent by the client in the form of an HTTP `Authorization` header. The transaction being authenticated could be anything, including a request for a Bearer token. This has the advantage of allowing a once-off request to skip the extra transaction to fetch a Bearer token and act more like traditional HTTP authentication. Also, as this header payload is BASE64 encoded, we don't need to canonicalize the JSON as the hash can be done on the BASE64 encoded bytes.
-  - As I write this I'm uncertain if this is the best approach. I may yet return to the 3.1 draft and consider version 4 (along with version 2) as an abandoned idea.
+  - The JSON request is now sent by the client in the form of an HTTP `Authorization` header. The transaction being authenticated could be anything, including a request for a Bearer token. This has the advantage of allowing a once-off request to skip the extra transaction to fetch a Bearer token and act more like traditional HTTP authentication. Also, as this header payload is BASE64 encoded, we don't need to canonicalize the JSON as the hash can be done on the BASE64 encoded bytes.
 
 ## Next Steps
 This document is a draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using PBKDF2 with its fixed salt correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm that authenticity of the authentication request. If you have any comments or notes, please raise an issue on this project's github.
