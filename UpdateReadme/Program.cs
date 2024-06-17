@@ -10,16 +10,47 @@ string readmePath = FindFileByName("README.md");
 var readmeLines = File.ReadAllLines(readmePath).ToList();
 var readmeOrigText = string.Join("\r\n", readmeLines);
 
-/* Load the fixed salt bytes. */
+/* Constants from which the fixed salt bytes will be derived. */
 const string fixed_salt_password = "To my Treacle.";
 const string fixed_salt_salt = "I love you to the moon and back.";
 const int fixed_salt_rounds = 238854 * 2; 
-var fixedSaltBytes = Rfc2898DeriveBytes.Pbkdf2(
+
+/* Find the fixed salt. */
+var fixedSaltBytes = Pbkdf2(
     password: Encoding.ASCII.GetBytes(fixed_salt_password),
     salt: Encoding.ASCII.GetBytes(fixed_salt_salt),
     iterations: fixed_salt_rounds,
     hashAlgorithm: HashAlgorithmName.SHA512,
     outputLength: 32);
+
+byte[] Pbkdf2(byte[] password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
+{
+    /* Check if we've done this exact hashing operation before. */
+    string cacheFixedSaltPath = 
+        Path.Combine(Path.GetTempPath(),
+        "CacheFixedSaltPath" +
+        $"_{BytesToHex(password)}" +
+        $"_{BytesToHex(salt)}" +
+        $"_{iterations}" +
+        $"_{hashAlgorithm}" +
+        $"_{outputLength}.bin");
+    if (File.Exists(cacheFixedSaltPath))
+        return File.ReadAllBytes(cacheFixedSaltPath);
+
+    /* If not call hrough to the actual PBKDF2. */
+    var fixedSaltAsBytes = Rfc2898DeriveBytes.Pbkdf2(
+        password: password,
+        salt: salt,
+        iterations: iterations,
+        hashAlgorithm: hashAlgorithm,
+        outputLength: outputLength);
+
+    /* Save to cache. */
+    File.WriteAllBytes(cacheFixedSaltPath, fixedSaltAsBytes);
+
+    /* Return now cached bytes to caller. */
+    return fixedSaltAsBytes;
+}
 
 string StringSaltParameters(string label, string value)
 {

@@ -112,7 +112,7 @@ The hashing process takes the following steps.
    - Output: 256 bits / 32 bytes
 2. Encode the hash result using BASE-64, including the trailing `=` character.
 
-Note that the hash is performed on the same bytes that were encoded inside the BASE64 block. Because of this, the JSON itself may be flexible with formatting whitespace or JSON character encoding, as long as the JSON object is valid according to the rules above. As the intended audience is another machine, no whitespace and UTF-8 encoding is preferable.
+Note that the hash is performed on the same bytes that were encoded inside the BASE64 block. Because of this, the JSON itself may be flexible with formatting whitespace or JSON character encoding, as long as the JSON object is valid according to the requirements of JSON itself and the rules stated above.
 
 The fixed salt is used to ensure that a valid hash is only meaningful in light of this document, as that salt is not sent over the wire with the request. For your convenience, here is the 32 byte fixed salt block in a variety of encodings:
 - Base64: `cdpiCQall50uHOUQQltbSJb2RVPY6xXvouWLowZJr8k=`<!--FIXED_SALT_B64-->
@@ -171,7 +171,7 @@ The response body includes the requested Bearer token and optional metadata abou
   - This is the requested Bearer token. An opaque string of characters without (necessarily) any internal structure.
   - Because Bearer tokens are sent in ASCII-only HTTP headers, it must consist only of printable ASCII characters.
 - `Id`
-  - The ID of this issued token. If used, must have a string value. The value should be publishable without revealing or weakening the bearer token.
+  - The ID of this issued token. If used, must have a string value. The value should be publishable without revealing or weakening the bearer token itself.
   - May be useful for auditing and to allow a token to be identified without revealing it.
 - `IssuedAt`
   - The UTC time this token was issued.
