@@ -1,8 +1,6 @@
 ﻿/* Modify the README.md file with correct tokens and 
  * signatures using the crypto-helper functions. */
 using Newtonsoft.Json.Linq;
-using System.Diagnostics;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -89,7 +87,7 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     requestJson["Version"] = "BILLPG_DRAFT_4.0";
     requestJson["Host"] = hostDomainName;
     requestJson["Now"] = UnixTime(now);
-    requestJson["Unus"] = GenerateUnus(keyBase);
+    requestJson["Unus"] = GenerateUnus(128, keyBase);
     requestJson["Rounds"] = rounds;
     requestJson["Verify"] = verifyUrl;
     ReplaceJson($"<!--{keyBase}_REQUEST-->", requestJson);
@@ -142,7 +140,7 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
 
 Guid GenerateGuid(string key)
 {
-    string shortBase64 = GenerateUnus(key).Substring(21) + "=";
+    string shortBase64 = GenerateUnus(128,key);
     byte[] keyAsBytes = Convert.FromBase64String(shortBase64);
     keyAsBytes[7] = (byte)(keyAsBytes[7] & ~0xF0 | 0x40);
     keyAsBytes[8] = (byte)(keyAsBytes[8] & ~0xF0 | 0x80);
@@ -161,7 +159,7 @@ string GenerateBearerToken(string keyBase)
             token += ".";
 
         /* Add some random looking characters. */
-        string random = GenerateUnus(keyBase + "SimpleBearer" + i).Replace("+","").Replace("/", "");
+        string random = GenerateUnus(256, keyBase + "SimpleBearer" + i).Replace("+","").Replace("/", "");
         token += random.Substring(0, 8);
     }
 
@@ -233,11 +231,15 @@ string FindFileByName(string fileName)
 }
 
 /* Create a random-looking 256-bit Base64 encoded string from a starting string. */
-string GenerateUnus(string v)
+string GenerateUnus(int bits, string v)
 {
     /* Hash the input string and return in hex. */
-    using var sha = System.Security.Cryptography.SHA256.Create();
-    byte[] hash = sha.ComputeHash(System.Text.Encoding.ASCII.GetBytes(v + "Unus"));
+    var hash = Rfc2898DeriveBytes.Pbkdf2(
+        password: Encoding.ASCII.GetBytes(v),
+        salt: Encoding.ASCII.GetBytes("no salt this time"),
+        hashAlgorithm: HashAlgorithmName.SHA256,
+        iterations: 1,
+        outputLength: bits / 8);
     return Convert.ToBase64String(hash);
 }
 
@@ -257,11 +259,11 @@ string DumpByteArray(IList<byte> bytes)
         if (i % 8 == 0)
             list += "       ";
         if (i == 0)
-            list += "[";
+            list += "";
         list += $"{bytes[i]},";
     }
 
-    return list.Trim(',') + "]";
+    return list.Trim(',') + "";
 }
 
 string BytesToHex(IList<byte> bytes)

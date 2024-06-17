@@ -60,7 +60,7 @@ The BASE64 encoded block must be a single string with no spaces or end-of-line c
   - The recipient service should reject this request if timestamp is too far from its current time. This document does not specify a threshold in either direction but instead this is left to the service's configuration. (Finger in the air - ten seconds.)
   - The integer type should be greater than 32 bits to ensure this exchange will continue to work beyond the year 2038.
 - `Unus`
-  - 256 bits of cryptographic-quality randomness, encoded in BASE-64 including trailing `=`.
+  - 128 bits of cryptographic-quality randomness, encoded in BASE-64 including trailing `==`.
   - This is to make reversal of the verification hash practically impossible. The other JSON property values listed here are "predictable". The security of this exchange relies on this one value not being predictable.
   - The value must be unique for each request. Servers should reject any reused value within the allowed drift it places on the `Now` value.
   - I am English and I would prefer to not to name this property using a particular five letter word starting with N, as it has an unfortunate meaning in my culture.
@@ -79,7 +79,7 @@ For example:<!--1066_EXAMPLE_REQUEST-->
     "Version": "BILLPG_DRAFT_4.0",
     "Host": "server.example",
     "Now": 529297200,
-    "Unus": "iZ5kWQaBRd3EaMtJpC4AS40JzfFgSepLpvPxMTAbt6w=",
+    "Unus": "Rpgt4Fc5nMDq14LOps/hYQ==",
     "Rounds": 1,
     "Verify": "https://client.example/hashback_files/my_json_hash.txt"
 }
@@ -88,9 +88,9 @@ This JSON string is BASE64 encoded and added to the end of the `Authorization:` 
 ```
 Authorization: HashBack
  eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMCIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v
- dyI6NTI5Mjk3MjAwLCJVbnVzIjoiaVo1a1dRYUJSZDNFYU10SnBDNEFTNDBKemZGZ1NlcExwdlB4
- TVRBYnQ2dz0iLCJSb3VuZHMiOjEsIlZlcmlmeSI6Imh0dHBzOi8vY2xpZW50LmV4YW1wbGUvaGFz
- aGJhY2tfZmlsZXMvbXlfanNvbl9oYXNoLnR4dCJ9
+ dyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYzVuTURxMTRMT3BzL2hZUT09IiwiUm91bmRzIjox
+ LCJWZXJpZnkiOiJodHRwczovL2NsaWVudC5leGFtcGxlL2hhc2hiYWNrX2ZpbGVzL215X2pzb25f
+ aGFzaC50eHQifQ==
 ```
 
 ### Verification Hash Calculation and Publication
@@ -102,10 +102,10 @@ The hashing process takes the following steps.
    - Password: The bytes that the went into the BASE64 block.
    - Salt: The following 32 bytes.<!--FIXED_SALT-->
      - ```
-       [113,218,98,9,6,165,151,157,
+       113,218,98,9,6,165,151,157,
        46,28,229,16,66,91,91,72,
        150,246,69,83,216,235,21,239,
-       162,229,139,163,6,73,175,201]
+       162,229,139,163,6,73,175,201
        ```
    - Hash Algorithm: SHA256
    - Rounds: The value specified in the JSON under `Rounds`.
@@ -122,7 +122,7 @@ The fixed salt is used to ensure that a valid hash is only meaningful in light o
 Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The text file itself must be one line with the BASE-64 encoded hash in ASCII as that only line. The file must either be exactly 44 bytes long with no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence.
 
 The expected hash of the above example is: 
-- `Fy2bFY9NWxVqeUeb7pcO11AnVp68Ws6wOi8MaaZEGuM=`<!--1066_EXAMPLE_HASH-->
+- `U1Ga5HE1dmo3GjBMqsAx2eQna9f8YxNthl4fJeqpfhs=`<!--1066_EXAMPLE_HASH-->
 
 Once the service has downloaded that verification hash, it should compare it against the result of hashing the bytes inside the BASE64 block. If the two hashes match, the server may be reassured that the client is indeed the user identified by the URL from where the hash was downloaded and proceed to process the remainder of the request.
 
@@ -160,8 +160,8 @@ GET /api/tokens?startIn=1000&lifeSpan=3600 HTTP/1.1
 Host: xn--tokensus-5fh.example
 Authorization: HashBack
  eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMCIsIkhvc3QiOiJ0b2tlbnPRj3VzLmV4YW1wbGUi
- LCJOb3ciOjY4MjcxODUyMCwiVW51cyI6IkpBTGlDeXpBanpVNkJDUHk3Q296dTdNUFZJZGlHUVlp
- N2trbnpCcXcydnc9IiwiUm91bmRzIjoxLCJWZXJpZnkiOiJ0aGlzLWlzLW5vdC11c2VkIn0=
+ LCJOb3ciOjY4MjcxODUyMCwiVW51cyI6Ikt6SmsxTmcyRzBEWHZTb0V4RjJvV0E9PSIsIlJvdW5k
+ cyI6MSwiVmVyaWZ5IjoidGhpcy1pcy1ub3QtdXNlZCJ9
 Accept: application/temporal-bearer-token+json
 ```
 
@@ -181,20 +181,20 @@ The response body includes the requested Bearer token and optional metadata abou
 - `ExpiresAt`
   - The UTC time this Bearer token is due to expire.
 - `DeleteUrl`
-  - An optional string URL that may be `DELETE`'d to cause this bearer token to become invalid.
-  - If used, the DELETE operation must include the bearer token that's about to be invalidated in an `Authorization` header.
+  - An optional string URL that may be `DELETE`'d to cause this bearer token to become invalid ahead of schedule.
+  - If used, the DELETE operation must an `Authorization` header with this Bearer token.
 
 
 For example:<!--BEARER_RESPONSE-->
 ```
 Content-Type: application/temporal-bearer-token+json
 {
-    "Id": "e706d02e-6871-4016-87c3-d8ebaac44fcd",
-    "BearerToken": "XCQr0XW1.J1wriEeU.Wqf15hS8.0MDhVode.bAg6RYdj.Swjyq1qR",
+    "Id": "3c14e547-6012-499f-8e32-8c501d3450fc",
+    "BearerToken": "xygCgzNR.GKl0narP.DYKaXhKF.ZNk1go1M.jYNpHaD8.MhidPVnp",
     "NotBefore": 682719521,
     "IssuedAt": 682718521,
     "ExpiresAt": 682723121,
-    "DeleteUrl": "https://tokens\u044Fus.example/tokens?id=e706d02e-6871-4016-87c3-d8ebaac44fcd"
+    "DeleteUrl": "https://tokens\u044Fus.example/tokens?id=3c14e547-6012-499f-8e32-8c501d3450fc"
 }
 ```
 
@@ -210,14 +210,14 @@ Time passes and Carol needs to make a request to the Rutabaga Company API and ne
     "Version": "BILLPG_DRAFT_4.0",
     "Host": "rutabaga.example",
     "Now": 1111863600,
-    "Unus": "TmDFGekvQ+CRgANj9QPZQtBnF077gAc4AeRASFSDXo8=",
+    "Unus": "sGhK1rIbEWjW6Sg25s+KPg==",
     "Rounds": 1,
-    "Verify": "https://carol.example/api/hashback?ID=19b058de-47ec-4462-82c9-71e143d148e3"
+    "Verify": "https://carol.example/api/hashback?ID=9c8091c9-bcd2-405a-8b23-9bf4c492f803"
 }
 ```
 
 The code calculates the verification hash from this JSON using the process outlined above. The result of hashing the above example request is:
-- `PoFcC2Von3O5gvuR4BDoZBioFjixF0sICV8aNVpB8Nk=`<!--CASE_STUDY_HASH-->
+- `Wh+1CucKXji7KZKjCFQ8GkiUbXrpRZrW/ATKZNwI3k4=`<!--CASE_STUDY_HASH-->
 
 To complete the GET request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows.<!--CASE_STUDY_AUTH_HEADER-->
 ```
@@ -227,9 +227,9 @@ User-Agent: Carol's Magnificent Application Server.
 Accept: application/temporal-bearer-token+json
 Authorization: HashBack
  eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMCIsIkhvc3QiOiJydXRhYmFnYS5leGFtcGxlIiwi
- Tm93IjoxMTExODYzNjAwLCJVbnVzIjoiVG1ERkdla3ZRK0NSZ0FOajlRUFpRdEJuRjA3N2dBYzRB
- ZVJBU0ZTRFhvOD0iLCJSb3VuZHMiOjEsIlZlcmlmeSI6Imh0dHBzOi8vY2Fyb2wuZXhhbXBsZS9h
- cGkvaGFzaGJhY2s/SUQ9MTliMDU4ZGUtNDdlYy00NDYyLTgyYzktNzFlMTQzZDE0OGUzIn0=
+ Tm93IjoxMTExODYzNjAwLCJVbnVzIjoic0doSzFySWJFV2pXNlNnMjVzK0tQZz09IiwiUm91bmRz
+ IjoxLCJWZXJpZnkiOiJodHRwczovL2Nhcm9sLmV4YW1wbGUvYXBpL2hhc2hiYWNrP0lEPTljODA5
+ MWM5LWJjZDItNDA1YS04YjIzLTliZjRjNDkyZjgwMyJ9
 ```
 
 Because the hash needs only to be stored for a few seconds, The hash is recoded in the server's own memory cache. With this in place, the request for a Bearer token including the header can be sent to the API. The HTTP client library used to make the request will perform the necessary TLS handshake as part of making the connection.
@@ -240,7 +240,7 @@ The Rutabaga Company website receives this request and validates the request bod
 - The `Authorization` header is `HashBack` type with a BASE64-encoded JSON payload.  :heavy_check_mark:
 - The `Host` value is a domain it owns - `rutabaga.example`.  :heavy_check_mark:
 - The `Now` time-stamp is reasonably close to the server's internal clock.  :heavy_check_mark:
-- The `Unus` value represents 256 bits encoded in base-64 and this value has never been seen before.  :heavy_check_mark:
+- The `Unus` value represents 128 bits encoded in base-64 and this value has never been seen before.  :heavy_check_mark:
 - The `Rounds` value is within its acceptable 1-99 rounds.  :heavy_check_mark:
 - The `Verify` value is an HTTPS URL belonging to a known user - *Carol*.  :heavy_check_mark:
 
@@ -267,12 +267,12 @@ HTTP/1.1 200 OK
 Content-Type: application/temporal-bearer-token+json
 
 {
-    "Id": "f2d4e71f-b3ca-43ac-8c05-2e81df8782dc",
-    "BearerToken": "M7HFwZjs.oaRmeCWn.x9P7p3OT.ab56YHh0.5q6qAiR0.u1jjMYc3",
+    "Id": "13a862de-dc89-4f50-8709-0e7ed1cb6293",
+    "BearerToken": "jTqkkDGt.IGu55JOH.cGlsgwiC.8Y2GZRQE.g4CR9icp.GB0XDinI",
     "NotBefore": 1111864601,
     "IssuedAt": 1111863601,
     "ExpiresAt": 1111868201,
-    "DeleteUrl": "https://rutabaga.example/tokens?id=f2d4e71f-b3ca-43ac-8c05-2e81df8782dc"
+    "DeleteUrl": "https://rutabaga.example/tokens?id=13a862de-dc89-4f50-8709-0e7ed1cb6293"
 }
 ```
 
