@@ -152,7 +152,7 @@ Clients may skip that initial transaction if it is already known that the server
 ## application/temporal-bearer-token+json
 The above exchange does have the disadvantage of being expensive. While this may be acceptable for a once-off transaction, it would be prohibitively expensive to perform the full exchange for a large number of requests. 
 
-This section describes an optional use of HashBack authentication that addresses this. An API that can be called once-off with a single HashBack transaction, that returns a temporal *Bearer token* that can be used until it expires. The use of an additional header, `Accept: application/temporal-bearer-token+json`, indicates the caller's request. 
+This section describes an optional use of HashBack authentication that addresses this. An API that can be called once-off with a single HashBack transaction, that returns a temporal *Bearer token* that can be used until it expires. The use of an additional header, `Accept: application/temporal-bearer-token+json`, indicates the caller is requesting a token with metadata in this format.
 
 For example: <!--BEARER_AUTH_HEADER-->
 ```
@@ -197,6 +197,8 @@ Content-Type: application/temporal-bearer-token+json
     "DeleteUrl": "https://tokens\u044Fus.example/tokens?id=3c14e547-6012-499f-8e32-8c501d3450fc"
 }
 ```
+
+If a service prefers to have clients go through HashBack to get a Bearer token, it may indicate this preference with a `WWW-Authenticate: Bearer` header and a `hashback` parameter. The parameter would be a URL for the client to send a GET request with an `Authorization: HashBack` header. This request could include an `Accept: application/temporal-bearer-token+json` or `Accept: application/jwt` (or both) depending on which format it prefers.
 
 # An extended example.
 **The Rutabaga Company** operates a website with an API designed for their customers to use. They publish a document for their customers that specifies how to use that API. One GET-able end-point is at `https://rutabaga.example/api/bearer_token` which returns a Bearer token in exchange for passing HashBack authentication. This end-points supports a number of query string parameters allowing the caller to request a particular desired life-span for the bearer token and if the request is for a token that will be used in a near future only.
@@ -363,14 +365,14 @@ I don't think this is necessary (indeed, all of the examples in this document us
 
 As this proposal is still in the public-draft phase, I am open to be persuaded that PBKDF2 is not needed and a single round of SHA256 is quite sufficient thank you very much. I'm also open to be persuaded that the default number of rounds needs to be significantly higher.
 
-### Why use a hash at all? Why not make the request a URL and the string expected at that URL?
+### Never mind PBKDF2, why use a hash at all? Why not make the request a URL and the string expected at that URL?
 (I am grateful to m'colleague Rob Armitage for asking this question.)
 
 It is necessary for the file retrieved from the client's website to be a hash (instead of a random string) to prevent an attack when a valid authorization request is fraudulently passed along to a third party. For example:
 
-A-to-B: "I am server A. To prove it, I have placed "ABC" at https://A.example/123.txt."
-B-to-C: "I am server A. To prove it, I have placed "ABC" at https://A.example/123.txt."
-C-to-A: "GET https://A.example/123.txt", to which A will return "ABC".
+A-to-B: "I am server A. To prove it, I have placed "ABC" at https://A.example/hashback?id=123"
+B-to-C: "I am server A. To prove it, I have placed "ABC" at https://A.example/hashback?id=123"
+C-to-A: "GET https://A.example/hashback?id=123", to which A will return "ABC".
 C-to-B: "You are successfully authorized."
 
 From A's point of view, they made a valid request and the request resulted in a single expected GET to the verification URL, presumably from B. As far as A is concerned, there's nothing untoward going on at all. By requiring a hash of the authorization header and checking that the 'Host' property is correct, this passing-along attack is prevented.
@@ -379,17 +381,33 @@ From A's point of view, they made a valid request and the request resulted in a 
 To ensure there's an unambiguous sequence of bytes to feed into the hash. By transferring the JSON block in an encoded set of bytes, the recipient can simply pass the decoded byte array into the PBKDF2 function as the password parameter.
 
 ### How does this compare to "ACME"? (RFC 8555)
+(I am grateful to m'colleague Ollie Hayman for asking this question and bringing ACME to my attention.)
+
 ACME, the exchange that makes "Let's Encrypt" work, has a lot in common with HashBack, including the "call-me-back" verification step at the core of HashBack. (So much so, I really can't claim to have invented this exchange (any more) but I will claim to have independently discovered it.)
 
-As I write this, I am investigating if the ACME verification step (including both HTTP and DNS methods) could be repurposed for HashBack authentication. If it could and without too much modification, this might become draft version 4.1. 
+HashBack is simpler than ACME because HashBack requires only two HTTPS transactions - the initial request and the verification request back. With ACME, there's an additional transaction needed first where the client initiates the ACME handshake and the server responds with a server challenge. HashBack, as it relies on TLS having been set up already - perhaps thanks to ACME - does not require this server challenge and so can go directly to the handshake.
 
-But as far this draft (4.0) is concerned, HashBack is simpler it requires only two HTTPS transactions because HashBack does not require a server challenge. (ACME requires an initial transaction in which the client initiates the certificate issue and the server responds with a challenge.)
+Nonetheless as I write this, I am investigating if the ACME verification step (including both HTTP and DNS methods) could be repurposed for HashBack authentication. If it could and without too much modification, this might become draft version 4.1 of HashBack.
 
 ### Shouldn't you have a server challenge like ACME?
-This is something I'd like an expert to confirm, but I don't think it needs one. The request is sent over TLS, which prevents an attacker seeing the request itself and also replaying it. The `Host` header prevents "passing along" attacks as described above.
+This is something I'd like an expert to confirm, but I don't think we need one. The request is sent over TLS, which prevents an attacker seeing the request itself and also replaying it. The `Host` header prevents "passing along" attacks as described above.
+
+If I am ever persuaded that a server challenge is needed, I'd make it a parameter to the `WWW-Authenticate: HashBack` header with the 401 response. The value of this parameter would then need to be included in the JSON that builds the `Authorization` header. The server would check this value is one it created and reject it if it isn't.
+
+### I'm going to make many requests to the same server. Can I send the same Authorization header with each request?
+Short version: No.
+Slightly longer version: Please don't.
+
+If this is your situation, my official answer is that the client should call the server to issue you a temporal bearer token. That initial request will cause the HashBack exchange to happen only once. Once that has finished, you'll have a bearer token (which is very cheap to use) until it expires. Then you can start over and request another one. My expectation is that almost all HashBack-backed requests will, in practice, actually be to request a new temporal bearer token. Indeed, for earlier drafts, requesting a temporal bearer token was the *only* thing you could do.
+
+But let's discuss the implications of reusing HashBack Authorization headers. I do understand the motivation for wanting to do this. If you've already taken the effort to publish a verification hash, why not reuse it as much as possible instead of doing it again?
+
+The security of this exchange relies on the `Unus` value being unpredictable. This means you should use your operating system's secure random number generator to make a new one each and every time you build a new JSON object. If there's any level of predictability of this value, an attacker might be able to predict a request you're about to make and the attacker makes it first. You're only making yourself less secure if you ever reuse an `Unus` value.
+
+### The process of requesting a temporal bearer token takes too long.
+Consider making that request for a token ahead of time on a schedule, just in case you might need one later. If later on, you do need to make a request and you need to make it now, you'll have that bearer token ready.
 
 ### What are the previous public drafts?
-
 - [Public Draft 1](https://github.com/billpg/HashBack/blob/22c67ba14d1a2b38c2a8daf1551f065b077bfbb0/README.md)
   - Initial published revision, then named "Cross Request Token Exchange".
   - Used two POST requests in opposite directions, with the second POST request acting as the response to the first.

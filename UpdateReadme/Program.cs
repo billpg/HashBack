@@ -1,6 +1,7 @@
 ﻿/* Modify the README.md file with correct tokens and 
  * signatures using the crypto-helper functions. */
 using Newtonsoft.Json.Linq;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -37,13 +38,15 @@ byte[] Pbkdf2(byte[] password, byte[] salt, int iterations, HashAlgorithmName ha
     if (File.Exists(cacheFixedSaltPath))
         return File.ReadAllBytes(cacheFixedSaltPath);
 
-    /* If not call hrough to the actual PBKDF2. */
+    /* If not call through to the actual PBKDF2. */
+    var hashTimer = Stopwatch.StartNew();
     var fixedSaltAsBytes = Rfc2898DeriveBytes.Pbkdf2(
         password: password,
         salt: salt,
         iterations: iterations,
         hashAlgorithm: hashAlgorithm,
         outputLength: outputLength);
+    Console.WriteLine($"PBKDF2 took {hashTimer.Elapsed}");
 
     /* Save to cache. */
     File.WriteAllBytes(cacheFixedSaltPath, fixedSaltAsBytes);
