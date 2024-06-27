@@ -82,7 +82,7 @@ PopulateExample(
     "1066_EXAMPLE",
     DateTime.Parse("1986-10-09T23:00:00-04:00"),
     "server.example",
-    "https://client.example/hashback_files/my_json_hash.txt");
+    "https://client.example/hashback?id=" + GenerateDecimal("1066"));
 
 PopulateExample(
     "CASE_STUDY",
@@ -179,6 +179,15 @@ Guid GenerateGuid(string key)
     keyAsBytes[7] = (byte)(keyAsBytes[7] & ~0xF0 | 0x40);
     keyAsBytes[8] = (byte)(keyAsBytes[8] & ~0xF0 | 0x80);
     return new Guid(keyAsBytes);
+}
+
+int GenerateDecimal(string key)
+{
+    var valueAsBase64 = GenerateUnus(32, key + "GenerateDecimal");
+    var valueAsBytes = Convert.FromBase64String(valueAsBase64);
+    valueAsBytes[0] &= 0x7F;
+    var valueAsInt = BitConverter.ToInt32(valueAsBytes);
+    return (valueAsInt % 10000000);
 }
 
 /* Generate a random-looking token that would work as a non-JWT bearer token. */
