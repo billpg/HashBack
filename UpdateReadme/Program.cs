@@ -1,9 +1,7 @@
 ﻿/* Modify the README.md file with correct tokens and 
  * signatures using the crypto-helper functions. */
-using billpg.CrossRequestTokenExchange;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -13,16 +11,49 @@ string readmePath = FindFileByName("README.md");
 var readmeLines = File.ReadAllLines(readmePath).ToList();
 var readmeOrigText = string.Join("\r\n", readmeLines);
 
-/* Load the fixed salt bytes. */
+/* Constants from which the fixed salt bytes will be derived. */
 const string fixed_salt_password = "To my Treacle.";
 const string fixed_salt_salt = "I love you to the moon and back.";
 const int fixed_salt_rounds = 238854 * 2; 
-var fixedSaltBytes = Rfc2898DeriveBytes.Pbkdf2(
+
+/* Find the fixed salt. */
+var fixedSaltBytes = Pbkdf2(
     password: Encoding.ASCII.GetBytes(fixed_salt_password),
     salt: Encoding.ASCII.GetBytes(fixed_salt_salt),
     iterations: fixed_salt_rounds,
     hashAlgorithm: HashAlgorithmName.SHA512,
     outputLength: 32);
+
+byte[] Pbkdf2(byte[] password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
+{
+    /* Check if we've done this exact hashing operation before. */
+    string cacheFixedSaltPath = 
+        Path.Combine(Path.GetTempPath(),
+        "CacheFixedSaltPath" +
+        $"_{BytesToHex(password)}" +
+        $"_{BytesToHex(salt)}" +
+        $"_{iterations}" +
+        $"_{hashAlgorithm}" +
+        $"_{outputLength}.bin");
+    if (File.Exists(cacheFixedSaltPath))
+        return File.ReadAllBytes(cacheFixedSaltPath);
+
+    /* If not call through to the actual PBKDF2. */
+    var hashTimer = Stopwatch.StartNew();
+    var fixedSaltAsBytes = Rfc2898DeriveBytes.Pbkdf2(
+        password: password,
+        salt: salt,
+        iterations: iterations,
+        hashAlgorithm: hashAlgorithm,
+        outputLength: outputLength);
+    Console.WriteLine($"PBKDF2 took {hashTimer.Elapsed}");
+
+    /* Save to cache. */
+    File.WriteAllBytes(cacheFixedSaltPath, fixedSaltAsBytes);
+
+    /* Return now cached bytes to caller. */
+    return fixedSaltAsBytes;
+}
 
 string StringSaltParameters(string label, string value)
 {
@@ -41,21 +72,29 @@ int fixedSaltIndex = readmeLines.FindIndex(src => src.Contains("<!--FIXED_SALT--
 readmeLines.RemoveRange(fixedSaltIndex, 4);
 readmeLines.Insert(fixedSaltIndex, DumpByteArray(fixedSaltBytes));
 
-/* Set the bytes for CryptoHelper. */
-CryptoHelpers.FIXED_SALT = fixedSaltBytes;
+/* Look for the line with the fixed salt in hex/base64. */
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_HEX-->", $"- Hex: `{BytesToHex(fixedSaltBytes)}`");
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_B64-->", $"- Base64: `{Convert.ToBase64String(fixedSaltBytes)}`");
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_URL-->", $"- URL: `{System.Web.HttpUtility.UrlEncode(fixedSaltBytes)}`");
 
 /* Populate the main examples in the README. */
 PopulateExample(
     "1066_EXAMPLE",
     DateTime.Parse("1986-10-09T23:00:00-04:00"),
-    "https://issuer.example/api/generate_bearer_token",
-    "https://caller.example/hashback_files/my_json_hash.txt");
+    "server.example",
+    "https://client.example/hashback?id=" + GenerateDecimal("1066"));
 
 PopulateExample(
     "CASE_STUDY",
     DateTime.Parse("2005-03-26T19:00:00Z"),
-    "https://sass.example/api/login/hashback",
-    "https://carol.example/hashback/64961859.txt");
+    "rutabaga.example",
+    "https://carol.example/api/hashback?ID=" + GenerateGuid("CarolQueryStringID"));
+
+PopulateExample(
+    "BEARER",
+    DateTime.Parse("1991-08-20T23:02:00+03:00"),
+    "tokens\u044fus.example",
+    "https://tokens-i-want.example/hashback?id="+ GenerateDecimal("BearerExample"));
 
 /* If README has changed, rewrite back. */
 if (readmeOrigText != string.Join("\r\n", readmeLines))
@@ -73,52 +112,132 @@ long UnixTime(DateTime utc)
     return (long)(utc.ToUniversalTime() - DateTime.Parse("1970-01-01T00:00:00Z")).TotalSeconds;
 }
 
-void PopulateExample(string keyBase, DateTime now, string issuerUrl, string verifyUrl)
+void PopulateExample(string keyBase, DateTime now, string hostDomainName, string verifyUrl)
 {
+    const int rounds = 1;
+
     /* Build request JSON. */
     var requestJson = new JObject();
-    requestJson["HashBack"] = "HASHBACK-PUBLIC-DRAFT-3-1";
-    requestJson["TypeOfResponse"] = "BearerToken";
-    requestJson["IssuerUrl"] = issuerUrl;
+    requestJson["Version"] = "BILLPG_DRAFT_4.0";
+    requestJson["Host"] = hostDomainName;
     requestJson["Now"] = UnixTime(now);
-    requestJson["Unus"] = GenerateUnus(keyBase);
-    requestJson["Rounds"] = 1;
-    requestJson["VerifyUrl"] = verifyUrl;
+    requestJson["Unus"] = GenerateUnus(128, keyBase);
+    requestJson["Rounds"] = rounds;
+    requestJson["Verify"] = verifyUrl;
     ReplaceJson($"<!--{keyBase}_REQUEST-->", requestJson);
 
+    /* Encode JSON into bytes. */
+    string jsonAsString = requestJson.ToString(Newtonsoft.Json.Formatting.None);
+    byte[] jsonAsBytes = Encoding.UTF8.GetBytes(jsonAsString);
+
+    /* Build JSON into an Authorization header. */
+    int authHeaderIndex = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_AUTH_HEADER-->"));
+    if (authHeaderIndex > 0)
+    {
+        /* The HTTP Host: header requies xn-- notation for domains. */
+        int hostHeaderIndex = readmeLines.FindIndex(authHeaderIndex, src => src.StartsWith("Host:"));
+        if (hostHeaderIndex > 0 && hostHeaderIndex < readmeLines.Count)
+        {
+            string xnHostDomain = new System.Globalization.IdnMapping().GetAscii(hostDomainName);
+            readmeLines[hostHeaderIndex] = $"Host: {xnHostDomain}";
+        }
+
+        int authHeaderStartIndex = readmeLines.FindIndex(authHeaderIndex, src => src.StartsWith("Authorization"));
+        int authHeaderEndIndx = readmeLines.FindIndex(authHeaderStartIndex+1, src => src.StartsWith(" ") == false);
+        readmeLines.RemoveRange(authHeaderStartIndex+1, authHeaderEndIndx - authHeaderStartIndex - 1);
+
+        /* Convert JSON into a BASE64 string. */
+        string jsonAsBase64 = Convert.ToBase64String(jsonAsBytes, Base64FormattingOptions.InsertLineBreaks);
+        var jsonAsBase64Lines = jsonAsBase64.Split('\r', '\n').Where(s => s.Length > 0).Select(s => " " + s);
+        readmeLines.InsertRange(authHeaderStartIndex+1, jsonAsBase64Lines);
+    }
+
     /* Insert the hash of the above JSON into the readme. */
-    string hash1066 = CryptoHelpers.HashRequestBody(requestJson);
+    string hash1066 = HashRequestJsonBytes(jsonAsBytes, rounds);
     int hash1066Index = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_HASH-->"));
-    readmeLines[hash1066Index] = $"- `{hash1066}`<!--{keyBase}_HASH-->";
+    if (hash1066Index > 0)
+        readmeLines[hash1066Index] = $"- `{hash1066}`<!--{keyBase}_HASH-->";
 
     /* Build response JSON. */
     DateTime issuedAt = now.AddSeconds(1);
     var responseJson = new JObject();
-    string jwt = ToBearerToken(new Uri(verifyUrl).Host, new Uri(issuerUrl).Host, issuedAt, out DateTime expiresAt);
-    responseJson["BearerToken"] = jwt;
-    responseJson["IssuedAt"] = UnixTime(issuedAt);
-    responseJson["ExpiresAt"] = UnixTime(expiresAt);
+    long issuedAtUnix = UnixTime(issuedAt);
+    Guid tokenId = GenerateGuid($"TokenId_{keyBase}");
+    responseJson["Id"] = tokenId;
+    responseJson["BearerToken"] = GenerateBearerToken(keyBase);
+    responseJson["NotBefore"] = issuedAtUnix + 1000;
+    responseJson["IssuedAt"] = issuedAtUnix;
+    responseJson["ExpiresAt"] = issuedAtUnix + 1000 + 3600;
+    responseJson["DeleteUrl"] = $"https://{hostDomainName}/tokens?id={tokenId}";
     ReplaceJson($"<!--{keyBase}_RESPONSE-->", responseJson);
+}
 
-    /* Build a JWT only response. */
-    ReplaceJsonString($"<!--{keyBase}_RESPONSE_JWT_ONLY-->", jwt);
+Guid GenerateGuid(string key)
+{
+    string shortBase64 = GenerateUnus(128,key);
+    byte[] keyAsBytes = Convert.FromBase64String(shortBase64);
+    keyAsBytes[7] = (byte)(keyAsBytes[7] & ~0xF0 | 0x40);
+    keyAsBytes[8] = (byte)(keyAsBytes[8] & ~0xF0 | 0x80);
+    return new Guid(keyAsBytes);
+}
 
-    /* Build a simple token example. */
-    responseJson["BearerToken"] = GenerateUnus(keyBase + "SimpleToken").Substring(0, 40);
-    ReplaceJson($"<!--{keyBase}_RESPONSE_SIMPLE_TOKEN-->", responseJson);
+int GenerateDecimal(string key)
+{
+    var valueAsBase64 = GenerateUnus(32, key + "GenerateDecimal");
+    var valueAsBytes = Convert.FromBase64String(valueAsBase64);
+    valueAsBytes[0] &= 0x7F;
+    var valueAsInt = BitConverter.ToInt32(valueAsBytes);
+    return (valueAsInt % 10000000);
+}
 
-    /* Build a set-cookie example. */
-    int setCookieMarkerIndex = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_SET_COOKIE-->"));
-    if (setCookieMarkerIndex > 0)
+/* Generate a random-looking token that would work as a non-JWT bearer token. */
+string GenerateBearerToken(string keyBase)
+{
+    /* Loop through six times, adding hyphens. */
+    string token = "";
+    for (int i = 0; i < 6; i++)
     {
-        int setCookieHeaderIndex = readmeLines.FindIndex(setCookieMarkerIndex, src => src.StartsWith("Set-Cookie"));
-        var setCookieValue = GenerateUnus(keyBase + "SetCookie").Substring(0, 40);
-        readmeLines[setCookieHeaderIndex] = $"Set-Cookie: MyCookie={setCookieValue}; Secure; HttpOnly;";
+        /* Dot separator, except first time. */
+        if (i > 0)
+            token += ".";
+
+        /* Add some random looking characters. */
+        string random = GenerateUnus(256, keyBase + "SimpleBearer" + i).Replace("+","").Replace("/", "");
+        token += random.Substring(0, 8);
     }
+
+    /* Completed token. */
+    return token;
+}
+
+string HashRequestJsonBytes(byte[] jsonAsBytes, int rounds)
+{
+    /* Run PBKDF2 over the JSON in byte form. */
+    var hash = Rfc2898DeriveBytes.Pbkdf2(
+        password: jsonAsBytes,
+        salt: fixedSaltBytes,
+        hashAlgorithm: HashAlgorithmName.SHA256,
+        iterations: rounds,
+        outputLength: 256 / 8);
+
+    /* Return as a base-64 string. */
+    return Convert.ToBase64String(hash);
 }
 
 void ReplaceJson(string tag, JObject insert)
-{ 
+{
+    /* Turn the JSON object into a Json string with only ascii. */
+    StringBuilder jsonAsString = new StringBuilder(insert.ToString().Replace("\r\n  ", "\r\n    "));
+    for (int jsonIndex = jsonAsString.Length-1; jsonIndex > 0; jsonIndex--)
+    {
+        char ch = jsonAsString[jsonIndex];
+        if (ch > 126)
+        {
+            jsonAsString.Remove(jsonIndex, 1);
+            jsonAsString.Insert(jsonIndex, $"\\u{(int)ch:X4}");
+        }
+    }
+
     /* Look for the "1066" example JSON. */
     int markerIndex = readmeLines.FindIndex(src => src.Contains(tag));
     if (markerIndex < 0) return;
@@ -127,16 +246,7 @@ void ReplaceJson(string tag, JObject insert)
     readmeLines.RemoveRange(openBraceIndex, closeBraceIndex - openBraceIndex + 1);
 
     /* Insert back into code. */
-    readmeLines.Insert(openBraceIndex, insert.ToString().Replace("\r\n  ", "\r\n    "));
-}
-
-void ReplaceJsonString(string tag, string value)
-{
-    /* Look for the tag, then look for the string. */
-    int markerIndex = readmeLines.FindIndex(src => src.Contains(tag));
-    if (markerIndex < 0) return;
-    int stringIndex = readmeLines.FindIndex(markerIndex, src => src.StartsWith("\"ey"));
-    readmeLines[stringIndex] = "\"" + value + "\"";
+    readmeLines.Insert(openBraceIndex, jsonAsString.ToString());
 }
 
 /* Find the file with the given name, starting from this file's folder moving upwards. */
@@ -164,41 +274,17 @@ string FindFileByName(string fileName)
 }
 
 /* Create a random-looking 256-bit Base64 encoded string from a starting string. */
-string GenerateUnus(string v)
+string GenerateUnus(int bits, string v)
 {
     /* Hash the input string and return in hex. */
-    using var sha = System.Security.Cryptography.SHA256.Create();
-    byte[] hash = sha.ComputeHash(System.Text.Encoding.ASCII.GetBytes(v + "Unus"));
+    var hash = Rfc2898DeriveBytes.Pbkdf2(
+        password: Encoding.ASCII.GetBytes(v),
+        salt: Encoding.ASCII.GetBytes("no salt this time"),
+        hashAlgorithm: HashAlgorithmName.SHA256,
+        iterations: 1,
+        outputLength: bits / 8);
     return Convert.ToBase64String(hash);
 }
-
-/* Convert a string into an example JWT. */
-string ToBearerToken(string caller, string issuer, DateTime issuedAt, out DateTime expiresAt)
-{
-    expiresAt = issuedAt.ToUniversalTime().AddHours(1).ToUniversalTime();
-    long iat = UnixTime(issuedAt);
-    long exp = UnixTime(expiresAt);
-
-    string jwtHeader = JWT64Encode(new JObject { ["typ"] = "JWT", ["alg"] = "HS256", [""] = "billpg.com/nggyu" });
-    string jwtBody = JWT64Encode(new JObject { ["sub"] = caller, ["iss"] = issuer, ["iat"] = iat, ["exp"] = exp });
-    string jwtHeaderDotBody = jwtHeader + "." + jwtBody;
-
-    using var hmac = new System.Security.Cryptography.HMACSHA256();
-    hmac.Key = System.Text.Encoding.ASCII.GetBytes("your-256-bit-secret");
-    var hash = hmac.ComputeHash(System.Text.Encoding.ASCII.GetBytes(jwtHeaderDotBody));
-    string jwtSig = JWT64EncodeBytes(hash);
-    string jwtFull = jwtHeaderDotBody + "." + jwtSig;
-    return jwtFull;
-}
-
-string JWT64Encode(JObject j)
-    => JWT64EncodeString(j.ToString(Newtonsoft.Json.Formatting.None));
-
-string JWT64EncodeBytes(byte[] bytes)
-    => Convert.ToBase64String(bytes).Replace('+', '-').Replace('/', '_').TrimEnd('=');
-
-string JWT64EncodeString(string jsonAsString)
-    => JWT64EncodeBytes(System.Text.Encoding.ASCII.GetBytes(jsonAsString));
 
 void SetTextByMarker(List<string> lines, string marker, string line)
 {
@@ -216,9 +302,12 @@ string DumpByteArray(IList<byte> bytes)
         if (i % 8 == 0)
             list += "       ";
         if (i == 0)
-            list += "[";
+            list += "";
         list += $"{bytes[i]},";
     }
 
-    return list.Trim(',') + "]";
+    return list.Trim(',') + "";
 }
+
+string BytesToHex(IList<byte> bytes)
+    => string.Concat(bytes.Select(b => b.ToString("X2")));
