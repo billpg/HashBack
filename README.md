@@ -28,12 +28,12 @@ If you're running a service out in the cloud which interacts with an external se
 
 This repository of secrets will need to be managed. The service won't be able to manage these things for itself because it'll need to identify itself to the service that issues these tokens, moving the problem one layer away without eliminating the problem itself. Either that or you make the decision that these secret tokens stay valid for long periods of time.
 
-Repositories of secret tokens or keys. They have to be so secure that passers by can't access them, but so available that your code running in cloud can. 
+Repositories of secret tokens or keys. They have to be so secure that passers by can't access them, but so available that your code running in cloud can access them. 
 
 ## The Exchange
 In a nutshell, a client proves their identity by publishing a short string on their TLS-secured website. The server downloads that string and thanks to TLS, is reassured that the client is indeed someone who is in control of that website.
 
-To add a little more detail, the client builds a claim for authentication in the form of a JSON object. That object is itself hashed and the hash result string is published on the client's website. To complete the loop, the server gets that string in its own separate HTTP/TLS transaction. Once the server can confirm that the hash published on the client's website matches its own calculated hash for the request header, the server passes the request.
+To add a little more detail, the client builds a claim for authentication in the form of a JSON object. That object's bytes are themselves hashed and the hash result string is published on the client's website. To complete the loop, the server gets that string in its own separate HTTP/TLS transaction. Once the server can confirm that the hash published on the client's website matches its own calculated hash for the supplied JSON object's bytes, the server passes the request.
 
 ### Ahead of time.
 Before any of this can take place, the client's administrator (in their administrator role) will need to affirm to the remote server exactly what range of URLs the client has sole control over and wishes to use for HashBack authentication. Ideally, this would be a single fixed URL with a single query string parameter as only variation allowed. This URL must use TLS via the HTTPS scheme.
@@ -160,7 +160,8 @@ Host: xn--tokensus-5fh.example
 Authorization: HashBack
  eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMCIsIkhvc3QiOiJ0b2tlbnPRj3VzLmV4YW1wbGUi
  LCJOb3ciOjY4MjcxODUyMCwiVW51cyI6Ikt6SmsxTmcyRzBEWHZTb0V4RjJvV0E9PSIsIlJvdW5k
- cyI6MSwiVmVyaWZ5IjoidGhpcy1pcy1ub3QtdXNlZCJ9
+ cyI6MSwiVmVyaWZ5IjoiaHR0cHM6Ly90b2tlbnMtaS13YW50LmV4YW1wbGUvaGFzaGJhY2s/aWQ9
+ ODIzNjE0MyJ9
 Accept: application/temporal-bearer-token+json
 ```
 
@@ -429,5 +430,9 @@ This document is a draft version. I'm looking (please) for clever people to revi
 In due course I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform both the role of an authenticating server by downloading your hashes and validating them, as well as perform the role of a client requesting authentication from you and publishing a verification hash for you to download. (And yes, you could point both APIs at each other, just for laughs.)
 
 Ultimately, I hope to publish this as an RFC and establish it as a public standard.
+
+My thanks to Danny Wilson for his feedback and for developing his own service that performs this authentication. Multiple independent implementations are good for establishing a new standard.
+
+Thank you to my wife for her love and support while I developed this idea. I couldn't have done this without you.
 
 Regards, Bill. <div><a href="https://billpg.com/"><img src="https://billpg.com/wp-content/uploads/2021/03/BillAndRobotAtFargo-e1616435505905-150x150.jpg" alt="billpg.com" align="right" border="0" style="border-radius: 25px; box-shadow: 5px 5px 5px grey;" /></a></div>

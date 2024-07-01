@@ -94,7 +94,7 @@ PopulateExample(
     "BEARER",
     DateTime.Parse("1991-08-20T23:02:00+03:00"),
     "tokens\u044fus.example",
-    "this-is-not-used");
+    "https://tokens-i-want.example/hashback?id="+ GenerateDecimal("BearerExample"));
 
 /* If README has changed, rewrite back. */
 if (readmeOrigText != string.Join("\r\n", readmeLines))
