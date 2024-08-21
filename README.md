@@ -35,6 +35,18 @@ In a nutshell, a client proves their identity by publishing a short string on th
 
 To add a little more detail, the client builds a claim for authentication in the form of a JSON object. That object's bytes are themselves hashed and the hash result string is published on the client's website. To complete the loop, the server gets that string in its own separate HTTP/TLS transaction. Once the server can confirm that the hash published on the client's website matches its own calculated hash for the supplied JSON object's bytes, the server passes the request.
 
+### "Isn't that like ACME?" (Let's Encrypt)
+
+Yes, the exchange used by ACME has a lot in common with HashBack, especially the "call me back" verification step at its core. HashBack does have these significant differences:
+
+*HashBack is a general purpose authentication mechanism*. You could use HashBack for any API that needs caller authentication. ACME is made for issuing TLS certificates and doesn't lend itself to other uses.
+
+*HashBack is simpler*. You can complete the exchange with two transactions - one in each direction. It can do this because it relies on TLS having already been setup with mutually trusted CAs. ACME needs three request/response transactions to issue a certificate.
+
+None of this is to denigrate ACME or Let's Encrypt. Indeed, this proposal is only possible because TLS has become ubiquitous and that's thanks to the Let's Encrypt project. We sitting on the shoulders of giants. 
+
+I am very much open to the next version of this draft exchange reusing parts of ACME. Especially if we can keep it to two-transactions, or a security analysis reveals that we really do need that third transaction. 
+
 ### Ahead of time.
 Before any of this can take place, the client's administrator (in their administrator role) will need to affirm to the remote server exactly what range of URLs the client has sole control over and wishes to use for HashBack authentication. Ideally, this would be a single fixed URL with a single query string parameter as only variation allowed. This URL must use TLS via the HTTPS scheme.
 
@@ -380,15 +392,6 @@ From A's point of view, they made a valid request and the request resulted in a 
 ### Why BASE64 the JSON in the `Authorization` header?
 To ensure there's an unambiguous sequence of bytes to feed into the hash. By transferring the JSON block in an encoded set of bytes, the recipient can simply pass the decoded byte array into the PBKDF2 function as the password parameter.
 
-### How does this compare to "ACME"? (RFC 8555)
-(I am grateful to m'colleague Ollie Hayman for asking this question and bringing ACME to my attention.)
-
-ACME, the exchange that makes "Let's Encrypt" work, has a lot in common with HashBack, including the "call-me-back" verification step at the core of HashBack. (So much so, I really can't claim to have invented this exchange (any more) but I will claim to have independently discovered it.)
-
-HashBack is simpler than ACME because HashBack requires only two HTTPS transactions - the initial request and the verification request back. With ACME, there's an additional transaction needed first where the client initiates the ACME handshake and the server responds with a server challenge. HashBack, as it relies on TLS having been set up already - perhaps thanks to ACME - does not require this server challenge and so can go directly to the handshake.
-
-Nonetheless as I write this, I am investigating if the ACME verification step (including both HTTP and DNS methods) could be repurposed for HashBack authentication. If it could and without too much modification, this might become draft version 4.1 of HashBack.
-
 ### Shouldn't you have a server challenge like ACME?
 This is something I'd like an expert to confirm, but I don't think we need one. The request is sent over TLS, which prevents an attacker seeing the request itself and also replaying it. The `Host` header prevents "passing along" attacks as described above.
 
@@ -431,7 +434,7 @@ In due course I plan to deploy a publicly accessible test API which you could us
 
 Ultimately, I hope to publish this as an RFC and establish it as a public standard.
 
-My thanks to Danny Wilson for his feedback and for developing his own service that performs this authentication. Multiple independent implementations are good for establishing a new standard.
+My thanks to Danny Wilson for his feedback and for developing his own service that performs this authentication. Multiple independent implementations are good for establishing a new standard. My thanks also to Ollie Hayman for bringing ACME to my attention.
 
 Thank you to my wife for her love and support while I developed this idea. I couldn't have done this without you.
 
