@@ -37,13 +37,21 @@ To add a little more detail, the client builds a claim for authentication in the
 
 ### "Isn't that like ACME?" (Let's Encrypt)
 
-Yes, the exchange used by ACME has a lot in common with HashBack, especially the "call me back" verification step at its core. HashBack does have these significant differences:
+Yes, the exchange used by ACME has a lot in common with HashBack, especially the "call me back" verification step at its core.
 
-*HashBack is a general purpose authentication mechanism*. You could use HashBack for any API that needs caller authentication. ACME is made for issuing TLS certificates and doesn't lend itself to other uses.
+HashBack and ACME have these significant differences:
 
-*HashBack is simpler*. You can complete the exchange with two transactions - one in each direction. It can do this because it relies on TLS having already been setup with mutually trusted CAs. ACME needs three request/response transactions to issue a certificate.
+| &nbsp;                                         | ACME               | HashBack           |
+|-----------------------------------------------:|--------------------|--------------------|
+| Number of tranactions needed to complete auth: | **3**              | **2**              |
+|            General purpose API authentication: | :x:                | :heavy_check_mark: | 
+|               Works without TLS already setup: | :heavy_check_mark: | :x:                |  
+|                   Useful for establishing TLS: | :heavy_check_mark: | :x:                |
 
-None of this is to denigrate ACME or Let's Encrypt. Indeed, this proposal is only possible because TLS has become ubiquitous and that's thanks to the Let's Encrypt project. We sitting on the shoulders of giants. 
+*HashBack is a general purpose authentication mechanism.* You could use HashBack for any API that needs caller authentication.    
+*HashBack is simpler.* You can complete the exchange with two transactions - a request and response in each direction.
+
+HashBack requires that both sides already have TLS established and configured before you even start. Without TLS on both sides, this mechanism is going to fail. It is thanks to Let's Encrypt and the AMCE protocol making TLS ubiquitous that HashBack is even possible. We are truly standing on the shoulders of giants.
 
 I am very much open to the next version of this draft exchange reusing parts of ACME. Especially if we can keep it to two-transactions, or a security analysis reveals that we really do need that third transaction. 
 
