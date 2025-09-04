@@ -2,6 +2,7 @@
  * signatures using the crypto-helper functions. */
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
+using System.Net;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -115,14 +116,14 @@ long UnixTime(DateTime utc)
 void PopulateExample(string keyBase, DateTime now, string hostDomainName, string verifyUrl)
 {
     const int rounds = 1;
+    string xnHostDomain = new System.Globalization.IdnMapping().GetAscii(hostDomainName);
 
     /* Build request JSON. */
     var requestJson = new JObject();
-    requestJson["Version"] = "BILLPG_DRAFT_4.0";
+    requestJson["Version"] = "BILLPG_DRAFT_4.1";
     requestJson["Host"] = hostDomainName;
     requestJson["Now"] = UnixTime(now);
     requestJson["Unus"] = GenerateUnus(128, keyBase);
-    requestJson["Rounds"] = rounds;
     requestJson["Verify"] = verifyUrl;
     ReplaceJson($"<!--{keyBase}_REQUEST-->", requestJson);
 
@@ -138,7 +139,6 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
         int hostHeaderIndex = readmeLines.FindIndex(authHeaderIndex, src => src.StartsWith("Host:"));
         if (hostHeaderIndex > 0 && hostHeaderIndex < readmeLines.Count)
         {
-            string xnHostDomain = new System.Globalization.IdnMapping().GetAscii(hostDomainName);
             readmeLines[hostHeaderIndex] = $"Host: {xnHostDomain}";
         }
 
@@ -156,7 +156,10 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     string hash1066 = HashRequestJsonBytes(jsonAsBytes, rounds);
     int hash1066Index = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_HASH-->"));
     if (hash1066Index > 0)
-        readmeLines[hash1066Index] = $"- `{hash1066}`<!--{keyBase}_HASH-->";
+    {
+        var lineByQuotes = readmeLines[hash1066Index].Split('`');
+        readmeLines[hash1066Index] = lineByQuotes[0] + "`" + hash1066 + "`" + lineByQuotes[2];
+    }
 
     /* Build response JSON. */
     DateTime issuedAt = now.AddSeconds(1);
@@ -169,7 +172,27 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     responseJson["IssuedAt"] = issuedAtUnix;
     responseJson["ExpiresAt"] = issuedAtUnix + 1000 + 3600;
     responseJson["DeleteUrl"] = $"https://{hostDomainName}/tokens?id={tokenId}";
-    ReplaceJson($"<!--{keyBase}_RESPONSE-->", responseJson);
+    //ReplaceJson($"<!--{keyBase}_RESPONSE-->", responseJson);
+
+    int responseMarkerLineIndex = readmeLines.FindIndex(s => s.Contains($"<!--{keyBase}_RESPONSE-->"));
+    if (responseMarkerLineIndex > 0)
+    {
+        string cookieName =
+            hostDomainName.Contains("utabag") ? "RutabagaAuth" : "AuthToken";
+
+        string setCookieHeader =
+            $"Set-Cookie:" +
+            $" {cookieName}={GenerateBearerToken(keyBase)};\r\n" +
+            $"  Domain={xnHostDomain};\r\n" +
+            $"  Expires={issuedAt + TimeSpan.FromSeconds(1000 + 3600):R};\r\n" +
+            $"  Secure; HttpOnly; SameSite=Strict";
+        int setCookieLineIndex = readmeLines.FindIndex(responseMarkerLineIndex, s => s.StartsWith("Set-Cookie:"));
+        int endSetCookie = readmeLines.FindIndex(setCookieLineIndex, s => s == "```");
+        readmeLines[setCookieLineIndex] = setCookieHeader;
+        readmeLines.RemoveRange(setCookieLineIndex + 1, endSetCookie - setCookieLineIndex - 1);
+    }
+
+  
 }
 
 Guid GenerateGuid(string key)
@@ -195,7 +218,7 @@ string GenerateBearerToken(string keyBase)
 {
     /* Loop through six times, adding hyphens. */
     string token = "";
-    for (int i = 0; i < 6; i++)
+    for (int i = 0; i < 3; i++)
     {
         /* Dot separator, except first time. */
         if (i > 0)
@@ -212,16 +235,11 @@ string GenerateBearerToken(string keyBase)
 
 string HashRequestJsonBytes(byte[] jsonAsBytes, int rounds)
 {
-    /* Run PBKDF2 over the JSON in byte form. */
-    var hash = Rfc2898DeriveBytes.Pbkdf2(
-        password: jsonAsBytes,
-        salt: fixedSaltBytes,
-        hashAlgorithm: HashAlgorithmName.SHA256,
-        iterations: rounds,
-        outputLength: 256 / 8);
-
-    /* Return as a base-64 string. */
-    return Convert.ToBase64String(hash);
+    var hashInput = new byte[fixedSaltBytes.Length + jsonAsBytes.Length];
+    Buffer.BlockCopy(fixedSaltBytes, 0, hashInput, 0, fixedSaltBytes.Length);
+    Buffer.BlockCopy(jsonAsBytes, 0, hashInput, fixedSaltBytes.Length, jsonAsBytes.Length);
+    var hashOutput = SHA256.HashData(hashInput);
+    return Convert.ToBase64String(hashOutput);
 }
 
 void ReplaceJson(string tag, JObject insert)
