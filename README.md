@@ -335,9 +335,9 @@ Nonetheless, I have a separate proposal that will allow for the POST request to 
 
 It is necessary for the file retrieved from the client's website to be a hash (instead of a random string) to prevent an attack when a valid authorization request is fraudulently passed along to a third party. For example:
 
-A-to-B: "I am server A. To prove it, I have placed "ABC" at https://A.example/hashback?id=123"
-B-to-C: "I am server A. To prove it, I have placed "ABC" at https://A.example/hashback?id=123"
-C-to-A: "GET https://A.example/hashback?id=123", to which A will return "ABC".
+A-to-B: "I am server A. To prove it, I have placed "ABC" at https://A.example/hashback?id=123"    
+B-to-C: "I am server A. To prove it, I have placed "ABC" at https://A.example/hashback?id=123"    
+C-to-A: "GET https://A.example/hashback?id=123", to which A will return "ABC".    
 C-to-B: "You are successfully authorized."
 
 From A's point of view, they made a valid request and the request resulted in a single expected GET to the verification URL, presumably from B. As far as A is concerned, there's nothing untoward going on at all. By requiring a hash of the authorization header and checking that the 'Host' property is correct, this passing-along attack is prevented.
@@ -351,7 +351,7 @@ This is something I'd like an expert to confirm, but I don't think we need one. 
 If I am ever persuaded that a server challenge is needed, I'd make it a parameter to the `WWW-Authenticate: HashBack` header with the 401 response. The value of this parameter would then need to be included in the JSON that builds the `Authorization` header. The server would check this value is one it created and reject it if it isn't.
 
 ### I'm going to make many requests to the same server. Can I send the same Authorization header with each request?
-Short version: No.
+Short version: No.    
 Slightly longer version: Please don't.
 
 If this is your situation, my official answer is that the client should call the server to issue a temporal cookie back to you. That initial request will cause the HashBack exchange to happen only once. Once that has finished, you'll have a cookie (which is very cheap to use) until it expires. Then you can start over and request another one. My expectation is that almost all HashBack-backed requests will, in practice, actually be to request a new temporal bearer token. Indeed, for earlier drafts, requesting a temporal bearer token was the *only* thing you could do.
@@ -391,4 +391,4 @@ My thanks to Danny Wilson for his feedback and for developing his own service th
 
 Thank you to my wife for her love and support while I developed this idea. I couldn't have done this without you.
 
-Regards, Bill. <div><a href="https://billpg.com/"><img src="https://owl.billpg.com/wp-content/uploads/2025/09/wizard-owl-icon-500x500-1.png" alt="billpg.com" align="right" border="0" width="250" height="250" style="border-radius: 25px; box-shadow: 5px 5px 5px grey;" /></a></div>
+Regards, Bill. <div><a href="https://billpg.com/"><img src="https://owl.billpg.com/wp-content/uploads/2025/09/wizard-owl-icon-500x500-1.png" alt="billpg.com" align="right" border="0" style="border-radius: 25px; box-shadow: 5px 5px 5px grey;" /></a></div>
