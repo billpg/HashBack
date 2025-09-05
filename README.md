@@ -159,35 +159,21 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
 
 Clients may skip that initial transaction if it is already known that the server supports HashBack authentication.
 
-# application/204-Set-Cookie
-The above exchange does have the disadvantage of being expensive, requiring a separate transaction in the opposite direction to complete a login request. While this may be acceptable for a once-off transaction, it would be prohibitively expensive to perform the full exchange every time for a large number of requests. 
+# "Do we need to perform this exchange for every API request?"
+Yes, but also, No.
 
-An API that can be called once-off with a single HashBack transaction, could return a standard cookie for subsequent API uses until the cookie expires. The use of an additional header, `Accept: application/204-Set-Cookie`, indicates the caller is expecting a 204 response (no content) with a `Set-Cookie` header. I anticipate this would be the primary use of HashBack in practice. (In earlier drafts, getting a Bearer token was the *only* thing you could with this authentication.)
+Yes, each time you make an API request authenticated by HashBack, you need to make a new header and arrange for the new verification hash to be made available. That is an expensive operation and there's no shortcut. Every single time you want to make an API request with HashBack, you need to start entire process over. Even if you have a thousand requests to make.
 
-For example: <!--BEARER_AUTH_HEADER-->
-```
-GET /api/login HTTP/1.1
-Host: xn--tokensus-5fh.example
-Authorization: HashBack
- eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJ0b2tlbnPRj3VzLmV4YW1wbGUi
- LCJOb3ciOjY4MjcxODUyMCwiVW51cyI6Ikt6SmsxTmcyRzBEWHZTb0V4RjJvV0E9PSIsIlZlcmlm
- eSI6Imh0dHBzOi8vdG9rZW5zLWktd2FudC5leGFtcGxlL2hhc2hiYWNrP2lkPTgyMzYxNDMifQ==
-Accept: application/204-Set-Cookie
-```
+But because it is expensive, maybe plan for the response to the first successful response to include a `Set-Cookie` header or some form of bearer token. Once the caller has one of those, they can use the cookie for (say) ten minutes until it expires. At that point, perform that hashBack exchange again for a fresh cookie.
 
-Response: <!--BEARER_RESPONSE-->
-```
-204 No Content
-Set-Cookie: AuthToken=xygCgzNR.GKl0narP.DYKaXhKF;
-  Domain=xn--tokensus-5fh.example;
-  Expires=Tue, 20 Aug 1991 22:18:41 GMT;
-  Secure; HttpOnly; SameSite=Strict
-```
+I've avoided specifying that mechanism in this document to keep it focused to the main idea. For earlier drafts, supplying a bearer token was the *only* thing you could do with HashBack, thinking that no-one would ever want to use it in any other mode. I changed my mind when I relaised that someone wanting to make a single request every hour would prefer to skip the bearer token step.
+
+If you are developing the receiving end of a HashBack request, please add a `Set-Cookie` to the response that the caller can use for a little while. If you're developing the requesting end, please have your code check the response for that cookie and use it next time. Or some other mechanism. 
 
 # An extended example.
-**The Rutabaga Company** operates a website with an API designed for their customers to use. They publish a document for their customers that specifies how to use that API. One GET-able end-point is at `https://rutabaga.example/api/login` which returns a 204 (no content) response in exchange for passing HashBack authentication. 
+**The Rutabaga Company** operates a website with an API designed for their customers to use, accepting POST requests for customers to make orders for their tasty rutabagas.
 
-**Carol** is a customer of the Rutabaga Company. She's recently signed up and logged into their customer portal. On her authentication page under the *HashBack Authentication* section, she's configured her account affirming that `https://carol.example/hashback` is under her sole control and where her verification hashes will be saved and returned using the `?ID=` query string parameter.
+**Carol** is a customer of the Rutabaga Company. She's recently signed up and logged into their customer portal. On her authentication page under the *HashBack Authentication* section, she's configured her account affirming that `https://carol.example/hashback` is under her sole control and where her verification hashes will be made avaiable.
 
 ## Making the request.
 Time passes and Carol needs to make a request to the Rutabaga Company API and needs a Bearer token. Her code builds a JSON object in memory:<!--CASE_STUDY_REQUEST-->
@@ -201,30 +187,35 @@ Time passes and Carol needs to make a request to the Rutabaga Company API and ne
 }
 ```
 
-The code calculates the verification hash from this JSON using the process outlined above (`E8Xz9p7Nm/aFRKhfibhKwiWtevne0T2plvny3WY/Ih8=`)<!--CASE_STUDY_HASH--> which is saved ready for retrieval later.
+The code calculates the verification hash from this JSON obejct (`E8Xz9p7Nm/aFRKhfibhKwiWtevne0T2plvny3WY/Ih8=`) and saves it ready for retrieval in a few moments.<!--CASE_STUDY_HASH-->
 
-To complete the GET request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows.<!--CASE_STUDY_AUTH_HEADER-->
+To complete the request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows.<!--CASE_STUDY_AUTH_HEADER-->
 ```
-GET /api/login HTTP/1.1
+POST /api/order HTTP/1.1
 Host: rutabaga.example
 User-Agent: Carol's Magnificent Application Server.
-Accept: application/204-Set-Cookie
 Authorization: HashBack
  eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJydXRhYmFnYS5leGFtcGxlIiwi
  Tm93IjoxMTExODYzNjAwLCJVbnVzIjoic0doSzFySWJFV2pXNlNnMjVzK0tQZz09IiwiVmVyaWZ5
  IjoiaHR0cHM6Ly9jYXJvbC5leGFtcGxlL2FwaS9oYXNoYmFjaz9JRD05YzgwOTFjOS1iY2QyLTQw
  NWEtOGIyMy05YmY0YzQ5MmY4MDMifQ==
+Accept: application/json
+Content-Type: application/json
+
+{
+   "Product": "Rutabagas",
+   "Quality": "Tasty!",
+   "Quantity": "Lots!"
+}
 ```
 
-Because the hash needs only to be stored for a few seconds, The hash is recoded in the server's own memory cache. With this in place, the request for a Bearer token including the header can be sent to the API. The HTTP client library used to make the request will perform the necessary TLS handshake as part of making the connection.
-
 ## Checking the request
-The Rutabaga Company website receives this request and validates the request body, performing the following checks:
+The Rutabaga Company website receives this request and validates it, performing the following checks:
 - The request arrived via HTTPS.  :heavy_check_mark:
 - The `Authorization` header is `HashBack` type with a BASE64-encoded JSON payload.  :heavy_check_mark:
 - The `Host` value is a domain it owns - `rutabaga.example`.  :heavy_check_mark:
 - The `Now` time-stamp is reasonably close to the server's internal clock.  :heavy_check_mark:
-- The `Unus` value represents 128 bits encoded in base-64 and this value has never been seen before.  :heavy_check_mark:
+- The `Unus` value represents 128 bits encoded in base-64.  :heavy_check_mark:
 - The `Verify` value is an HTTPS URL belonging to a known user - *Carol*.  :heavy_check_mark:
 
 The service has passed the request for basic validity, but it still doesn't know if the request has genuinely come from Carol's service or not. To perform this step, it proceeds to check the verification hash.
@@ -235,25 +226,26 @@ Having the URL to get the client's verification hash, the Rutabaga Company's ser
 - The TLS handshake completes with a valid certificate.  :heavy_check_mark:
 - The GET response code is 200.  :heavy_check_mark:
 - The response's `Content-Type` is `text/plain`.  :heavy_check_mark:
-- The text, once any CRLF bytes have been trimmed from the end, is 256 bits encoded in BASE-64.  :heavy_check_mark:
-
-(If any of these tests had failed, the specific error would be indicated in a 400 error response to the initial request with the `Authorization` header. As the download was successful, that isn't needed.)
+- The text represents 256 bits encoded in BASE-64.  :heavy_check_mark:
 
 Having successfully retrieved a verification hash, it must now find the expected hash to check it is genuine.
 
 ## Checking the verification hash
-The service performs the same hashing operation on the block of BASE64-encoded bytes request that the Caller performed earlier. With both the retrieved verification hash and the internally calculated expected hash, the service may compare the two strings. If they don't match, the service would make a 400 response to the original request complaining that the verification hash doesn't match the request body. In this case, they do indeed match and the service is reassured that the client is actually Carol.
+The service performs the same hashing operation on the block of BASE64-encoded bytes request that the Caller performed earlier. If they match, the request is authenticated and may continue processing it, reassured that the client is actually Carol.
 
-Satisfied the request is genuine, the service generates a cookie and returns it to the caller as the response to the initial request.<!--CASE_STUDY_RESPONSE-->
 ```
-HTTP/1.1 204 No Content
+HTTP/1.1 200 OK
 Set-Cookie: RutabagaAuth=jTqkkDGt.IGu55JOH.cGlsgwiC;
   Domain=rutabaga.example;
   Expires=Sat, 26 Mar 2005 20:16:41 GMT;
   Secure; HttpOnly; SameSite=Strict
-```
+Content-Type: application/json
 
-She may now use the issued cookie to call the Rutabaga API until that token expires.
+{
+   "OrderID": "12",
+   "ExpectedDelivery": "Tomorrow"
+}
+```
 
 ## Answers to Anticipated Questions
 
@@ -274,7 +266,7 @@ For example, if a user affirms they are in control of `https://example.com/hashb
 Ultimately, it is up to the code performing this exchange to agree what URLs identify each user. This document does not proscribe that scope.
 
 ### TLS supports client-side certificates.
-To use client-side certificates, the client side would need access to the private key. This would need secure storage for the key which the caller code has access to. Avoidance of this is the main motivation of this exchange.
+To use client-side certificates, the client side would need access to a private key. This would need secure storage for the key which the caller code has access to. Avoidance of this is the main motivation of this exchange.
 
 ### What if an attacker attempts to eavesdrop on either request?"
 The attacker can't eavesdrop because TLS is securing the channel.
@@ -287,7 +279,7 @@ If you want to allow for self-signed TLS certificates, since this exchange relie
 ### What if an attacker has a TLS certificate signed by a trusted CA?
 Then the attacker has broken TLS itself and we have bigger problems.
 
-If this is a serious concern, then you could keep your own collection of trusted TLS certificates and refuse of recognize any TLS certificates not on your list. You'd effectively be running your own CA if you can't trust the ones built into your HTTP library.
+If this is a serious concern, you could keep your own collection of trusted TLS certificates and refuse of recognize any TLS certificates not on your list. You'd effectively be running your own CA if you can't trust the ones built into your HTTP library.
 
 ### What if an attacker sends a fake Authorization header?
 The recipient will attempt to retrieve a verification hash file from the real client's website. As there won't be a verification hash that matches the fake header, the attempt will fail.
@@ -354,11 +346,13 @@ If I am ever persuaded that a server challenge is needed, I'd make it a paramete
 Short version: No.    
 Slightly longer version: Please don't.
 
-If this is your situation, my official answer is that the client should call the server to issue a temporal cookie back to you. That initial request will cause the HashBack exchange to happen only once. Once that has finished, you'll have a cookie (which is very cheap to use) until it expires. Then you can start over and request another one. My expectation is that almost all HashBack-backed requests will, in practice, actually be to request a new temporal bearer token. Indeed, for earlier drafts, requesting a temporal bearer token was the *only* thing you could do.
+If this is your situation, my official answer is that the client should call the server to issue a temporal cookie back. That initial request will only need to perform the HashBack exchange once until the cookie expires. The time between those requests can use the cookie, which is significantly cheaper. (My expectation is that almost all HashBack-backed requests will, in practice, actually be to request a new temporal cookie.)
 
 But let's discuss the implications of reusing HashBack Authorization headers. I do understand the motivation for wanting to do this. If you've already taken the effort to publish a verification hash, why not reuse it as much as possible instead of doing it again?
 
 The security of this exchange relies on the `Unus` value being unpredictable. This means you should use your operating system's secure random number generator to make a new one each and every time you build a new JSON object. If there's any level of predictability of this value, an attacker might be able to predict a request you're about to make and the attacker makes it first. You're only making yourself less secure if you ever reuse an `Unus` value.
+
+Servers are free to reject any request with an `Unus` string they've seen before.
 
 ### What are the previous public drafts?
 - [Public Draft 1](https://github.com/billpg/HashBack/blob/22c67ba14d1a2b38c2a8daf1551f065b077bfbb0/README.md)
@@ -375,13 +369,14 @@ The security of this exchange relies on the `Unus` value being unpredictable. Th
   - The "fixed salt" is now the result of running RBKDF2 but without processing the result into capitals letters. This means I no longer need to link to some "attached" C# code and can simply record the input parameters. (The original motivation of having only capital letters in the salt was to support implementations that only accept ASCII strings, but all implementations I could find will accept arbitrary blocks of bytes as input.)
   - Added "204SetCookie" as a third response type. Might be useful for a browser making the POST request.
 - [Public Draft 4.0](https://github.com/billpg/HashBack/blob/5cef44b500f6885202d24eda51aa81fe865b8495/README.md)
-  - The JSON request is now sent by the client in the form of an HTTP `Authorization` header. The transaction being authenticated could be anything, including a request for a Bearer token. This has the advantage of allowing a once-off request to skip the extra transaction to fetch a Bearer token and act more like traditional HTTP authentication. Also, as this header payload is BASE64 encoded, we don't need to canonicalize the JSON as the hash can be done on the BASE64 encoded bytes.
+  - Another substantial refactoring. The JSON request is now sent by the client in the form of an HTTP `Authorization` header.
+  - The transaction being authenticated could be anything, including a request for a Bearer token, but not just that. This has the advantage of allowing a once-off request to skip the extra transaction to fetch a Bearer token and act more like traditional HTTP authentication. Also, as this header payload is BASE64 encoded, we don't need to canonicalize the JSON as the hash can be done on the BASE64 encoded bytes.
  - Public Draft 4.1 (This Document)
-   - Replaced PBKDF2 with a single round of salted SHA-256 for the verification hash.
-   - Replaced discussion of temporal bearer tokens with cookies to simplify the document.
+   - Replaced PBKDF2 with a single round of salted SHA-256 for the verification hash. I'm happy the extended hashing isn't needed.
+   - Removed the mechanism to retrieve a temporal bearer token to simplify the document.
 
 ## Next Steps
-This document is a draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using SHA-256 with its fixed salt correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm that authenticity of the authentication request. If you have any comments or notes, please raise an issue on this project's github.
+This document is a public draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using SHA-256 with its fixed salt correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm that authenticity of the authentication request. If you have any comments or notes, please raise an issue on this project's github.
 
 In due course I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform both the role of an authenticating server by downloading your hashes and validating them, as well as perform the role of a client requesting authentication from you and publishing a verification hash for you to download. (And yes, you could point both APIs at each other, just for laughs.)
 
