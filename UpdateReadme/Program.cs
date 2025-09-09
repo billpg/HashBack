@@ -51,8 +51,8 @@ PopulateExample(
 PopulateExample(
     "CASE_STUDY",
     DateTime.Parse("1991-08-20T23:02:00+03:00"),
-    "TheRutabagaCompany.example",
-    "carol.example");
+    "RootHavenFarms.example",
+    "Petunia.example");
 
 /* If README has changed, rewrite back. */
 if (readmeOrigText != string.Join("\r\n", readmeLines))

@@ -1,5 +1,5 @@
-# HashBack Authentication
-A web authentication exchange where a caller proves their identity by publishing a hash value on their website.
+# HashBack Authentication: Trust, Verified.
+HashBack is a two-step authentication exchange over HTTPS/TLS. Your identity is proven by publishing a hash, not sharing a secret. One Request. One Verification. Zero Secrets.
 
 This version of the document is a **public-draft** for review and discussion tagged as version **4.1**.
 If you have any comments or notes, please open an issue on this project's public github.
@@ -172,71 +172,68 @@ If you are developing the receiving end of a HashBack request, please add a `Set
 
 # An extended example.
 **The Rutabaga Company** operates a website with an API designed for their customers to use, accepting POST requests for customers to make orders for their tasty rutabagas.
+# Case Study
+**Root Haven Farms** is a large agricultural concern that grows and sells rutabagas and other root vegetables. They have a secure API at `RootHavenFarms.example` for their regular customers use to place orders directly from their own systems.
 
-**Carol** is a customer of the Rutabaga Company. She's recently signed up and logged into their customer portal. On her authentication page under the *HashBack Authentication* section, she's configured her account affirming that `https://carol.example/hashback` is under her sole control and where her verification hashes will be made avaiable.
+One such customer is Petunia Parsnip, founder of **The Underground Supper Club**, a high-end vegan patisserie that specializes in root-vegatable-themed banquets. Her clients expect nothing less than the finest rutabaga souffles and parsnip pavlovas, delivered with flair and precision.
+
+Petunia has recently signed up with Root Haven Farms and logged into their customer portal. On her authentication page under the *HashBack Authentication* section, she's configured her account affirming that `https://petunia.example/hashback` is under her sole control and where her verification hashes will be made avaiable.
 
 ## Making the request.
-Time passes and Carol needs to make a request to the Rutabaga Company API and needs a Bearer token. Her code builds a JSON object in memory:<!--CASE_STUDY_REQUEST-->
+Petunia needs to place a large rutabaga order for an upcoming "Turnip the Volume" gala. Her stock management system constructs the following JSON payload:<!--CASE_STUDY_REQUEST-->
 ```
 {
     "Version": "BILLPG_DRAFT_4.1",
-    "Host": "TheRutabagaCompany.example",
+    "Host": "RootHavenFarms.example",
     "Now": 682718520,
     "Unus": "sGhK1rIbEWjW6Sg25s+KPg==",
-    "Verify": "https://carol.example/api/hashback?id=901983180"
+    "Verify": "https://Petunia.example/api/hashback?id=901983180"
 }
 ```
 
-The code calculates the verification hash from this JSON obejct (`5bYvRPAPcOhuK2Jw1LPM5/cRezzJ01GrLNT7587ZdMQ=`) and saves it ready for retrieval in a few moments.<!--CASE_STUDY_HASH-->
+The system calculates the verification hash from this JSON object (`EZ4A66YWHR0B4iC1OB298/b4CTYWtq/ul7eVRi9N3Ks=`) and publishes it on their server at the specified URL, ready for retrieval.<!--CASE_STUDY_HASH-->
 
 To complete the request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows.<!--CASE_STUDY_AUTH_HEADER-->
 ```
 POST /api/order HTTP/1.1
-Host: TheRutabagaCompany.example
-User-Agent: Carol's Magnificent Application Server.
+Host: RootHavenFarms.example
+User-Agent: Petunia's Wonderful Stock Management System.
 Authorization: HashBack
- eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJUaGVSdXRhYmFnYUNvbXBhbnku
- ZXhhbXBsZSIsIk5vdyI6NjgyNzE4NTIwLCJVbnVzIjoic0doSzFySWJFV2pXNlNnMjVzK0tQZz09
- IiwiVmVyaWZ5IjoiaHR0cHM6Ly9jYXJvbC5leGFtcGxlL2FwaS9oYXNoYmFjaz9pZD05MDE5ODMx
- ODAifQ==
+ eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJSb290SGF2ZW5GYXJtcy5leGFt
+ cGxlIiwiTm93Ijo2ODI3MTg1MjAsIlVudXMiOiJzR2hLMXJJYkVXalc2U2cyNXMrS1BnPT0iLCJW
+ ZXJpZnkiOiJodHRwczovL1BldHVuaWEuZXhhbXBsZS9hcGkvaGFzaGJhY2s/aWQ9OTAxOTgzMTgw
+ In0=
 Accept: application/json
 Content-Type: application/json
 
-{
-   "Product": "Rutabagas",
-   "Quality": "Tasty!",
-   "Quantity": "Lots!"
-}
+{ "Product": "Rutabagas!", "Quality": "Tasty!", "Quantity": "Lots!" }
 ```
 
 ## Checking the request
-The Rutabaga Company website receives this request and validates it, performing the following checks:
-- The request arrived via HTTPS.  :heavy_check_mark:
-- The `Authorization` header is `HashBack` type with a BASE64-encoded JSON payload.  :heavy_check_mark:
-- The `Host` value is a domain it owns - `rutabaga.example`.  :heavy_check_mark:
-- The `Now` time-stamp is reasonably close to the server's internal clock.  :heavy_check_mark:
-- The `Unus` value represents 128 bits encoded in base-64.  :heavy_check_mark:
-- The `Verify` value is an HTTPS URL belonging to a known user - *Carol*.  :heavy_check_mark:
+The Root Haven Farms website receives this request and validates it, performing the following checks:
+- :heavy_check_mark: The request arrived via HTTPS.  
+- :heavy_check_mark: The `Authorization` header is `HashBack` type.
+- :heavy_check_mark: The `Host` value is a domain it owns - `RootHavenFarms.example`.
+- :heavy_check_mark: The `Now` time-stamp is reasonably close to the server's internal clock.
+- :heavy_check_mark: The `Verify` value is an HTTPS URL belonging to a known user - *Petunia*.
 
 The service has passed the request for basic validity, but it still doesn't know if the request has genuinely come from Carol's service or not. To perform this step, it proceeds to check the verification hash.
 
 ## Retrieval of the verification hash
-Having the URL to get the client's verification hash, the Rutabaga Company's service performs a GET request for that URL. As part of the request, it makes the following checks:
-- The URL lists a valid domain name.  :heavy_check_mark:
-- The TLS handshake completes with a valid certificate.  :heavy_check_mark:
-- The GET response code is 200.  :heavy_check_mark:
-- The response's `Content-Type` is `text/plain`.  :heavy_check_mark:
-- The text represents 256 bits encoded in BASE-64.  :heavy_check_mark:
+Having the URL to get the client's verification hash, the service performs a GET request for that URL. As part of the request, it makes the following checks:
+- :heavy_check_mark: The TLS certificate is valid.
+- :heavy_check_mark: The response is `text/plain`.
+- :heavy_check_mark: The response body is 256 bits in BASE-64.
 
 Having successfully retrieved a verification hash, it must now find the expected hash to check it is genuine.
 
 ## Checking the verification hash
-The service performs the same hashing operation on the block of BASE64-encoded bytes request that the Caller performed earlier. If they match, the request is authenticated and may continue processing it, reassured that the client is actually Carol. <!--CASE_STUDY_SET_COOKIE-->
+The service performs the same hashing operation on the block of BASE64-encoded bytes request that the caller performed earlier. If they match, the request is authenticated and may continue processing it, reassured that the client is actually Petunia. <!--CASE_STUDY_SET_COOKIE-->
 
 ```
 HTTP/1.1 200 OK
 Set-Cookie: RutabagaAuth=jTqkkDGt.IGu55JOH.cGlsgwiC;
-  Domain=TheRutabagaCompany.example;
+  Domain=RootHavenFarms.example;
   Expires=Tue, 20 Aug 1991 22:18:41 GMT;
   Secure; HttpOnly; SameSite=Strict
 Content-Type: application/json
@@ -246,6 +243,9 @@ Content-Type: application/json
    "ExpectedDelivery": "Tomorrow"
 }
 ```
+
+## Outcome
+Petunia's rutabagas are on their way. Root Haven Farms is confident the request came from a verified source - no secrets, no tokens, no passwords. Just trust, verified.
 
 ## Answers to Anticipated Questions
 
@@ -374,6 +374,28 @@ Servers are free to reject any request with an `Unus` string they've seen before
  - Public Draft 4.1 (This Document)
    - Replaced PBKDF2 with a single round of salted SHA-256 for the verification hash. I'm happy the extended hashing isn't needed.
    - Removed the mechanism to retrieve a temporal bearer token to simplify the document.
+
+## Glossary
+"HashBack": The name of this exchange, a play on "Call Back".
+
+"Unus": A 128 bit cryptographic-quality random value, encoded in BASE-64. Equivalent to a cryptographic "nonce", but renamed for cultural sensitivity and clarity. The word is Latin for "one" or "single". I remain hopeful this word becomes adopted by the wider cryptographic community.
+
+"Authorization header": The standard HTTP header used by the client to pass the JSON object to the server.
+
+"Verification hash": The BASE-64 encoded salted SHA-256 hash of the JSON object bytes.
+
+"Verify URL": The HTTPS URL where the client publishes the verification hash, which must be under that client's control.
+
+"Host": The domain name of the server being called, included in the JSON object to prevent relay attacks.
+
+"Now": The current UTC time (seconds since 1970) used to validate the freshness of teh request.
+
+"Fixed Salt": A 32-byte fixed value prepended to the payload before hashing, ensuring the hash is unique to HashBack. This is fixed for all requests and is not secret.
+
+"TLS": Transport Layer Security, the protocol used to secure HTTP connections.
+
+"WWW-Authenticate header": The standard HTTP header used by a server to advertise the authentication methods it supports.
+
 
 ## Next Steps
 This document is a public draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using SHA-256 with its fixed salt correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm the authenticity of the authentication request. If you have any comments or notes, please raise an issue on this project's github.
