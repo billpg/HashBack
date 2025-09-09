@@ -102,7 +102,7 @@ This JSON string is BASE64 encoded and added to the end of the `Authorization:` 
 ```
 Authorization: HashBack
  eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v
- dyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYzVuTURxMTRMT3BzL2hZUT09IiwiVmVyaWZ5Ijoi
+ wyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYzVuTURxMTRMT3BzL2hZUT09IiwiVmVyaWZ5Ijoi
  aHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9hcGkvaGFzaGJhY2s/aWQ9NTAyNTQyODg2In0=
 ```
 
@@ -250,7 +250,7 @@ Content-Type: application/json
 ## Answers to Anticipated Questions
 
 ### What's wrong with keeping a pre-shared secret long term?
-They require management and secure storage. Your server-side code will need a way to access them without access to your master passwords or MFA codes. There are solutions for secure password storage that your unattended service code can use but they still need to be managed while this exchange utilises TLS (which both sides will have already made an investment in) to secure the exchange.
+They require management and secure storage. Your server-side code will need a way to access them without access to your master passwords or MFA codes. There are solutions for secure password storage that your unattended service code can use but they still need to be managed while this exchange utilizes TLS (which both sides will have already made an investment in) to secure the exchange.
 
 ### I don't have a web server.
 Then this exchange is not for you. It works by having two web servers make requests to each other.
@@ -263,7 +263,7 @@ I recommend keeping it tight to either a file inside a single folder or to a sin
 
 For example, if a user affirms they are in control of `https://example.com/hashback/`, then allow `https://example.com/hashback/1234.txt`, but reject any sub-folders or URLs with query strings. Similarly, if a user affirms they are in control of `https://example.com/hashback?ID=` then allow variations of URLs with that query string parameter changing, rejecting any requests with sub-folders or additional query string parameters.
 
-Ultimately, it is up to the code performing this exchange to agree what URLs identify each user. This document does not proscribe that scope.
+Ultimately, it is up to the code performing this exchange to agree what URLs identify each user. This document does not prescribe that scope.
 
 ### TLS supports client-side certificates.
 To use client-side certificates, the client side would need access to a private key. This would need secure storage for the key which the caller code has access to. Avoidance of this is the main motivation of this exchange.
@@ -279,7 +279,7 @@ If you want to allow for self-signed TLS certificates, since this exchange relie
 ### What if an attacker has a TLS certificate signed by a trusted CA?
 Then the attacker has broken TLS itself and we have bigger problems.
 
-If this is a serious concern, you could keep your own collection of trusted TLS certificates and refuse of recognize any TLS certificates not on your list. You'd effectively be running your own CA if you can't trust the ones built into your HTTP library.
+If this is a serious concern, you could keep your own collection of trusted TLS certificates and refuse to recognize any TLS certificates not on your list. You'd effectively be running your own CA if you can't trust the ones built into your HTTP library.
 
 ### What if an attacker sends a fake Authorization header?
 The recipient will attempt to retrieve a verification hash file from the real client's website. As there won't be a verification hash that matches the fake header, the attempt will fail.
@@ -304,12 +304,12 @@ The second server will reject the request because they will observe the `Host` p
 ### What if an attacker floods the POST request URL with many fake requests?
 Any number of fake requests will all be rejected by the server because the real user is not publishing hashes that match these fake requests.
 
-Despite this, the fact that a request for authentication will trigger a second GET request might be used as a denial-of-service attack. For this reason, it may be prudent for an server to track IP address blocks with a history of making bad authentication requests and rejecting subsequent requests that originate from these blocks, or even requiring that clients be at a pre-agreed range of IPs and rejecting anyone outside this range. (Note that I suggest this only as a means to prevent abuse. The security of the authentication method is not dependent on any IP block analysis.)
+Despite this, the fact that a request for authentication will trigger a second GET request might be used as a denial-of-service attack. For this reason, it may be prudent for a server to track IP address blocks with a history of making bad authentication requests and rejecting subsequent requests that originate from these blocks, or even requiring that clients be at a pre-agreed range of IPs and rejecting anyone outside this range. (Note that I suggest this only as a means to prevent abuse. The security of the authentication method is not dependent on any IP block analysis.)
 
 ### What if there's a website that will host files from anyone?
 Maybe don't claim that website as one that you have exclusive control over.
 
-At its a core, you pass authentication by being someone who was able to demonstrate control of a particular URL. If the group of people who have that control is "anyone" than that's who can pass authentication.
+At its core, you pass authentication by being someone who was able to demonstrate control of a particular URL. If the group of people who have that control is "anyone" then that's who can pass authentication.
 
 ### What if a malicious Caller supplies a verification URL that keeps the request open?
 [I am grateful to "buzer" of Hacker News for asking this question.](https://news.ycombinator.com/item?id=38110536)
@@ -318,7 +318,7 @@ Suppose an attacker sets themselves up and configures their website to host veri
 
 We're used to web services making calls to databases or file systems and waiting for those external systems to respond before responding to its own received request. The difference in this scenario is that the external system we're waiting for is controlled by someone else who may be hostile.
 
-This can be mitigated by the server configuring a low timeout for the request that fetches the verification hash. The allowed time only needs to be long enough to perform the hash and the usual roundtrip overhead of a request. If the verification hash requests takes too long the overall transaction can be abandoned.
+This can be mitigated by the server configuring a low timeout for the request that fetches the verification hash. The allowed time only needs to be long enough to perform the hash and the usual roundtrip overhead of a request. If the verification hash request takes too long the overall transaction can be abandoned.
 
 Nonetheless, I have a separate proposal that will allow for the POST request to use a 202 "Accepted" response where the underlying connection can be closed and reopened later. Instead of keeping the POST request open, the Issuer can close the request and the Caller may reopen it at a later time.
 
@@ -359,14 +359,14 @@ Servers are free to reject any request with an `Unus` string they've seen before
   - Initial published revision, then named "Cross Request Token Exchange".
   - Used two POST requests in opposite directions, with the second POST request acting as the response to the first.
 - [Public Draft 2](https://github.com/billpg/HashBack/blob/2165a661e093754e038620d3b2be1caeacb9eba0/README.md)
-  - Updated to allow a 202 "Accepted" response to the first POST request, avoiding to need to keep the connection open.
+  - Updated to allow a 202 "Accepted" response to the first POST request, avoiding the need to keep the connection open.
   - I had a change of heart to this approach shortly after publishing it.
 - [Public Draft 3.0](https://github.com/billpg/HashBack/blob/bf7e2ff1876e9673b04bffb7d70766a10d326976/README.md)
   - Substantial refactoring. The client makes a POST request with a JSON body and puts a hash of that JSON body on their website. The server fetches that hash and compares it to their own expected hash. The POST response is always a Bearer token.
   - Added a "dot zero" to allow for minor updates, reserving 4.0 for another substantial refactor.
   - Changed name to "HashBack" Authentication, as a play on "Call Back".
 - [Public Draft 3.1](https://github.com/billpg/HashBack/blob/d8886ce0cebb159f6484186f5b6ccd750d0dd97c/README.md)
-  - The "fixed salt" is now the result of running RBKDF2 but without processing the result into capitals letters. This means I no longer need to link to some "attached" C# code and can simply record the input parameters. (The original motivation of having only capital letters in the salt was to support implementations that only accept ASCII strings, but all implementations I could find will accept arbitrary blocks of bytes as input.)
+  - The "fixed salt" is now the result of running PBKDF2 but without processing the result into capital letters. This means I no longer need to link to some "attached" C# code and can simply record the input parameters. (The original motivation of having only capital letters in the salt was to support implementations that only accept ASCII strings, but all implementations I could find will accept arbitrary blocks of bytes as input.)
   - Added "204SetCookie" as a third response type. Might be useful for a browser making the POST request.
 - [Public Draft 4.0](https://github.com/billpg/HashBack/blob/5cef44b500f6885202d24eda51aa81fe865b8495/README.md)
   - Another substantial refactoring. The JSON request is now sent by the client in the form of an HTTP `Authorization` header.
@@ -376,7 +376,7 @@ Servers are free to reject any request with an `Unus` string they've seen before
    - Removed the mechanism to retrieve a temporal bearer token to simplify the document.
 
 ## Next Steps
-This document is a public draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using SHA-256 with its fixed salt correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm that authenticity of the authentication request. If you have any comments or notes, please raise an issue on this project's github.
+This document is a public draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using SHA-256 with its fixed salt correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm the authenticity of the authentication request. If you have any comments or notes, please raise an issue on this project's github.
 
 In due course I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform both the role of an authenticating server by downloading your hashes and validating them, as well as perform the role of a client requesting authentication from you and publishing a verification hash for you to download. (And yes, you could point both APIs at each other, just for laughs.)
 
