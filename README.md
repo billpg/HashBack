@@ -22,12 +22,18 @@ While a recipient of a call *can't* be certain who a caller is, the caller *can*
 
 Now apply that thought to web authentication. The client can be sure (thanks to TLS) who the server is, but the server can't be sure who the client is, much like the analogy with phone calls. This document describes how the same "call me back" step could be used to authenticate a web API request.
 
+## &#x1F994; Meet Hashbert, the brainy hedgehog.
+<p align="left">
+  <img src="https://owl.billpg.com/wp-content/uploads/2025/09/Hashbert-cropped-717x717-1.png" alt="Hashbert the brainy hedgehog" width="96" height="96" style="border-radius: 16px; box-shadow: 2px 2px 6px #888;">
+</p>
+He's the unofficial mascot of HashBack. Cautious, clever, and always prepared. He's a friendly chap, isn't he? Hashbert is here to help you understand HashBack Authentication.
+
 ## What is the problem this is meant to fix?
-If you're running a service out in the cloud which interacts with an external service, you probably have cryptographic keys or a password or token squirreled away somewhere. This is probably encrypted or stored in a purpose built repository of secret keys and tokens. Either way, your code will need to unlock that material whenever it needs to interact with that external service.
+If you're running a service out in the cloud which interacts with an external service, you probably have cryptographic keys or a password or token squirreled away somewhere. This is probably encrypted or stored in a purpose-built repository of secret keys and tokens. Either way, your code will need to unlock that material whenever it needs to interact with that external service.
 
 This repository of secrets will need to be managed. The service won't be able to manage these things for itself because it'll need to identify itself to the service that issues these tokens, moving the problem one layer away without eliminating the problem itself. Either that or you make the decision that these secret tokens stay valid for long periods of time.
 
-Repositories of secret tokens or keys. They have to be so secure that passers by can't access them, but so available that your code running in cloud can access them. 
+Repositories of secret tokens or keys. They have to be so secure that passersby can't access them, but so available that your code running in cloud can access them. 
 
 ## The Exchange
 In a nutshell, a client proves their identity by publishing a short string on their TLS-secured website. The server downloads that string and thanks to TLS, is reassured that the client is indeed someone who is in control of that website.
@@ -51,7 +57,7 @@ HashBack and ACME have these significant differences:
 
 HashBack requires that both sides already have TLS established and configured before you even start. Without TLS on both sides, this mechanism is going to fail. It is thanks to Let's Encrypt and the ACME protocol making TLS ubiquitous that HashBack is even possible.
 
-I am very much open to the next version of this draft exchange reusing parts of ACME. Especially if we can keep it to two-transactions, or a security analysis reveals that we really do need that third transaction. 
+I am very much open to the next version of this draft exchange reusing parts of ACME. Especially if we can keep it to two transactions, or a security analysis reveals that we really do need that third transaction. 
 
 ### Ahead of time.
 Before any of this can take place, the client's administrator (in their administrator role) will need to affirm to the remote server exactly what range of URLs the client has sole control over and wishes to use for HashBack authentication. Ideally, this would be a single fixed URL with a single query string parameter as only variation allowed. This URL must use TLS via the HTTPS scheme.
@@ -75,13 +81,13 @@ The BASE64 encoded block must be a single string with no spaces or end-of-line c
   - The recipient service must reject all requests that come with a name that belongs to someone else or generic names such as `localhost`, as this may be an attacker attempting to re-use a request that was made for a different server.
 - `Now`
   - The current UTC time, expressed as an integer of the number of seconds since the start of 1970.
-  - The recipient service should reject this request if timestamp is too far from its current time. This document does not specify a threshold in either direction but instead this is left to the service's configuration.
+  - The recipient service should reject this request if the timestamp is too far from its current time. This document does not specify a threshold in either direction but instead this is left to the service's configuration.
   - The integer type should be greater than 32 bits to ensure this exchange will continue to work beyond the year 2038.
 - `Unus`
   - 128 bits of cryptographic-quality randomness, encoded in BASE-64 including trailing `==`.
   - This is to make reversal of the verification hash practically impossible. The other JSON property values listed here are "predictable". The security of this exchange relies on this one value not being predictable.
   - The value must be unique for each request. Servers should reject any reused value within the allowed drift it places on the `Now` value.
-  - I am English and I would prefer to not to name this property using a particular five letter word starting with N, as it has an unfortunate meaning in my culture.
+  - I am English and I would prefer not to name this property using a particular five-letter word starting with N, as it has an unfortunate meaning in my culture.
 - `Verify`
   - An `https://` URL belonging to the client where the verification hash may be retrieved with a GET request.
   - The URL must be one that server knows as belonging to a specific user. Exactly which URLs belong to which users is beyond the scope of this document.
@@ -256,12 +262,12 @@ Then this exchange is not for you. It works by having two web servers make reque
 ### I have a web server on the other side of the Internet but not the same machine.
 Your web site needs to be covered by TLS, and for your code to be able to publish a small static file to a folder on it. If you can be reasonably certain that no-one else can publish files on that folder, it'll be suitable for this exchange.
 
-### What sort of range should be allowed for identifying a verification hash URL to a single user.
-I recommend keeping it tight to either a file inside a single folder or to a single URL with a single query string parameter.
+### What range of verification hash URLs should be allowed for identifying a single user?
+The server should allow only a **controlled, user-specific range** of URLs - wide enough to support dynamic hash publication, but narrow enough to prevent impersonation.
 
-For example, if a user affirms they are in control of `https://example.com/hashback/`, then allow `https://example.com/hashback/1234.txt`, but reject any sub-folders or URLs with query strings. Similarly, if a user affirms they are in control of `https://example.com/hashback?ID=` then allow variations of URLs with that query string parameter changing, rejecting any requests with sub-folders or additional query string parameters.
+Suppose a user's website also hosts a blog with comments or a wiki, an attacker wishing to impersonate that user could publish a verification hash in a comment or wiki page. The server should not allow this.
 
-Ultimately, it is up to the code performing this exchange to agree what URLs identify each user. This document does not prescribe that scope.
+This is why the user must, ahead of time, affirm to the server exactly which URLs belong to them and are suitable for this exchange. The server must only accept verification hashes from those URLs. Treat the URL as a scoped trust boundary.
 
 ### TLS supports client-side certificates.
 To use client-side certificates, the client side would need access to a private key. This would need secure storage for the key which the caller code has access to. Avoidance of this is the main motivation of this exchange.
@@ -270,7 +276,7 @@ To use client-side certificates, the client side would need access to a private 
 The attacker can't eavesdrop because TLS is securing the channel.
 
 ### What if either HTTP transaction uses a self-signed TLS certificate or one signed by an untrusted root?
-If a connection to an untrusted TLS certificate is found, abandon the request and maybe log an error. Fortunately, this is default of most (all?) HTTP client libraries.
+If a connection to an untrusted TLS certificate is found, abandon the request and maybe log an error. Fortunately, this is the default of most (all?) HTTP client libraries.
 
 If you want to allow for self-signed TLS certificates, since this exchange relies on a pre-existing relationship, you could perhaps allow for "pinned" TLS certificates to be configured.
 
@@ -287,7 +293,7 @@ Let them.
 
 Suppose an attacker knows a current request's verification hash URL. They would be able to make that GET request and from that know the verification hash. Additionally, they could construct their own Authorization header to a genuine server, using the known `Verify` value with knowledge the genuine client's website will respond again to a second GET request with the same known verification hash.
 
-To successfully perform this attack, the attacker will need to construct the JSON block such that its hash will match the verification hash, or else the server will reject the request. This will require finding the value of the `Unus` property which is unpredictable because it was generated from cryptographic-quality-randomness, sent over a TLS protected channel to the genuine server, and is never reused. 
+To successfully perform this attack, the attacker will need to construct the JSON block such that its hash will match the verification hash, or else the server will reject the request. This will require finding the value of the `Unus` property which is unpredictable because it was generated from cryptographic-quality randomness, sent over a TLS protected channel to the genuine server, and is never reused. 
 
 For an attacker to exploit knowing a current verification hash, they would need to be able to reverse that hash back into the original JSON request, including the unpredictable `Unus` property. Reversing SHA-256 is considered practically impossible.
 
@@ -320,17 +326,24 @@ This can be mitigated by the server configuring a low timeout for the request th
 
 Nonetheless, I have a separate proposal that will allow for the POST request to use a 202 "Accepted" response where the underlying connection can be closed and reopened later. Instead of keeping the POST request open, the Issuer can close the request and the Caller may reopen it at a later time.
 
-### Why use a hash at all? Why not make the request a URL and the string expected at that URL?
+### Why use a hash at all?
 (I am grateful to m'colleague Rob Armitage for asking this question.)
+
+You might ask, "Why not publish a random string and include that string directly in the request? Why bother with hashing at all?"
+
+Because without a hash, a malicious server could forward your request to a third party and falsely claim it came from you.
 
 It is necessary for the file retrieved from the client's website to be a hash (instead of a random string) to prevent an attack when a valid authorization request is fraudulently passed along to a third party. For example:
 
-A-to-B: "I am server A. To prove it, I have placed "ABC" at https://A.example/hashback?id=123"    
-B-to-C: "I am server A. To prove it, I have placed "ABC" at https://A.example/hashback?id=123"    
-C-to-A: "GET https://A.example/hashback?id=123", to which A will return "ABC".    
-C-to-B: "You are successfully authorized."
+1. Server A sends: "I am server A. To prove it, I have placed "ABC" at (A's url)."    
+2. Server B forwards that exact claim to Server C: "I am server A. To prove it, I have placed "ABC" at (A's url)."    
+3. Server C fetches the URL from A and sees "ABC", mistakenly believing it is talking to A.
 
-From A's point of view, they made a valid request and the request resulted in a single expected GET to the verification URL, presumably from B. As far as A is concerned, there's nothing untoward going on at all. By requiring a hash of the authorization header and checking that the 'Host' property is correct, this passing-along attack is prevented.
+From server A's perspective, everything looks fine - it received a single GET request and returned the expected string, but Server B just impersonated Server A!
+
+By requiring the published hash to be a *hash of the actual request*, this kind of "pass-along" attack is prevented. The hash ties the published value to the specific request being made - including the intended recipient (`Host`). If any part of the request is changed or reused, the hash won't match and the authentication fails.
+
+In short: The hash makes the proof specific, unforeseeable, and bound to the request.
 
 ### Why BASE64 the JSON in the `Authorization` header?
 To ensure there's an unambiguous sequence of bytes to feed into the hash. By transferring the JSON block in an encoded set of bytes, the recipient can simply pass the decoded byte array (with salt appended) into the SHA-256 function.
@@ -340,17 +353,13 @@ This is something I'd like an expert to confirm, but I don't think we need one. 
 
 If I am ever persuaded that a server challenge is needed, I'd make it a parameter to the `WWW-Authenticate: HashBack` header with the 401 response. The value of this parameter would then need to be included in the JSON that builds the `Authorization` header. The server would check this value is one it created and reject it if it isn't.
 
-### I'm going to make many requests to the same server. Can I send the same Authorization header with each request?
+### Can I send the same Authorization header with each request?
 Short version: No.    
 Slightly longer version: Please don't.
 
-If this is your situation, my official answer is that the client should call the server to issue a temporal cookie back. That initial request will only need to perform the HashBack exchange once until the cookie expires. The time between those requests can use the cookie, which is significantly cheaper. (My expectation is that almost all HashBack-backed requests will, in practice, actually be to request a new temporal cookie.)
+Each HashBack request includes a timestamp (`Now`) and a cryptographic-quality random value (`Unus`). The `Now` value ensures the request is fresh and the `Unus` value ensures the request can't be predicted or replayed. Reusing either defeats the purpose of this exchange and opens the door to replay attacks. You'd only be making yourself less secure.
 
-But let's discuss the implications of reusing HashBack Authorization headers. I do understand the motivation for wanting to do this. If you've already taken the effort to publish a verification hash, why not reuse it as much as possible instead of doing it again?
-
-The security of this exchange relies on the `Unus` value being unpredictable. This means you should use your operating system's secure random number generator to make a new one each and every time you build a new JSON object. If there's any level of predictability of this value, an attacker might be able to predict a request you're about to make and the attacker makes it first. You're only making yourself less secure if you ever reuse an `Unus` value.
-
-Servers are free to reject any request with an `Unus` string they've seen before.
+Instead, generate a fresh header for each request. It's lightweight enough and it's exactly what Hashbert would do.
 
 ### What are the previous public drafts?
 - [Public Draft 1](https://github.com/billpg/HashBack/blob/22c67ba14d1a2b38c2a8daf1551f065b077bfbb0/README.md)
@@ -376,7 +385,7 @@ Servers are free to reject any request with an `Unus` string they've seen before
 ## Glossary
 "HashBack": The name of this exchange, a play on "Call Back".
 
-"Unus": A 128 bit cryptographic-quality random value, encoded in BASE-64. Equivalent to a cryptographic "nonce", but renamed for cultural sensitivity and clarity. The word is Latin for "one" or "single". I remain hopeful this word becomes adopted by the wider cryptographic community.
+"Unus": A 128-bit cryptographic-quality random value, encoded in BASE-64. Equivalent to a cryptographic "nonce", but renamed for cultural sensitivity and clarity. The word is Latin for "one" or "single". I remain hopeful this word becomes adopted by the wider cryptographic community.
 
 "Authorization header": The standard HTTP header used by the client to pass the JSON object to the server.
 
@@ -396,9 +405,9 @@ Servers are free to reject any request with an `Unus` string they've seen before
 
 
 ## Next Steps
-This document is a public draft version. I'm looking (please) for clever people to review it and give feedback. In particular I'd like some confirmation I'm using SHA-256 with its fixed salt correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm the authenticity of the authentication request. If you have any comments or notes, please raise an issue on this project's github.
+This document is a public draft version. I'm looking (please) for clever people to review it and give feedback. In particular, I'd like some confirmation I'm using SHA-256 with its fixed salt correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm the authenticity of the authentication request. If you have any comments or notes, please raise an issue on this project's github.
 
-In due course I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform both the role of an authenticating server by downloading your hashes and validating them, as well as perform the role of a client requesting authentication from you and publishing a verification hash for you to download. (And yes, you could point both APIs at each other, just for laughs.)
+In due course, I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform both the role of an authenticating server by downloading your hashes and validating them, as well as perform the role of a client requesting authentication from you and publishing a verification hash for you to download. (And yes, you could point both APIs at each other, just for laughs.)
 
 Ultimately, I hope to publish this as an RFC and establish it as a public standard.
 
