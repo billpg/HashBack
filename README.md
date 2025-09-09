@@ -64,7 +64,7 @@ The header is constructed as follows:
 Authorization: HashBack (BASE64 encoded JSON) 
 ```
 
-The BASE64 encoded block must be a single string with no spaces or end-of-line characters and must include the trailing `=` characters per the rules of BASE64. (The examples in this document split the string into multiple lines for clarity.) The bytes inside the BASE64 block are the UTF-8 representation of a JSON object with the properties listed below. All are required and the values are string type unless otherwise noted.
+The BASE64 encoded block must be a single string with no spaces or end-of-line characters and must include the trailing `=` characters per the rules of BASE64. (The examples in this document split the string into multiple lines for clarity only. The normal rules of HTTP prefer that headers arrive as a single line.) The bytes inside the BASE64 block are the UTF-8 representation of a JSON object with the properties listed below. All are required and the values are string type unless otherwise noted.
 
 - `Version`
   - A string indicating the version of this exchange in use.
@@ -75,7 +75,7 @@ The BASE64 encoded block must be a single string with no spaces or end-of-line c
   - The recipient service must reject all requests that come with a name that belongs to someone else or generic names such as `localhost`, as this may be an attacker attempting to re-use a request that was made for a different server.
 - `Now`
   - The current UTC time, expressed as an integer of the number of seconds since the start of 1970.
-  - The recipient service should reject this request if timestamp is too far from its current time. This document does not specify a threshold in either direction but instead this is left to the service's configuration. (Finger in the air - ten seconds.)
+  - The recipient service should reject this request if timestamp is too far from its current time. This document does not specify a threshold in either direction but instead this is left to the service's configuration.
   - The integer type should be greater than 32 bits to ensure this exchange will continue to work beyond the year 2038.
 - `Unus`
   - 128 bits of cryptographic-quality randomness, encoded in BASE-64 including trailing `==`.
@@ -86,7 +86,7 @@ The BASE64 encoded block must be a single string with no spaces or end-of-line c
   - An `https://` URL belonging to the client where the verification hash may be retrieved with a GET request.
   - The URL must be one that server knows as belonging to a specific user. Exactly which URLs belong to which users is beyond the scope of this document.
 
-If either or both of the two properties that include domain names (`Host` and `Verify`) uses IDN, those non-ASCII characters must be either UTF-8 encoded or use JSON's `\u` notation. Both properties must not use the `xn--` form.
+If either or both of the two properties that include domain names (`Host` and `Verify`) uses IDN, those non-ASCII characters should be normalized and must be either UTF-8 encoded or use JSON's `\u` notation. Both properties must not use the `xn--` form.
 
 For example:<!--1066_EXAMPLE_REQUEST-->
 ```
@@ -102,7 +102,7 @@ This JSON string is BASE64 encoded and added to the end of the `Authorization:` 
 ```
 Authorization: HashBack
  eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v
- wyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYzVuTURxMTRMT3BzL2hZUT09IiwiVmVyaWZ5Ijoi
+ dyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYzVuTURxMTRMT3BzL2hZUT09IiwiVmVyaWZ5Ijoi
  aHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9hcGkvaGFzaGJhY2s/aWQ9NTAyNTQyODg2In0=
 ```
 
@@ -129,7 +129,7 @@ The fixed salt is used to ensure that a valid hash is only meaningful in light o
 - Hex: `71DA620906A5979D2E1CE510425B5B4896F64553D8EB15EFA2E58BA30649AFC9`<!--FIXED_SALT_HEX-->
 - URL: `q%dab%09%06%a5%97%9d.%1c%e5%10B%5b%5bH%96%f6ES%d8%eb%15%ef%a2%e5%8b%a3%06I%af%c9`<!--FIXED_SALT_URL-->
 
-Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The returned string itself must be one line with the BASE-64 encoded hash in ASCII as that only line. It must either have no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence.
+Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The returned string itself must be one line with the BASE-64 encoded hash in ASCII as that only line. It must either have no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence. The response must be `200 OK` and the TLS certificate must be valid.
 
 The expected hash of the above example is: 
 - `0PptsdmB3W0j06DA1GfI/i88EtDejPTRnZ/0BpmFWZI=`<!--1066_EXAMPLE_HASH-->
@@ -170,14 +170,12 @@ I've avoided specifying that mechanism in this document to keep it focused to th
 
 If you are developing the receiving end of a HashBack request, please add a `Set-Cookie` to the response that the caller can use for a little while. If you're developing the requesting end, please have your code check the response for that cookie and use it next time. Or some other mechanism. 
 
-# An extended example.
-**The Rutabaga Company** operates a website with an API designed for their customers to use, accepting POST requests for customers to make orders for their tasty rutabagas.
 # Case Study
 **Root Haven Farms** is a large agricultural concern that grows and sells rutabagas and other root vegetables. They have a secure API at `RootHavenFarms.example` for their regular customers use to place orders directly from their own systems.
 
-One such customer is Petunia Parsnip, founder of **The Underground Supper Club**, a high-end vegan patisserie that specializes in root-vegatable-themed banquets. Her clients expect nothing less than the finest rutabaga souffles and parsnip pavlovas, delivered with flair and precision.
+One such customer is Petunia Parsnip, founder of **The Underground Supper Club**, a high-end vegan patisserie that specializes in root-vegetable-themed banquets. Her clients expect nothing less than the finest rutabaga souffles and parsnip pavlovas, delivered with flair and precision.
 
-Petunia has recently signed up with Root Haven Farms and logged into their customer portal. On her authentication page under the *HashBack Authentication* section, she's configured her account affirming that `https://petunia.example/hashback` is under her sole control and where her verification hashes will be made avaiable.
+Petunia has recently signed up with Root Haven Farms and logged into their customer portal. On her authentication page under the *HashBack Authentication* section, she's configured her account affirming that `https://petunia.example/hashback` is under her sole control and where her verification hashes will be made available.
 
 ## Making the request.
 Petunia needs to place a large rutabaga order for an upcoming "Turnip the Volume" gala. Her stock management system constructs the following JSON payload:<!--CASE_STUDY_REQUEST-->
@@ -217,7 +215,7 @@ The Root Haven Farms website receives this request and validates it, performing 
 - :heavy_check_mark: The `Now` time-stamp is reasonably close to the server's internal clock.
 - :heavy_check_mark: The `Verify` value is an HTTPS URL belonging to a known user - *Petunia*.
 
-The service has passed the request for basic validity, but it still doesn't know if the request has genuinely come from Carol's service or not. To perform this step, it proceeds to check the verification hash.
+The service has passed the request for basic validity, but it still doesn't know if the request has genuinely come from Petunia's service or not. To perform this step, it proceeds to check the verification hash.
 
 ## Retrieval of the verification hash
 Having the URL to get the client's verification hash, the service performs a GET request for that URL. As part of the request, it makes the following checks:
@@ -388,7 +386,7 @@ Servers are free to reject any request with an `Unus` string they've seen before
 
 "Host": The domain name of the server being called, included in the JSON object to prevent relay attacks.
 
-"Now": The current UTC time (seconds since 1970) used to validate the freshness of teh request.
+"Now": The current UTC time (seconds since 1970) used to validate the freshness of the request.
 
 "Fixed Salt": A 32-byte fixed value prepended to the payload before hashing, ensuring the hash is unique to HashBack. This is fixed for all requests and is not secret.
 
