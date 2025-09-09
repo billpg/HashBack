@@ -39,12 +39,12 @@ Yes, the exchange used by ACME has a lot in common with HashBack, especially the
 
 HashBack and ACME have these significant differences:
 
-| &nbsp;                                         | ACME               | HashBack           |
-|-----------------------------------------------:|--------------------|--------------------|
-| Number of tranactions needed to complete auth: | **3**              | **2**              |
-|            General purpose API authentication: | :x:                | :heavy_check_mark: | 
-|               Works without TLS already setup: | :heavy_check_mark: | :x:                |  
-|                   Useful for establishing TLS: | :heavy_check_mark: | :x:                |
+| &nbsp;                                          | ACME               | HashBack           |
+|------------------------------------------------:|--------------------|--------------------|
+| Number of transactions needed to complete auth: | **3**              | **2**              |
+|             General purpose API authentication: | :x:                | :heavy_check_mark: | 
+|                Works without TLS already setup: | :heavy_check_mark: | :x:                |  
+|                    Useful for establishing TLS: | :heavy_check_mark: | :x:                |
 
 *HashBack is a general purpose authentication mechanism.* You could use HashBack for any API that needs caller authentication.    
 *HashBack is simpler.* You can complete the exchange with two transactions - a request and response in each direction.
@@ -95,7 +95,7 @@ For example:<!--1066_EXAMPLE_REQUEST-->
     "Host": "server.example",
     "Now": 529297200,
     "Unus": "Rpgt4Fc5nMDq14LOps/hYQ==",
-    "Verify": "https://client.example/hashback?id=-925769"
+    "Verify": "https://client.example/api/hashback?id=502542886"
 }
 ```
 This JSON string is BASE64 encoded and added to the end of the `Authorization:` header.<!--1066_EXAMPLE_AUTH_HEADER-->
@@ -103,7 +103,7 @@ This JSON string is BASE64 encoded and added to the end of the `Authorization:` 
 Authorization: HashBack
  eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v
  dyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYzVuTURxMTRMT3BzL2hZUT09IiwiVmVyaWZ5Ijoi
- aHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9oYXNoYmFjaz9pZD0tOTI1NzY5In0=
+ aHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9hcGkvaGFzaGJhY2s/aWQ9NTAyNTQyODg2In0=
 ```
 
 ### Verification Hash Calculation and Publication
@@ -132,7 +132,7 @@ The fixed salt is used to ensure that a valid hash is only meaningful in light o
 Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The returned string itself must be one line with the BASE-64 encoded hash in ASCII as that only line. It must either have no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence.
 
 The expected hash of the above example is: 
-- `fd9jbvxG+q9kJlq1M4B8LVEGGzQ7WlRSRGt34ThWats=`<!--1066_EXAMPLE_HASH-->
+- `0PptsdmB3W0j06DA1GfI/i88EtDejPTRnZ/0BpmFWZI=`<!--1066_EXAMPLE_HASH-->
 
 Once the service has downloaded that verification hash, it should compare it against the result of hashing the bytes inside the BASE64 block. If the two hashes match, the server may be reassured that the client is indeed the user identified by the URL from where the hash was downloaded and proceed to process the remainder of the request.
 
@@ -180,25 +180,25 @@ Time passes and Carol needs to make a request to the Rutabaga Company API and ne
 ```
 {
     "Version": "BILLPG_DRAFT_4.1",
-    "Host": "rutabaga.example",
-    "Now": 1111863600,
+    "Host": "TheRutabagaCompany.example",
+    "Now": 682718520,
     "Unus": "sGhK1rIbEWjW6Sg25s+KPg==",
-    "Verify": "https://carol.example/api/hashback?ID=9c8091c9-bcd2-405a-8b23-9bf4c492f803"
+    "Verify": "https://carol.example/api/hashback?id=901983180"
 }
 ```
 
-The code calculates the verification hash from this JSON obejct (`E8Xz9p7Nm/aFRKhfibhKwiWtevne0T2plvny3WY/Ih8=`) and saves it ready for retrieval in a few moments.<!--CASE_STUDY_HASH-->
+The code calculates the verification hash from this JSON obejct (`5bYvRPAPcOhuK2Jw1LPM5/cRezzJ01GrLNT7587ZdMQ=`) and saves it ready for retrieval in a few moments.<!--CASE_STUDY_HASH-->
 
 To complete the request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows.<!--CASE_STUDY_AUTH_HEADER-->
 ```
 POST /api/order HTTP/1.1
-Host: rutabaga.example
+Host: TheRutabagaCompany.example
 User-Agent: Carol's Magnificent Application Server.
 Authorization: HashBack
- eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJydXRhYmFnYS5leGFtcGxlIiwi
- Tm93IjoxMTExODYzNjAwLCJVbnVzIjoic0doSzFySWJFV2pXNlNnMjVzK0tQZz09IiwiVmVyaWZ5
- IjoiaHR0cHM6Ly9jYXJvbC5leGFtcGxlL2FwaS9oYXNoYmFjaz9JRD05YzgwOTFjOS1iY2QyLTQw
- NWEtOGIyMy05YmY0YzQ5MmY4MDMifQ==
+ eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJUaGVSdXRhYmFnYUNvbXBhbnku
+ ZXhhbXBsZSIsIk5vdyI6NjgyNzE4NTIwLCJVbnVzIjoic0doSzFySWJFV2pXNlNnMjVzK0tQZz09
+ IiwiVmVyaWZ5IjoiaHR0cHM6Ly9jYXJvbC5leGFtcGxlL2FwaS9oYXNoYmFjaz9pZD05MDE5ODMx
+ ODAifQ==
 Accept: application/json
 Content-Type: application/json
 
@@ -231,13 +231,13 @@ Having the URL to get the client's verification hash, the Rutabaga Company's ser
 Having successfully retrieved a verification hash, it must now find the expected hash to check it is genuine.
 
 ## Checking the verification hash
-The service performs the same hashing operation on the block of BASE64-encoded bytes request that the Caller performed earlier. If they match, the request is authenticated and may continue processing it, reassured that the client is actually Carol.
+The service performs the same hashing operation on the block of BASE64-encoded bytes request that the Caller performed earlier. If they match, the request is authenticated and may continue processing it, reassured that the client is actually Carol. <!--CASE_STUDY_SET_COOKIE-->
 
 ```
 HTTP/1.1 200 OK
 Set-Cookie: RutabagaAuth=jTqkkDGt.IGu55JOH.cGlsgwiC;
-  Domain=rutabaga.example;
-  Expires=Sat, 26 Mar 2005 20:16:41 GMT;
+  Domain=TheRutabagaCompany.example;
+  Expires=Tue, 20 Aug 1991 22:18:41 GMT;
   Secure; HttpOnly; SameSite=Strict
 Content-Type: application/json
 

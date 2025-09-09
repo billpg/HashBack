@@ -25,10 +25,50 @@ var fixedSaltBytes = Pbkdf2(
     hashAlgorithm: HashAlgorithmName.SHA512,
     outputLength: 32);
 
+/* Look for the fixed salt in the README. */
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_PASSWORD-->", StringSaltParameters("Password", fixed_salt_password));
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_DEDICATION-->", StringSaltParameters("Salt", fixed_salt_salt));
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_ITERATIONS-->", $"- Iterations: {fixed_salt_rounds}");
+
+/* Look for the fixed salt byte block, two lines after the marker. */
+int fixedSaltIndex = readmeLines.FindIndex(src => src.Contains("<!--FIXED_SALT-->")) + 2;
+readmeLines.RemoveRange(fixedSaltIndex, 4);
+readmeLines.Insert(fixedSaltIndex, DumpByteArray(fixedSaltBytes));
+
+/* Look for the line with the fixed salt in hex/base64. */
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_HEX-->", $"- Hex: `{BytesToHex(fixedSaltBytes)}`");
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_B64-->", $"- Base64: `{Convert.ToBase64String(fixedSaltBytes)}`");
+SetTextByMarker(readmeLines, "<!--FIXED_SALT_URL-->", $"- URL: `{System.Web.HttpUtility.UrlEncode(fixedSaltBytes)}`");
+
+/* Populate the main examples in the README. */
+PopulateExample(
+    "1066_EXAMPLE",
+    DateTime.Parse("1986-10-09T23:00:00-04:00"),
+    "server.example",
+    "client.example");
+
+/* Populate the case study. */
+PopulateExample(
+    "CASE_STUDY",
+    DateTime.Parse("1991-08-20T23:02:00+03:00"),
+    "TheRutabagaCompany.example",
+    "carol.example");
+
+/* If README has changed, rewrite back. */
+if (readmeOrigText != string.Join("\r\n", readmeLines))
+{
+    Console.WriteLine("Saving modified README.md.");
+    File.WriteAllLines(readmePath, readmeLines);
+}
+
+/* Announce end. */
+Console.WriteLine("Finished helper/readme update.");
+
+/* Run PBKDF2 to generate the fixed salt, refering to a cache if we have it. */
 byte[] Pbkdf2(byte[] password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
 {
     /* Check if we've done this exact hashing operation before. */
-    string cacheFixedSaltPath = 
+    string cacheFixedSaltPath =
         Path.Combine(Path.GetTempPath(),
         "CacheFixedSaltPath" +
         $"_{BytesToHex(password)}" +
@@ -56,6 +96,7 @@ byte[] Pbkdf2(byte[] password, byte[] salt, int iterations, HashAlgorithmName ha
     return fixedSaltAsBytes;
 }
 
+/* Expand the salt parameter strings into a longer entry, clarifying their length and byte sum. */
 string StringSaltParameters(string label, string value)
 {
     int byteCount = value.Length;
@@ -63,59 +104,20 @@ string StringSaltParameters(string label, string value)
     return $"- {label}: \"{value}\" ({byteCount} bytes, summing to {byteSum}.)";
 }
 
-/* Look for the fixed salt in the README. */
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_PASSWORD-->", StringSaltParameters("Password", fixed_salt_password));
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_DEDICATION-->", StringSaltParameters("Salt", fixed_salt_salt));
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_ITERATIONS-->", $"- Iterations: {fixed_salt_rounds}");
-
-/* Look for the fixed salt byte block, two lines after the marker. */
-int fixedSaltIndex = readmeLines.FindIndex(src => src.Contains("<!--FIXED_SALT-->")) + 2;
-readmeLines.RemoveRange(fixedSaltIndex, 4);
-readmeLines.Insert(fixedSaltIndex, DumpByteArray(fixedSaltBytes));
-
-/* Look for the line with the fixed salt in hex/base64. */
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_HEX-->", $"- Hex: `{BytesToHex(fixedSaltBytes)}`");
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_B64-->", $"- Base64: `{Convert.ToBase64String(fixedSaltBytes)}`");
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_URL-->", $"- URL: `{System.Web.HttpUtility.UrlEncode(fixedSaltBytes)}`");
-
-/* Populate the main examples in the README. */
-PopulateExample(
-    "1066_EXAMPLE",
-    DateTime.Parse("1986-10-09T23:00:00-04:00"),
-    "server.example",
-    "https://client.example/hashback?id=" + GenerateDecimal("1066"));
-
-PopulateExample(
-    "CASE_STUDY",
-    DateTime.Parse("2005-03-26T19:00:00Z"),
-    "rutabaga.example",
-    "https://carol.example/api/hashback?ID=" + GenerateGuid("CarolQueryStringID"));
-
-PopulateExample(
-    "BEARER",
-    DateTime.Parse("1991-08-20T23:02:00+03:00"),
-    "tokens\u044fus.example",
-    "https://tokens-i-want.example/hashback?id="+ GenerateDecimal("BearerExample"));
-
-/* If README has changed, rewrite back. */
-if (readmeOrigText != string.Join("\r\n", readmeLines))
-{
-    Console.WriteLine("Saving modified README.md.");
-    File.WriteAllLines(readmePath, readmeLines);
-}
-
-/* Announce end. */
-Console.WriteLine("Finished helper/readme update.");
-
 /* Return the number of seconds since 1970 for the supplied timestamp. */
 long UnixTime(DateTime utc)
 {
     return (long)(utc.ToUniversalTime() - DateTime.Parse("1970-01-01T00:00:00Z")).TotalSeconds;
 }
 
-void PopulateExample(string keyBase, DateTime now, string hostDomainName, string verifyUrl)
+/* Look for markers in the readme to populate with specific examples. */
+void PopulateExample(string keyBase, DateTime now, string hostDomainName, string clientDomainName)
 {
-    const int rounds = 1;
+    var verifyUrl = new UriBuilder("https", clientDomainName)
+    {
+        Path = "/api/hashback", 
+        Query = $"?id={GenerateDecimal(keyBase)}"
+    }.ToString();
     string xnHostDomain = new System.Globalization.IdnMapping().GetAscii(hostDomainName);
 
     /* Build request JSON. */
@@ -153,7 +155,7 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     }
 
     /* Insert the hash of the above JSON into the readme. */
-    string hash1066 = HashRequestJsonBytes(jsonAsBytes, rounds);
+    string hash1066 = HashRequestJsonBytes(jsonAsBytes);
     int hash1066Index = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_HASH-->"));
     if (hash1066Index > 0)
     {
@@ -161,56 +163,31 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
         readmeLines[hash1066Index] = lineByQuotes[0] + "`" + hash1066 + "`" + lineByQuotes[2];
     }
 
-    /* Build response JSON. */
-    DateTime issuedAt = now.AddSeconds(1);
-    var responseJson = new JObject();
-    long issuedAtUnix = UnixTime(issuedAt);
-    Guid tokenId = GenerateGuid($"TokenId_{keyBase}");
-    responseJson["Id"] = tokenId;
-    responseJson["BearerToken"] = GenerateBearerToken(keyBase);
-    responseJson["NotBefore"] = issuedAtUnix + 1000;
-    responseJson["IssuedAt"] = issuedAtUnix;
-    responseJson["ExpiresAt"] = issuedAtUnix + 1000 + 3600;
-    responseJson["DeleteUrl"] = $"https://{hostDomainName}/tokens?id={tokenId}";
-    //ReplaceJson($"<!--{keyBase}_RESPONSE-->", responseJson);
-
-    int responseMarkerLineIndex = readmeLines.FindIndex(s => s.Contains($"<!--{keyBase}_RESPONSE-->"));
+    /* Build Set-Cookie header. */
+    int responseMarkerLineIndex = readmeLines.FindIndex(s => s.Contains($"<!--{keyBase}_SET_COOKIE-->"));
     if (responseMarkerLineIndex > 0)
     {
-        string cookieName =
-            hostDomainName.Contains("utabag") ? "RutabagaAuth" : "AuthToken";
-
         string setCookieHeader =
             $"Set-Cookie:" +
-            $" {cookieName}={GenerateBearerToken(keyBase)};\r\n" +
+            $" RutabagaAuth={GenerateBearerToken(keyBase)};\r\n" +
             $"  Domain={xnHostDomain};\r\n" +
-            $"  Expires={issuedAt + TimeSpan.FromSeconds(1000 + 3600):R};\r\n" +
+            $"  Expires={now.AddSeconds(4601):R};\r\n" +
             $"  Secure; HttpOnly; SameSite=Strict";
         int setCookieLineIndex = readmeLines.FindIndex(responseMarkerLineIndex, s => s.StartsWith("Set-Cookie:"));
-        int endSetCookie = readmeLines.FindIndex(setCookieLineIndex, s => s == "```");
+        int endSetCookie = readmeLines.FindIndex(setCookieLineIndex+1, s => s.StartsWith(' ') == false);
         readmeLines[setCookieLineIndex] = setCookieHeader;
         readmeLines.RemoveRange(setCookieLineIndex + 1, endSetCookie - setCookieLineIndex - 1);
     }
-
-  
 }
 
-Guid GenerateGuid(string key)
-{
-    string shortBase64 = GenerateUnus(128,key);
-    byte[] keyAsBytes = Convert.FromBase64String(shortBase64);
-    keyAsBytes[7] = (byte)(keyAsBytes[7] & ~0xF0 | 0x40);
-    keyAsBytes[8] = (byte)(keyAsBytes[8] & ~0xF0 | 0x80);
-    return new Guid(keyAsBytes);
-}
-
+/* Generate a deterministic decimal number for examples. */
 int GenerateDecimal(string key)
 {
     var valueAsBase64 = GenerateUnus(32, key + "GenerateDecimal");
     var valueAsBytes = Convert.FromBase64String(valueAsBase64);
-    valueAsBytes[0] &= 0x7F;
+    valueAsBytes[3] &= 0x7F;
     var valueAsInt = BitConverter.ToInt32(valueAsBytes);
-    return (valueAsInt % 10000000);
+    return (valueAsInt % 1000000000);
 }
 
 /* Generate a random-looking token that would work as a non-JWT bearer token. */
@@ -233,7 +210,7 @@ string GenerateBearerToken(string keyBase)
     return token;
 }
 
-string HashRequestJsonBytes(byte[] jsonAsBytes, int rounds)
+string HashRequestJsonBytes(byte[] jsonAsBytes)
 {
     var hashInput = new byte[fixedSaltBytes.Length + jsonAsBytes.Length];
     Buffer.BlockCopy(fixedSaltBytes, 0, hashInput, 0, fixedSaltBytes.Length);
