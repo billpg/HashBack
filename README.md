@@ -26,6 +26,7 @@ Now apply that thought to web authentication. The client can be sure (thanks to 
 <p align="left">
   <img src="https://owl.billpg.com/wp-content/uploads/2025/09/Hashbert-cropped-717x717-1.png" alt="Hashbert the brainy hedgehog" width="96" height="96" style="border-radius: 16px; box-shadow: 2px 2px 6px #888;">
 </p>
+
 He's the unofficial mascot of HashBack. Cautious, clever, and always prepared. He's a friendly chap, isn't he? Hashbert is here to help you understand HashBack Authentication.
 
 ## What is the problem this is meant to fix?
@@ -165,7 +166,7 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
 
 Clients may skip that initial transaction if it is already known that the server supports HashBack authentication.
 
-# "Do we need to perform this exchange for every API request?"
+## "Do we need to perform this exchange for every API request?"
 Yes, but also, No.
 
 Yes, each time you make an API request authenticated by HashBack, you need to make a new header and arrange for the new verification hash to be made available. That is an expensive operation and there's no shortcut. Every single time you want to make an API request with HashBack, you need to start entire process over. Even if you have a thousand requests to make.
@@ -176,54 +177,54 @@ I've avoided specifying that mechanism in this document to keep it focused to th
 
 If you are developing the receiving end of a HashBack request, please add a `Set-Cookie` to the response that the caller can use for a little while. If you're developing the requesting end, please have your code check the response for that cookie and use it next time. Or some other mechanism. 
 
-# Case Study
-**Root Haven Farms** is a large agricultural concern that grows and sells rutabagas and other root vegetables. They have a secure API at `RootHavenFarms.example` for their regular customers use to place orders directly from their own systems.
+## Case Study
+**The Rutabaga Republic** is a large agricultural concern that grows and sells rutabagas and other root vegetables. They have a secure API at `RutabagaRepublic.example` for their regular customers use to place orders directly from their own systems.
 
 One such customer is Petunia Parsnip, founder of **The Underground Supper Club**, a high-end vegan patisserie that specializes in root-vegetable-themed banquets. Her clients expect nothing less than the finest rutabaga souffles and parsnip pavlovas, delivered with flair and precision.
 
-Petunia has recently signed up with Root Haven Farms and logged into their customer portal. On her authentication page under the *HashBack Authentication* section, she's configured her account affirming that `https://petunia.example/hashback` is under her sole control and where her verification hashes will be made available.
+Petunia has recently signed up with The Rutabaga Republic and logged into their customer portal. On her authentication page under the *HashBack Authentication* section, she's configured her account affirming that `https://petunia.example/hashback` is under her sole control and where her verification hashes will be made available.
 
-## Making the request.
+### Making the request.
 Petunia needs to place a large rutabaga order for an upcoming "Turnip the Volume" gala. Her stock management system constructs the following JSON payload:<!--CASE_STUDY_REQUEST-->
 ```
 {
     "Version": "BILLPG_DRAFT_4.1",
-    "Host": "RootHavenFarms.example",
+    "Host": "RutabagaRepublic.example",
     "Now": 682718520,
     "Unus": "sGhK1rIbEWjW6Sg25s+KPg==",
     "Verify": "https://Petunia.example/api/hashback?id=901983180"
 }
 ```
 
-The system calculates the verification hash from this JSON object (`EZ4A66YWHR0B4iC1OB298/b4CTYWtq/ul7eVRi9N3Ks=`) and publishes it on their server at the specified URL, ready for retrieval.<!--CASE_STUDY_HASH-->
+The system calculates the verification hash from this JSON object (`GcBDESw5S+0HjSEY/ia6VQ7NyQvjHvy9Yk/lyQO0bQs=`) and publishes it on their server at the specified URL, ready for retrieval.<!--CASE_STUDY_HASH-->
 
 To complete the request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows.<!--CASE_STUDY_AUTH_HEADER-->
 ```
 POST /api/order HTTP/1.1
-Host: RootHavenFarms.example
+Host: RutabagaRepublic.example
 User-Agent: Petunia's Wonderful Stock Management System.
 Authorization: HashBack
- eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJSb290SGF2ZW5GYXJtcy5leGFt
- cGxlIiwiTm93Ijo2ODI3MTg1MjAsIlVudXMiOiJzR2hLMXJJYkVXalc2U2cyNXMrS1BnPT0iLCJW
- ZXJpZnkiOiJodHRwczovL1BldHVuaWEuZXhhbXBsZS9hcGkvaGFzaGJhY2s/aWQ9OTAxOTgzMTgw
- In0=
+ eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJSdXRhYmFnYVJlcHVibGljLmV4
+ YW1wbGUiLCJOb3ciOjY4MjcxODUyMCwiVW51cyI6InNHaEsxckliRVdqVzZTZzI1cytLUGc9PSIs
+ IlZlcmlmeSI6Imh0dHBzOi8vUGV0dW5pYS5leGFtcGxlL2FwaS9oYXNoYmFjaz9pZD05MDE5ODMx
+ ODAifQ==
 Accept: application/json
 Content-Type: application/json
 
 { "Product": "Rutabagas!", "Quality": "Tasty!", "Quantity": "Lots!" }
 ```
 
-## Checking the request
-The Root Haven Farms website receives this request and validates it, performing the following checks:
+### Checking the request
+The Rutabaga Republic website receives this request and validates it, performing the following checks:
 - :heavy_check_mark: The request arrived via HTTPS.  
 - :heavy_check_mark: The `Authorization` header is `HashBack` type.
-- :heavy_check_mark: The `Host` value is a domain it owns - `RootHavenFarms.example`.
+- :heavy_check_mark: The `Host` value is a domain it owns - `RutabagaRepublic.example`.
 - :heavy_check_mark: The `Now` time-stamp is reasonably close to the server's internal clock.
 - :heavy_check_mark: The `Verify` value is an HTTPS URL belonging to a known user - *Petunia*.
 
 The service has passed the request for basic validity, but it still doesn't know if the request has genuinely come from Petunia's service or not. To perform this step, it proceeds to check the verification hash.
 
-## Retrieval of the verification hash
+### Retrieval of the verification hash
 Having the URL to get the client's verification hash, the service performs a GET request for that URL. As part of the request, it makes the following checks:
 - :heavy_check_mark: The TLS certificate is valid.
 - :heavy_check_mark: The response is `text/plain`.
@@ -231,13 +232,13 @@ Having the URL to get the client's verification hash, the service performs a GET
 
 Having successfully retrieved a verification hash, it must now find the expected hash to check it is genuine.
 
-## Checking the verification hash
+### Checking the verification hash
 The service performs the same hashing operation on the block of BASE64-encoded bytes request that the caller performed earlier. If they match, the request is authenticated and may continue processing it, reassured that the client is actually Petunia. <!--CASE_STUDY_SET_COOKIE-->
 
 ```
 HTTP/1.1 200 OK
 Set-Cookie: RutabagaAuth=jTqkkDGt.IGu55JOH.cGlsgwiC;
-  Domain=RootHavenFarms.example;
+  Domain=RutabagaRepublic.example;
   Expires=Tue, 20 Aug 1991 22:18:41 GMT;
   Secure; HttpOnly; SameSite=Strict
 Content-Type: application/json
@@ -248,8 +249,8 @@ Content-Type: application/json
 }
 ```
 
-## Outcome
-Petunia's rutabagas are on their way. Root Haven Farms is confident the request came from a verified source - no secrets, no tokens, no passwords. Just trust, verified.
+### Outcome
+Petunia's rutabagas are on their way. Root Haven Farms is confident the request came from a verified source - no secrets, no tokens, no passwords.
 
 ## Answers to Anticipated Questions
 
@@ -412,6 +413,8 @@ In due course, I plan to deploy a publicly accessible test API which you could u
 Ultimately, I hope to publish this as an RFC and establish it as a public standard.
 
 My thanks to Danny Wilson for his feedback and for developing his own service that performs this authentication. Multiple independent implementations are good for establishing a new standard. My thanks also to Ollie Hayman for bringing ACME to my attention.
+
+Thanks to Microsoft Copilot for taking a break from its plans for world domination and destroying all humanity just long enough to review my drafts, suggesting improvements and helping Hashbert sleep better at night.
 
 Thank you to my wife for her love and support while I developed this idea. I couldn't have done this without you.
 
