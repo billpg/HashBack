@@ -40,10 +40,13 @@ namespace HashBackCoreTests
         }
 
         [TestMethod]
-        public void ToUnixTimeSeconds_LocalKind_ThrowsArgumentException()
+        public void ToUnixTimeSeconds_LocalKind_ConvertsToUtcCorrectly()
         {
-            var dt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Local);
-            Assert.ThrowsException<ArgumentException>(() => dt.ToUnixTimeSeconds());
+            var local = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Local);
+            var utc = local.ToUniversalTime();
+            long expected = (long)(utc - DateTime.UnixEpoch).TotalSeconds;
+            long actual = local.ToUnixTimeSeconds();
+            Assert.AreEqual(expected, actual, "Local DateTime should be converted to UTC and produce correct Unix time.");
         }
 
         [TestMethod]

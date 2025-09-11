@@ -5,7 +5,19 @@ using Newtonsoft.Json.Linq;
 
 namespace billpg.HashBackCore
 {
-    public static class ClientTools
+    public readonly struct AuthorizationBuildResult
+    {
+        public string AuthHeader { get; }
+        public string VerificationHash { get; }
+
+        public AuthorizationBuildResult(string authHeader, string verificationHash)
+        {
+            AuthHeader = authHeader;
+            VerificationHash = verificationHash;
+        }
+    }
+
+    public static class AuthorizationBuilder
     {
         /// <summary>
         /// Produces the BASE-64 block suitable for use in a HashBack Authorization header,
@@ -16,11 +28,9 @@ namespace billpg.HashBackCore
         /// <param name="unus">A 128-bit cryptographic-quality random value in BASE-64.</param>
         /// <param name="verify">The HTTPS URL where the verification hash will be published.</param>
         /// <returns>
-        /// Tuple: 
-        ///   - BASE-64 encoded JSON block for the Authorization header,
-        ///   - BASE-64 encoded salted SHA-256 hash string (verification hash).
+        /// An <see cref="AuthorizationBuildResult"/> containing the BASE-64 encoded JSON block and the verification hash.
         /// </returns>
-        public static (string authHeader, string verificationHash) BuildAuthorization(
+        public static AuthorizationBuildResult BuildAuthorization(
             string host,
             long now,
             string unus,
@@ -40,7 +50,7 @@ namespace billpg.HashBackCore
 
             /* Compute the verification hash using the Helpers function and return. */
             string verificationHash = Helpers.ComputeVerificationHash(jsonAsBytes);
-            return (authHeader, verificationHash);
+            return new AuthorizationBuildResult(authHeader, verificationHash);
         }
 
         /// <summary>
@@ -50,11 +60,9 @@ namespace billpg.HashBackCore
         /// <param name="host">The full domain name of the server being called.</param>
         /// <param name="verify">The HTTPS URL where the verification hash will be published.</param>
         /// <returns>
-        /// Tuple:
-        ///   - BASE-64 encoded JSON block for the Authorization header,
-        ///   - BASE-64 encoded salted SHA-256 hash string (verification hash).
+        /// An <see cref="AuthorizationBuildResult"/> containing the BASE-64 encoded JSON block and the verification hash.
         /// </returns>
-        public static (string authHeader, string verificationHash) BuildAuthorization(
+        public static AuthorizationBuildResult BuildAuthorization(
             string host,
             string verify)
         {

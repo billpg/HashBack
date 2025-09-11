@@ -28,7 +28,7 @@ namespace HashBackCoreTests
 
             /* Run the function, expecting the same result every time. */
             var (authHeader, verificationHash) = 
-                ClientTools.BuildAuthorization(host, now, unus, verify);
+                AuthorizationBuilder.BuildAuthorization(host, now, unus, verify);
 
             /* Compare results. */
             Assert.AreEqual(expectedBase64, authHeader, 
@@ -47,7 +47,7 @@ namespace HashBackCoreTests
             /* ACT - Collecting time before and after to verify 'Now' value. */
             long minimumNow = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds();
             var (authHeader, verificationHash) = 
-                ClientTools.BuildAuthorization(host, verify);
+                AuthorizationBuilder.BuildAuthorization(host, verify);
             long maximumNow = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds();
 
             /* BASE-64 block should decode to valid JSON. */
@@ -91,8 +91,8 @@ namespace HashBackCoreTests
             string host = "example.com";
             string verify = "https://example.com/hashback";
 
-            var (authHeader1, verificationHash1) = ClientTools.BuildAuthorization(host, verify);
-            var (authHeader2, verificationHash2) = ClientTools.BuildAuthorization(host, verify);
+            var (authHeader1, verificationHash1) = AuthorizationBuilder.BuildAuthorization(host, verify);
+            var (authHeader2, verificationHash2) = AuthorizationBuilder.BuildAuthorization(host, verify);
 
             // It's extremely unlikely for two auto-generated requests to have the same hash
             Assert.AreNotEqual(verificationHash1, verificationHash2, "Different requests should produce different hashes.");

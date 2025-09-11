@@ -55,16 +55,40 @@ namespace billpg.HashBackCore
             => ComputeVerificationHash(Convert.FromBase64String(base64Input));
 
         /// <summary>
-        /// Converts a DateTime to Unix time seconds. Only UTC DateTime is allowed.
+        /// Converts a DateTime to Unix time seconds, converting to UTC if necessary.
+        /// Throws if DateTime.Kind is Unspecified.
         /// </summary>
-        /// <param name="dt">The DateTime to convert (must be UTC).</param>
+        /// <param name="dt">The DateTime to convert (must be Utc or Local).</param>
         /// <returns>Seconds since 1970-01-01T00:00:00Z.</returns>
-        /// <exception cref="ArgumentException">Thrown if DateTime.Kind is not Utc.</exception>
+        /// <exception cref="ArgumentException">Thrown if DateTime.Kind is Unspecified.</exception>
         public static long ToUnixTimeSeconds(this DateTime dt)
         {
-            if (dt.Kind != DateTimeKind.Utc)
-                throw new ArgumentException("DateTime must be specified as UTC (DateTimeKind.Utc).", nameof(dt));
+            if (dt.Kind == DateTimeKind.Unspecified)
+                throw new ArgumentException("DateTime.Kind must not be Unspecified. Use Utc or Local.", nameof(dt));
+            if (dt.Kind == DateTimeKind.Local)
+                dt = dt.ToUniversalTime();
             return (long)(dt - DateTime.UnixEpoch).TotalSeconds;
         }
+
+        internal static bool EqualsNoCase(string x, string y)
+            => string.Equals(x, y, StringComparison.OrdinalIgnoreCase);
     }
+
+    public class AuthorizationParseException : Exception
+    {
+        public AuthorizationParseException(string message) : base(message) { }
+    }
+
+    public readonly struct AuthorizationParseResult
+    {
+        public string VerifyUrl { get; }
+        public string ExpectedHash { get; }
+
+        public AuthorizationParseResult(string verifyUrl, string expectedHash)
+        {
+            VerifyUrl = verifyUrl;
+            ExpectedHash = expectedHash;
+        }
+    }
+
 }
