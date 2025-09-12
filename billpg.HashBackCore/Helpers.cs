@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json.Linq;
+using System;
 using System.Security.Cryptography;
 
 namespace billpg.HashBackCore
@@ -72,6 +73,32 @@ namespace billpg.HashBackCore
 
         internal static bool EqualsNoCase(string x, string y)
             => string.Equals(x, y, StringComparison.OrdinalIgnoreCase);
+
+        internal static byte[]? TryBase64Decode(string base64)
+        {
+            try
+            {
+                return Convert.FromBase64String(base64);
+            }
+            catch (FormatException)
+            {
+                return null!;
+            }
+        }
+
+        internal static JObject? TryJsonParse(string json)
+        {
+            try
+            {
+                return JObject.Parse(json);
+            }
+            catch (Newtonsoft.Json.JsonReaderException)
+            {
+                return null!;
+            }
+        }
+
+        
     }
 
     public class AuthorizationParseException : Exception

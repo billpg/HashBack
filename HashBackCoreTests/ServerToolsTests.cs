@@ -15,8 +15,9 @@ namespace HashBackCoreTests
         {
             now ??= DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             string unus = Convert.ToBase64String(new byte[16]);
-            var (authHeader, _) = AuthorizationBuilder.BuildAuthorization(host, now.Value, unus, verify);
-            return authHeader;
+            return AuthorizationBuilder
+                .BuildAuthorization(host, now.Value, unus, verify)
+                .AuthHeader;
         }
 
         [TestMethod]

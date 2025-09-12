@@ -21,57 +21,65 @@ namespace billpg.HashBackCore
         /// Parses and validates a BASE-64 encoded Authorization header according to this policy.
         /// Throws <see cref="AuthorizationParseException"/> if the header is invalid.
         /// </summary>
-        /// <param name="authHeaderBase64">The BASE-64 encoded Authorization header block.</param>
+        /// <param name="authHeader">The BASE-64 encoded Authorization header block.</param>
         /// <returns>
         /// An <see cref="AuthorizationParseResult"/> containing the verification URL and expected hash.
         /// </returns>
         /// <exception cref="AuthorizationParseException">Thrown if the header is invalid or fails policy checks.</exception>
-        public AuthorizationParseResult Parse(string authHeaderBase64)
+        public AuthorizationParseResult Parse(string authHeader)
         {
-            byte[] jsonBytes;
-            try
+            /* Attempt to decode from base-64. */
+            byte[]? jsonBytes = Helpers.TryBase64Decode(authHeader);
+            string json;
+            if (jsonBytes != null)
             {
-                jsonBytes = Convert.FromBase64String(authHeaderBase64);
+                /* Successfully decoded base-64. Convert to string. */
+                json = Encoding.UTF8.GetString(jsonBytes);
             }
-            catch (FormatException)
+            /* Could this be an unencoded JSON string instead? */
+            else if (MightBeJsonHeader(authHeader))
+            {
+                /* Use it directly. The JSON-Parse farther down will reject if not.
+                 * (We will still need bytes for hashing later so save those.) */
+                json = authHeader;
+                jsonBytes = Encoding.UTF8.GetBytes(authHeader);
+            }
+            /* Complain that it's neither valid base-64 nor JSON. */
+            else
             {
                 throw new AuthorizationParseException("Authorization header is not valid BASE-64.");
             }
 
-            string json = Encoding.UTF8.GetString(jsonBytes);
-
-            JObject? obj;
-            try
+            /* Attempt to parse JSON, complaining if it rejects the string. */
+            JObject? obj = Helpers.TryJsonParse(json);
+            if (obj == null)
             {
-                obj = JObject.Parse(json);
-            }
-            catch (JsonReaderException)
-            {
+                /* If we got here, it means the input was not valid JSON. */
                 throw new AuthorizationParseException("Authorization header is not valid JSON.");
             }
 
-            // Validate Version
+            /* Validate Version. */
             string? version = obj["Version"]?.Value<string>();
             if (version == null)
                 throw new AuthorizationParseException("Version property is missing.");
             if (version != Helpers.VersionString)
                 throw new AuthorizationParseException($"Version must be '{Helpers.VersionString}'.");
 
-            // Validate Host
+            /* Validate Host. */
             string? host = obj["Host"]?.Value<string>();
             if (host == null)
                 throw new AuthorizationParseException("Host property is missing.");
             if (!HostTest(host))
                 throw new AuthorizationParseException("Host property is not valid for this server.");
 
-            // Validate Now
+            /* Validate Now. */
             long? now = obj["Now"]?.Value<long>();
             if (now == null)
                 throw new AuthorizationParseException("Now property is missing.");
             if (!NowTest(now.Value))
                 throw new AuthorizationParseException("Now property is not valid for this server's time policy.");
 
-            // Validate Verify (must be a valid https URL)
+            /* Validate Verify (must be a valid https URL) */
             string? verifyUrl = obj["Verify"]?.Value<string>();
             if (verifyUrl == null)
                 throw new AuthorizationParseException("Verify property is missing.");
@@ -80,9 +88,20 @@ namespace billpg.HashBackCore
             if (uri.Scheme != Uri.UriSchemeHttps)
                 throw new AuthorizationParseException("Verify URL must be HTTPS.");
 
-            // If all checks pass, compute the expected hash and return.
+            /* If all checks pass, compute the expected hash from 
+             * the bytes collected earlier and return both. */
             string expectedHash = Helpers.ComputeVerificationHash(jsonBytes);
             return new AuthorizationParseResult(verifyUrl, expectedHash);
+        }
+
+        private static bool MightBeJsonHeader(string authHeader)
+        {
+            /* Quick check to see if it looks like JSON and
+             * contains no whitespace. */
+            return 
+                authHeader.StartsWith("{") && 
+                authHeader.EndsWith("}") 
+                && authHeader.Any(char.IsWhiteSpace) == false;
         }
 
         /// <summary>

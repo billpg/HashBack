@@ -8,50 +8,95 @@ namespace billpg.HashBackCore
     public readonly struct AuthorizationBuildResult
     {
         public string AuthHeader { get; }
+        public string VerifyUrl { get; }
         public string VerificationHash { get; }
-
-        public AuthorizationBuildResult(string authHeader, string verificationHash)
+        public AuthorizationBuildResult(string authHeader, string verifyUrl, string verificationHash)
         {
             AuthHeader = authHeader;
+            VerifyUrl = verifyUrl;
             VerificationHash = verificationHash;
         }
     }
 
-    public static class AuthorizationBuilder
+
+    public record AuthorizationBuilder(
+        string? UseHost = null,
+        Func<long> NowGetter = null!,
+        Func<string> UnusGenerator = null!,
+        Func<string>? VerifyGenerator = null,
+        Action<AuthorizationBuildResult>? PostBuild = null)
     {
-        /// <summary>
-        /// Produces the BASE-64 block suitable for use in a HashBack Authorization header,
-        /// and the expected verification hash string.
-        /// </summary>
-        /// <param name="host">The full domain name of the server being called.</param>
-        /// <param name="now">The current UTC time, as seconds since 1970-01-01.</param>
-        /// <param name="unus">A 128-bit cryptographic-quality random value in BASE-64.</param>
-        /// <param name="verify">The HTTPS URL where the verification hash will be published.</param>
-        /// <returns>
-        /// An <see cref="AuthorizationBuildResult"/> containing the BASE-64 encoded JSON block and the verification hash.
-        /// </returns>
-        public static AuthorizationBuildResult BuildAuthorization(
-            string host,
-            long now,
-            string unus,
-            string verify)
+        public AuthorizationBuilder() : this(
+            UseHost: null,
+            NowGetter: DefaultNowGetter,
+            UnusGenerator: DefaultUnusGenerator,
+            VerifyGenerator: null,
+            PostBuild: null) {}
+
+        private static long DefaultNowGetter()
+            => DateTime.UtcNow.ToUnixTimeSeconds();
+
+        private static string DefaultUnusGenerator()
         {
+            byte[] unusBytes = new byte[16];
+            RandomNumberGenerator.Fill(unusBytes);
+            return Convert.ToBase64String(unusBytes);
+        }
+
+        public AuthorizationBuilder WithHost(string host)
+            => this with { UseHost = host };
+
+        public AuthorizationBuilder WithNowGetter(Func<long> nowGetter) 
+            => this with { NowGetter = nowGetter };
+
+        public AuthorizationBuilder WithUnusGenerator(Func<string> unusGenerator)   
+            => this with { UnusGenerator = unusGenerator };
+
+        public AuthorizationBuilder WithVerifyGenerator(Func<string> verifyGenerator)
+            => this with { VerifyGenerator = verifyGenerator };
+
+        public AuthorizationBuilder WithVerify(string verify)
+            => this with { VerifyGenerator = () => verify };
+
+        public AuthorizationBuilder WithPostBuild(Action<AuthorizationBuildResult> postBuild)
+            => this with { PostBuild = postBuild };
+
+        public AuthorizationBuildResult Build()
+        {
+            /* Check the optional properties have all been assigned. */
+            if (UseHost == null)
+                throw new InvalidOperationException("UseHost must be set.");
+            if (VerifyGenerator == null)
+                throw new InvalidOperationException("VerifyUrlGetter must be set.");
+
+            /* Get the Verify URL, which we'll need when building the return object. */
+            string verify = VerifyGenerator();
+
             /* Serialize parameters to JSON and encode. */
             string json = new JObject
             {
                 ["Version"] = Helpers.VersionString,
-                ["Host"] = host,
-                ["Now"] = now,
-                ["Unus"] = unus,
+                ["Host"] = this.UseHost,
+                ["Now"] = this.NowGetter(),
+                ["Unus"] = this.UnusGenerator(),
                 ["Verify"] = verify
             }.ToString(Newtonsoft.Json.Formatting.None);
             byte[] jsonAsBytes = Encoding.UTF8.GetBytes(json);
             string authHeader = Convert.ToBase64String(jsonAsBytes);
 
-            /* Compute the verification hash using the Helpers function and return. */
+            /* Compute the verification hash using the Helpers function. */
             string verificationHash = Helpers.ComputeVerificationHash(jsonAsBytes);
-            return new AuthorizationBuildResult(authHeader, verificationHash);
+            var result = new AuthorizationBuildResult(authHeader, verify, verificationHash);
+
+            /* Pass it to the PostBuild callable if we got one. */
+            PostBuild?.Invoke(result);
+
+            /* Return the result. */
+            return result;
         }
+
+        public string BuildAuthHeader()
+            => Build().AuthHeader;
 
         /// <summary>
         /// Produces the BASE-64 block and verification hash for a HashBack Authorization header,
@@ -66,17 +111,30 @@ namespace billpg.HashBackCore
             string host,
             string verify)
         {
-            /* Now: current UTC time in seconds since 1970-01-01. */
-            long now = DateTime.UtcNow.ToUnixTimeSeconds();
+            var builder = new AuthorizationBuilder()
+            {
+                UseHost = host,
+                NowGetter = DefaultNowGetter,
+                UnusGenerator = DefaultUnusGenerator,
+                VerifyGenerator = () => verify
+            };
+            return builder.Build();
+        }
 
-            /* Unus: 128 bits (16 bytes) of cryptographic-quality
-             * random data, BASE-64 encoded. */
-            byte[] unusBytes = new byte[16];
-            RandomNumberGenerator.Fill(unusBytes);
-            string unus = Convert.ToBase64String(unusBytes);
-
-            /* Call through to the main function. */
-            return BuildAuthorization(host, now, unus, verify);
+        public static AuthorizationBuildResult BuildAuthorization(
+            string host,
+            long now,
+            string unus,
+            string verify)
+        { 
+            var builder = new AuthorizationBuilder()
+            {
+                UseHost = host,
+                NowGetter = () => now,
+                UnusGenerator = () => unus,
+                VerifyGenerator = () => verify
+            };
+            return builder.Build();
         }
     }
 }
