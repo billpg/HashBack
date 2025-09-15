@@ -1,8 +1,8 @@
 ﻿# HashBackCore
 
-**hasBackCore** is a reference implementation of the HashBack authentication protocol, written in C#. It provides core logic for building and parsing HashBack Authorization headers and verifying thoe payloads - without handling HTTP requests directly.
+**HashBackCore** is a reference implementation of the HashBack authentication protocol, written in C#. It provides core logic for building and parsing HashBack Authorization headers and verifying those payloads - without handling HTTP requests directly.
 
-HashBackCore is designed to be lightwieght, testable and protcol-faithful. It supports both client-side and server-side operations, making it suitable for a variety of applications.
+HashBackCore is designed to be lightweight, testable and protocol-faithful. It supports both client-side and server-side operations, making it suitable for a variety of applications.
 
 ## 🚀 Features
 
@@ -27,7 +27,7 @@ Then, add a reference to HashBackCore in your project file (.csproj):
 var hashbackBuilder = new billpg.HashBackCore.AuthHeaderBuilder();
 
 /* Build an authorization header for a named remote 
- * host and where it can fetch our verfication hash.*/
+ * host and where it can fetch our verification hash. */
 var auth = hashbackBuilder
     .WithHost("server.example")
     .WithVerify("https://client.example/api/hashback?id=502542886")
@@ -70,5 +70,8 @@ HashBack is a protocol inspired by the metaphor:
 > "You know my number, call me back."
 
 The protocol is a round trip. The hash, protected by TLS in both directions, is the handshake.
+
+Hashbert the brainy hedgehog says:
+> 🦔 "HashBackCore is a spiky little library that gets the job done without fuss."
 
 ## 🦉 [billpg.com](https://billpg.com) 
