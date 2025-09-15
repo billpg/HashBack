@@ -15,7 +15,7 @@ namespace HashBackCoreTests
         {
             now ??= DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             string unus = Convert.ToBase64String(new byte[16]);
-            return AuthorizationBuilder
+            return AuthHeaderBuilder
                 .BuildAuthorization(host, now.Value, unus, verify)
                 .AuthHeader;
         }
@@ -23,7 +23,7 @@ namespace HashBackCoreTests
         [TestMethod]
         public void Validator_Default_AlwaysThrows()
         {
-            var validator = new AuthorizationPolicy();
+            var validator = new AuthHeaderParser();
             string authHeader = CreateValidAuthHeader();
             Assert.ThrowsException<AuthorizationParseException>(() => validator.Parse(authHeader));
         }
@@ -31,7 +31,7 @@ namespace HashBackCoreTests
         [TestMethod]
         public void Validator_WithHostTest_AllowsMatchingHost()
         {
-            var validator = new AuthorizationPolicy()
+            var validator = new AuthHeaderParser()
                 .WithHostTest(h => h == "server.example")
                 .WithNowTest(_ => true);
 
@@ -45,7 +45,7 @@ namespace HashBackCoreTests
         [TestMethod]
         public void Validator_WithHostTest_RejectsNonMatchingHost()
         {
-            var validator = new AuthorizationPolicy()
+            var validator = new AuthHeaderParser()
                 .WithHostTest(h => h == "server.example")
                 .WithNowTest(_ => true);
 
@@ -57,7 +57,7 @@ namespace HashBackCoreTests
         public void Validator_WithNowTest_AllowsValidNow()
         {
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var validator = new AuthorizationPolicy()
+            var validator = new AuthHeaderParser()
                 .WithHostTest(_ => true)
                 .WithNowTest(n => n == now);
 
@@ -72,7 +72,7 @@ namespace HashBackCoreTests
         public void Validator_WithNowTest_RejectsInvalidNow()
         {
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var validator = new AuthorizationPolicy()
+            var validator = new AuthHeaderParser()
                 .WithHostTest(_ => true)
                 .WithNowTest(n => n == now + 1000);
 
@@ -83,7 +83,7 @@ namespace HashBackCoreTests
         [TestMethod]
         public void Validator_WithRequireHostName_AllowsExactMatch()
         {
-            var validator = new AuthorizationPolicy()
+            var validator = new AuthHeaderParser()
                 .WithRequireHostName("server.example")
                 .WithNowTest(_ => true);
 
@@ -96,7 +96,7 @@ namespace HashBackCoreTests
         [TestMethod]
         public void Validator_WithRequireHostName_RejectsNonMatch()
         {
-            var validator = new AuthorizationPolicy()
+            var validator = new AuthHeaderParser()
                 .WithRequireHostName("server.example")
                 .WithNowTest(_ => true);
 
@@ -108,7 +108,7 @@ namespace HashBackCoreTests
         public void Validator_WithTimeTolerance_AllowsWithinTolerance()
         {
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var validator = new AuthorizationPolicy()
+            var validator = new AuthHeaderParser()
                 .WithHostTest(_ => true)
                 .WithTimeTolerance(() => DateTime.UtcNow, 10);
 
@@ -122,7 +122,7 @@ namespace HashBackCoreTests
         public void Validator_WithTimeTolerance_RejectsOutsideTolerance()
         {
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var validator = new AuthorizationPolicy()
+            var validator = new AuthHeaderParser()
                 .WithHostTest(_ => true)
                 .WithTimeTolerance(() => DateTime.UtcNow, 1);
 
@@ -134,7 +134,7 @@ namespace HashBackCoreTests
         public void Validator_FullHappyPath()
         {
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var validator = new AuthorizationPolicy()
+            var validator = new AuthHeaderParser()
                 .WithRequireHostName("server.example")
                 .WithTimeTolerance(() => DateTime.UtcNow, 30);
 

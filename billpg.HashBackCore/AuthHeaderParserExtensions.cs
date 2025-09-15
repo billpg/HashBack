@@ -4,8 +4,8 @@ namespace billpg.HashBackCore
 {
     public static class AuthorizationPolicyExtensions
     {
-        public static AuthorizationPolicy WithTimeTolerance(
-            this AuthorizationPolicy policy,
+        public static AuthHeaderParser WithTimeTolerance(
+            this AuthHeaderParser policy,
             Func<DateTime> nowGetter,
             long secondsTolerance)
         {
@@ -33,8 +33,8 @@ namespace billpg.HashBackCore
         /// <param name="policy">The policy to extend.</param>
         /// <param name="seconds">The allowed tolerance in secondsTolerance.</param>
         /// <returns>A new AuthorizationPolicy with the time tolerance applied.</returns>
-        public static AuthorizationPolicy WithTimeTolerance(
-            this AuthorizationPolicy policy,
+        public static AuthHeaderParser WithTimeTolerance(
+            this AuthHeaderParser policy,
             long seconds)
         {
             /* Call through to the other WithTimeTolerance function, 
@@ -51,15 +51,15 @@ namespace billpg.HashBackCore
         private static DateTime DateTimeUtcNowAsDelegate()
             => DateTime.UtcNow;
 
-        public static AuthorizationPolicy WithRequireHostName(
-            this AuthorizationPolicy policy,
+        public static AuthHeaderParser WithRequireHostName(
+            this AuthHeaderParser policy,
             string requiredHostName)
         {
             return policy.WithHostTest(host => Helpers.EqualsNoCase(host, requiredHostName));
         }
 
-        public static AuthorizationPolicy WithAnyRequiredHostName(
-            this AuthorizationPolicy policy,
+        public static AuthHeaderParser WithAnyRequiredHostName(
+            this AuthHeaderParser policy,
             params string[] requiredHostNames)
         {
             return policy.WithHostTest(Internal);

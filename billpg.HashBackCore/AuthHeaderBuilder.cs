@@ -5,12 +5,27 @@ using Newtonsoft.Json.Linq;
 
 namespace billpg.HashBackCore
 {
-    public readonly struct AuthorizationBuildResult
+    /// <summary>
+    /// Result of building an Authorization header.
+    /// </summary>
+    public readonly struct AuthHeaderBuildResult
     {
+        /// <summary>
+        /// The generated BASE-64 encoded JSON block for the Authorization header.
+        /// </summary>
         public string AuthHeader { get; }
+
+        /// <summary>
+        /// The Verify URL that was included in the JSON block.
+        /// </summary>
         public string VerifyUrl { get; }
+
+        /// <summary>
+        /// The computed verification hash for the JSON block.
+        /// </summary>
         public string VerificationHash { get; }
-        public AuthorizationBuildResult(string authHeader, string verifyUrl, string verificationHash)
+
+        public AuthHeaderBuildResult(string authHeader, string verifyUrl, string verificationHash)
         {
             AuthHeader = authHeader;
             VerifyUrl = verifyUrl;
@@ -19,14 +34,14 @@ namespace billpg.HashBackCore
     }
 
 
-    public record AuthorizationBuilder(
+    public record AuthHeaderBuilder(
         string? UseHost = null,
         Func<long> NowGetter = null!,
         Func<string> UnusGenerator = null!,
         Func<string>? VerifyGenerator = null,
-        Action<AuthorizationBuildResult>? PostBuild = null)
+        Action<AuthHeaderBuildResult>? PostBuild = null)
     {
-        public AuthorizationBuilder() : this(
+        public AuthHeaderBuilder() : this(
             UseHost: null,
             NowGetter: DefaultNowGetter,
             UnusGenerator: DefaultUnusGenerator,
@@ -43,25 +58,25 @@ namespace billpg.HashBackCore
             return Convert.ToBase64String(unusBytes);
         }
 
-        public AuthorizationBuilder WithHost(string host)
+        public AuthHeaderBuilder WithHost(string host)
             => this with { UseHost = host };
 
-        public AuthorizationBuilder WithNowGetter(Func<long> nowGetter) 
+        public AuthHeaderBuilder WithNowGetter(Func<long> nowGetter) 
             => this with { NowGetter = nowGetter };
 
-        public AuthorizationBuilder WithUnusGenerator(Func<string> unusGenerator)   
+        public AuthHeaderBuilder WithUnusGenerator(Func<string> unusGenerator)   
             => this with { UnusGenerator = unusGenerator };
 
-        public AuthorizationBuilder WithVerifyGenerator(Func<string> verifyGenerator)
+        public AuthHeaderBuilder WithVerifyGenerator(Func<string> verifyGenerator)
             => this with { VerifyGenerator = verifyGenerator };
 
-        public AuthorizationBuilder WithVerify(string verify)
+        public AuthHeaderBuilder WithVerify(string verify)
             => this with { VerifyGenerator = () => verify };
 
-        public AuthorizationBuilder WithPostBuild(Action<AuthorizationBuildResult> postBuild)
+        public AuthHeaderBuilder WithPostBuild(Action<AuthHeaderBuildResult> postBuild)
             => this with { PostBuild = postBuild };
 
-        public AuthorizationBuildResult Build()
+        public AuthHeaderBuildResult Build()
         {
             /* Check the optional properties have all been assigned. */
             if (UseHost == null)
@@ -86,7 +101,7 @@ namespace billpg.HashBackCore
 
             /* Compute the verification hash using the Helpers function. */
             string verificationHash = Helpers.ComputeVerificationHash(jsonAsBytes);
-            var result = new AuthorizationBuildResult(authHeader, verify, verificationHash);
+            var result = new AuthHeaderBuildResult(authHeader, verify, verificationHash);
 
             /* Pass it to the PostBuild callable if we got one. */
             PostBuild?.Invoke(result);
@@ -105,13 +120,13 @@ namespace billpg.HashBackCore
         /// <param name="host">The full domain name of the server being called.</param>
         /// <param name="verify">The HTTPS URL where the verification hash will be published.</param>
         /// <returns>
-        /// An <see cref="AuthorizationBuildResult"/> containing the BASE-64 encoded JSON block and the verification hash.
+        /// An <see cref="AuthHeaderBuildResult"/> containing the BASE-64 encoded JSON block and the verification hash.
         /// </returns>
-        public static AuthorizationBuildResult BuildAuthorization(
+        public static AuthHeaderBuildResult BuildAuthorization(
             string host,
             string verify)
         {
-            var builder = new AuthorizationBuilder()
+            var builder = new AuthHeaderBuilder()
             {
                 UseHost = host,
                 NowGetter = DefaultNowGetter,
@@ -121,13 +136,13 @@ namespace billpg.HashBackCore
             return builder.Build();
         }
 
-        public static AuthorizationBuildResult BuildAuthorization(
+        public static AuthHeaderBuildResult BuildAuthorization(
             string host,
             long now,
             string unus,
             string verify)
         { 
-            var builder = new AuthorizationBuilder()
+            var builder = new AuthHeaderBuilder()
             {
                 UseHost = host,
                 NowGetter = () => now,

@@ -28,7 +28,7 @@ namespace HashBackCoreTests
 
             /* Run the function, expecting the same result every time. */
             var auth = 
-                AuthorizationBuilder.BuildAuthorization(host, now, unus, verify);
+                AuthHeaderBuilder.BuildAuthorization(host, now, unus, verify);
 
             /* Compare results. */
             Assert.AreEqual(expectedBase64, auth.AuthHeader, 
@@ -47,7 +47,7 @@ namespace HashBackCoreTests
             /* ACT - Collecting time before and after to verify 'Now' value. */
             long minimumNow = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds();
             var auth = 
-                AuthorizationBuilder.BuildAuthorization(host, verify);
+                AuthHeaderBuilder.BuildAuthorization(host, verify);
             long maximumNow = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds();
 
             /* BASE-64 block should decode to valid JSON. */
@@ -91,8 +91,8 @@ namespace HashBackCoreTests
             string host = "example.com";
             string verify = "https://example.com/hashback";
 
-            var auth1 = AuthorizationBuilder.BuildAuthorization(host, verify);
-            var auth2 = AuthorizationBuilder.BuildAuthorization(host, verify);
+            var auth1 = AuthHeaderBuilder.BuildAuthorization(host, verify);
+            var auth2 = AuthHeaderBuilder.BuildAuthorization(host, verify);
 
             // It's extremely unlikely for two auto-generated requests to have the same hash
             Assert.AreNotEqual(auth1.VerificationHash, auth2.VerificationHash, "Different requests should produce different hashes.");
@@ -100,32 +100,57 @@ namespace HashBackCoreTests
         }
 
         [TestMethod]
-        public void AuthorizationBuilder_WithHashRegistry()
-        {
-            Guid? registeredId = null;
-            string? registeredHash = null;
-            void Register(Guid id, string hash)
-            {
-                registeredId = id;
-                registeredHash = hash;
-            }
+        public void AuthorizationBuilder_WithHashRegistty_NoQuery()
+            => AuthorizationBuilder_WithHashRegistry_Shared(
+                baseUrl: "https://example.com/hashback",
+                expectedAuthHeader: 
+                "eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJob3N0LmV4Y" +
+                "W1wbGUiLCJOb3ciOjUyOTI5NzIwMCwiVW51cyI6Illlc015VG90YWxseVJhbm" +
+                "RvbVVudXM9PSIsIlZlcmlmeSI6Imh0dHBzOi8vZXhhbXBsZS5jb20vaGFzaGJ" +
+                "hY2s/aWQ9MDE5OTRlMWQtNzAwNi03N2FjLThiNjUtYWYyZjU5ODI2ODYxIn0=",
+                expectedHash: "7TdLab4VfnQnQ0e9avYw8MAC0cU/sFNYII5IWyEbwEY=");
 
+        [TestMethod]
+        public void AuthorizationBuilder_WithHashRegistty_WithQuery()
+            => AuthorizationBuilder_WithHashRegistry_Shared(
+                baseUrl: "https://example.com/hashback?abc=zyx", 
+                expectedAuthHeader: 
+                "eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJob3N0LmV4YW1w" +
+                "bGUiLCJOb3ciOjUyOTI5NzIwMCwiVW51cyI6Illlc015VG90YWxseVJhbmRvbVVu" +
+                "dXM9PSIsIlZlcmlmeSI6Imh0dHBzOi8vZXhhbXBsZS5jb20vaGFzaGJhY2s/YWJj" +
+                "PXp5eCZpZD0wMTk5NGUxZC03MDA2LTc3YWMtOGI2NS1hZjJmNTk4MjY4NjEifQ==",
+                expectedHash: "hQLsjxbE9EuJpg+Mky0Qk5nmKKSCj3WlV/p4Cnvf7/k=");
+
+        private void AuthorizationBuilder_WithHashRegistry_Shared(
+            string baseUrl, string expectedAuthHeader, string expectedHash)
+        {
+            /* Collect registrations here. */
+            var registrations = new Dictionary<Guid, string>();
+
+            /* Expected GUID to register hash. */
+            Guid expectedGuid = Guid.Parse("01994E1D-7006-77AC-8B65-AF2F59826861");
+
+            /* Build an auth header with known values and a hash registry. */
             var authHeader =
-                new AuthorizationBuilder()
+                new AuthHeaderBuilder()
                 .WithHost("host.example")
-                .WithUnusGenerator(() => "AAAAAAAAAAAAAAAAAAAAAA==")
+                .WithUnusGenerator(() => "YesMyTotallyRandomUnus==")
                 .WithNowGetter(() => 529297200)
                 .WithHashRegistry(
-                    "https://example.com/hashback", "id", 
-                    () => Guid.Empty, 
-                    Register)
+                    baseUrl, "id", 
+                    () => expectedGuid, 
+                    registrations.Add)
                 .BuildAuthHeader();
 
-            Assert.AreEqual("eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJob3N0LmV4YW1wbGUiLCJOb3ciOjUyOTI5NzIwMCwiVW51cyI6IkFBQUFBQUFBQUFBQUFBQUFBQUFBQUE9PSIsIlZlcmlmeSI6Imh0dHBzOi8vZXhhbXBsZS5jb20vaGFzaGJhY2s/aWQ9MDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIn0=", authHeader);
-            Assert.IsNotNull(registeredId);
-            Assert.AreEqual(Guid.Empty, registeredId);
-            Assert.IsNotNull(registeredHash);
-            Assert.AreEqual("kewk4MSJiay5ONAwdkVna9rgW1BhIfQOazqGI7OGE80=", registeredHash);
+            /* Assert results. */
+            Assert.AreEqual(
+                expectedAuthHeader, 
+                authHeader);
+            Assert.AreEqual(1, registrations.Count);
+            Assert.IsTrue(registrations.ContainsKey(expectedGuid));
+            Assert.AreEqual(
+                expectedHash, 
+                registrations[expectedGuid]);
         }
     }
 }

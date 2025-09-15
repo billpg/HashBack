@@ -8,24 +8,27 @@ namespace billpg.HashBackCore
     /// <summary>
     /// Represents a policy for validating and parsing HashBack Authorization headers.
     /// </summary>
-    public record AuthorizationPolicy(
+    public record AuthHeaderParser(
         Func<string, bool> HostTest = null!,
         Func<long, bool> NowTest = null!)
     {
         /// <summary>
-        /// Initializes a new AuthorizationPolicy with default host and time tests (both always fail).
+        /// Initializes a new AuthHeaderParser with default 
+        /// host and time tests (both always reject).
         /// </summary>
-        public AuthorizationPolicy() : this(_ => false, _ => false) { }
+        public AuthHeaderParser() : this(_ => false, _ => false) { }
 
         /// <summary>
-        /// Parses and validates a BASE-64 encoded Authorization header according to this policy.
+        /// Parses and validates an Authorization header according to this policy.
         /// Throws <see cref="AuthorizationParseException"/> if the header is invalid.
         /// </summary>
-        /// <param name="authHeader">The BASE-64 encoded Authorization header block.</param>
+        /// <param name="authHeader">The Authorization header block in JSON or BASE-64 encoded JSON.</param>
         /// <returns>
         /// An <see cref="AuthorizationParseResult"/> containing the verification URL and expected hash.
         /// </returns>
-        /// <exception cref="AuthorizationParseException">Thrown if the header is invalid or fails policy checks.</exception>
+        /// <exception cref="AuthorizationParseException">
+        /// Thrown if the header is invalid or fails policy checks.
+        /// </exception>
         public AuthorizationParseResult Parse(string authHeader)
         {
             /* Attempt to decode from base-64. */
@@ -94,30 +97,31 @@ namespace billpg.HashBackCore
             return new AuthorizationParseResult(verifyUrl, expectedHash);
         }
 
-        private static bool MightBeJsonHeader(string authHeader)
-        {
-            /* Quick check to see if it looks like JSON and
-             * contains no whitespace. */
-            return 
-                authHeader.StartsWith("{") && 
-                authHeader.EndsWith("}") 
-                && authHeader.Any(char.IsWhiteSpace) == false;
-        }
-
         /// <summary>
-        /// Returns a new <see cref="AuthorizationPolicy"/> with the specified host validation function.
+        /// Quick check to see if it looks 
+        /// like JSON and contains no whitespace.
+        /// </summary>
+        /// <param name="authHeader">Header to test.</param>
+        /// <returns>True if this might be JSON. False otherwise.</returns>
+        private static bool MightBeJsonHeader(string authHeader)
+            => authHeader.StartsWith('{') &&
+               authHeader.EndsWith('}') && 
+               authHeader.Any(char.IsWhiteSpace) == false;
+        
+        /// <summary>
+        /// Returns a new <see cref="AuthHeaderParser"/> with the specified host validation function.
         /// </summary>
         /// <param name="hostTest">A function that returns true if the Host property is valid.</param>
-        /// <returns>A new <see cref="AuthorizationPolicy"/> with the updated host test.</returns>
-        public AuthorizationPolicy WithHostTest(Func<string, bool> hostTest)
+        /// <returns>A new <see cref="AuthHeaderParser"/> with the updated host test.</returns>
+        public AuthHeaderParser WithHostTest(Func<string, bool> hostTest)
             => this with { HostTest = hostTest };
 
         /// <summary>
-        /// Returns a new <see cref="AuthorizationPolicy"/> with the specified time validation function.
+        /// Returns a new <see cref="AuthHeaderParser"/> with the specified time validation function.
         /// </summary>
         /// <param name="nowTest">A function that returns true if the Now property (seconds since epoch) is valid.</param>
-        /// <returns>A new <see cref="AuthorizationPolicy"/> with the updated time test.</returns>
-        public AuthorizationPolicy WithNowTest(Func<long, bool> nowTest)
+        /// <returns>A new <see cref="AuthHeaderParser"/> with the updated time test.</returns>
+        public AuthHeaderParser WithNowTest(Func<long, bool> nowTest)
             => this with { NowTest = nowTest };
     }
 }

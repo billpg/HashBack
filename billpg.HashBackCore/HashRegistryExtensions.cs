@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace billpg.HashBackCore
 {
     public static class HashRegistryExtensions
     {
-        public static AuthorizationBuilder WithHashRegistry(
-            this AuthorizationBuilder builder,
+        public static AuthHeaderBuilder WithHashRegistry(
+            this AuthHeaderBuilder builder,
             string baseUrl,
             string queryParamName,
             Func<Guid> guidGenerator,
@@ -24,12 +25,16 @@ namespace billpg.HashBackCore
 
             /* Generated URL from parameters and a new GUID. */
             string InternalVerifyGenerator()
-                => new UriBuilder(baseUrl)
-                { Query = $"?{queryParamName}={guidGenerator()}" }
-            .Uri.AbsoluteUri;
-
+            {
+                var url = new UriBuilder(baseUrl);
+                var query = HttpUtility.ParseQueryString(url.Query);
+                query[queryParamName] = guidGenerator().ToString();
+                url.Query = query.ToString();
+                return url.Uri.AbsoluteUri;
+            }
+                 
             /* Extract the GUID from the Verify URL and register it with the hash. */
-            void InternalPostBuild(AuthorizationBuildResult result)
+            void InternalPostBuild(AuthHeaderBuildResult result)
             {
                 /* Extract the GUID from the Verify URL. */
                 var uri = new Uri(result.VerifyUrl);
