@@ -33,45 +33,105 @@ namespace billpg.HashBackCore
         }
     }
 
-
+    /// <summary>
+    /// An object for building a HashBack Authorization header.
+    /// </summary>
+    /// <param name="UseHost">Use this string as the JSON's Host value.</param>
+    /// <param name="NowGetter">Callable to return the current time.</param>
+    /// <param name="UnusGetter">Callable to return an Unus header.</param>
+    /// <param name="VerifyGetter">Callable to return a Verify URL string.</param>
+    /// <param name="PostBuild">Called after header and hash have been generated.</param>
     public record AuthHeaderBuilder(
         string? UseHost = null,
         Func<long> NowGetter = null!,
-        Func<string> UnusGenerator = null!,
-        Func<string>? VerifyGenerator = null,
+        Func<string> UnusGetter = null!,
+        Func<string>? VerifyGetter = null,
         Action<AuthHeaderBuildResult>? PostBuild = null)
     {
+        /// <summary>
+        /// Builds an AuthHeaderBuilder with default Now and Unus generators.
+        /// </summary>
         public AuthHeaderBuilder() : this(
             UseHost: null,
             NowGetter: DefaultNowGetter,
-            UnusGenerator: DefaultUnusGenerator,
-            VerifyGenerator: null,
+            UnusGetter: DefaultUnusGenerator,
+            VerifyGetter: null,
             PostBuild: null) {}
 
+        /// <summary>
+        /// Builds an AuthHeaderBuilder with supplied Host 
+        /// and Verify strings and default Now and Unus generators.
+        /// </summary>
+        /// <param name="host">String to use as Host value.</param>
+        /// <param name="verify">String to use as Verify value.</param>
+        public AuthHeaderBuilder(string host, string verify) : this(
+            UseHost: host,
+            NowGetter: DefaultNowGetter,
+            UnusGetter: DefaultUnusGenerator,
+            VerifyGetter: () => verify,
+            PostBuild: null) {}
+
+        /// <summary>
+        /// Funtion to use as the default Now generator, returning
+        /// the current time in Unix time seconds. Intended to be
+        /// used as the default for NowGetter rather than being
+        /// called directly.
+        /// </summary>
+        /// <returns>Current time in 1970 format.</returns>
         private static long DefaultNowGetter()
             => DateTime.UtcNow.ToUnixTimeSeconds();
 
+        /// <summary>
+        /// Fuction to use as the default Unus generator, returning
+        /// a random 16-byte value encoded as BASE-64. Intended
+        /// to be used as the default for UnusGetter rather
+        /// than being called directly.
+        /// </summary>
+        /// <returns>New Unus string.</returns>
         private static string DefaultUnusGenerator()
         {
+            /* Generate 16 cryptographic-quality 
+             * random bytes and encode as BASE-64. */
             byte[] unusBytes = new byte[16];
             RandomNumberGenerator.Fill(unusBytes);
             return Convert.ToBase64String(unusBytes);
         }
 
+        /// <summary>
+        /// Returns a copy of this builder with the specified Host value.
+        /// </summary>
+        /// <param name="host">String to use as the Host value.</param>
+        /// <returns>New object with updated property.</returns>
         public AuthHeaderBuilder WithHost(string host)
             => this with { UseHost = host };
 
+        /// <summary>
+        /// Returns a copy of this builder with the specified Now generator.
+        /// </summary>
+        /// <param name="nowGetter">New Now-getter.</param>
+        /// <returns>New object with updated property.</returns>
         public AuthHeaderBuilder WithNowGetter(Func<long> nowGetter) 
             => this with { NowGetter = nowGetter };
 
-        public AuthHeaderBuilder WithUnusGenerator(Func<string> unusGenerator)   
-            => this with { UnusGenerator = unusGenerator };
+        public AuthHeaderBuilder WithNow(long now)
+            => WithNowGetter(() => now);
 
-        public AuthHeaderBuilder WithVerifyGenerator(Func<string> verifyGenerator)
-            => this with { VerifyGenerator = verifyGenerator };
+        /// <summary>
+        /// Returns a copy of this builder with the specified Unus getter.
+        /// </summary>
+        /// <param name="unusGetter">New Unus-Getter.</param>
+        /// <returns>New object with updated property.</returns>
+        public AuthHeaderBuilder WithUnusGetter(Func<string> unusGetter)   
+            => this with { UnusGetter = unusGetter };
+
+        public AuthHeaderBuilder WithUnus(string unus)
+            => WithUnusGetter(() => unus);
+
+        public AuthHeaderBuilder WithVerifyGetter(Func<string> verifyGetter)
+            => this with { VerifyGetter = verifyGetter };
 
         public AuthHeaderBuilder WithVerify(string verify)
-            => this with { VerifyGenerator = () => verify };
+            => this with { VerifyGetter = () => verify };
 
         public AuthHeaderBuilder WithPostBuild(Action<AuthHeaderBuildResult> postBuild)
             => this with { PostBuild = postBuild };
@@ -81,11 +141,11 @@ namespace billpg.HashBackCore
             /* Check the optional properties have all been assigned. */
             if (UseHost == null)
                 throw new InvalidOperationException("UseHost must be set.");
-            if (VerifyGenerator == null)
+            if (VerifyGetter == null)
                 throw new InvalidOperationException("VerifyUrlGetter must be set.");
 
             /* Get the Verify URL, which we'll need when building the return object. */
-            string verify = VerifyGenerator();
+            string verify = VerifyGetter();
 
             /* Serialize parameters to JSON and encode. */
             string json = new JObject
@@ -93,7 +153,7 @@ namespace billpg.HashBackCore
                 ["Version"] = Helpers.VersionString,
                 ["Host"] = this.UseHost,
                 ["Now"] = this.NowGetter(),
-                ["Unus"] = this.UnusGenerator(),
+                ["Unus"] = this.UnusGetter(),
                 ["Verify"] = verify
             }.ToString(Newtonsoft.Json.Formatting.None);
             byte[] jsonAsBytes = Encoding.UTF8.GetBytes(json);
@@ -110,46 +170,13 @@ namespace billpg.HashBackCore
             return result;
         }
 
+        /// <summary>
+        /// Build an Authorization header string only.
+        /// (Intended for use when a separate PostBuild
+        /// will have captured the verifiation hash.)
+        /// </summary>
+        /// <returns>Authorization header in BASE-64.</returns>
         public string BuildAuthHeader()
             => Build().AuthHeader;
-
-        /// <summary>
-        /// Produces the BASE-64 block and verification hash for a HashBack Authorization header,
-        /// generating its own Now and Unus values.
-        /// </summary>
-        /// <param name="host">The full domain name of the server being called.</param>
-        /// <param name="verify">The HTTPS URL where the verification hash will be published.</param>
-        /// <returns>
-        /// An <see cref="AuthHeaderBuildResult"/> containing the BASE-64 encoded JSON block and the verification hash.
-        /// </returns>
-        public static AuthHeaderBuildResult BuildAuthorization(
-            string host,
-            string verify)
-        {
-            var builder = new AuthHeaderBuilder()
-            {
-                UseHost = host,
-                NowGetter = DefaultNowGetter,
-                UnusGenerator = DefaultUnusGenerator,
-                VerifyGenerator = () => verify
-            };
-            return builder.Build();
-        }
-
-        public static AuthHeaderBuildResult BuildAuthorization(
-            string host,
-            long now,
-            string unus,
-            string verify)
-        { 
-            var builder = new AuthHeaderBuilder()
-            {
-                UseHost = host,
-                NowGetter = () => now,
-                UnusGenerator = () => unus,
-                VerifyGenerator = () => verify
-            };
-            return builder.Build();
-        }
     }
 }

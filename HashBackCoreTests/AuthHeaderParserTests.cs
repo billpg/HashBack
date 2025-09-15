@@ -6,7 +6,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace HashBackCoreTests
 {
     [TestClass]
-    public class ServerToolsTests
+    public class AuthHeaderParserTests
     {
         private static string CreateValidAuthHeader(
             string host = "server.example",
@@ -14,10 +14,9 @@ namespace HashBackCoreTests
             string verify = "https://client.example/api/hashback?id=502542886")
         {
             now ??= DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            string unus = Convert.ToBase64String(new byte[16]);
-            return AuthHeaderBuilder
-                .BuildAuthorization(host, now.Value, unus, verify)
-                .AuthHeader;
+            return new AuthHeaderBuilder(host, verify)
+                .WithNowGetter(() => now.Value)
+                .BuildAuthHeader();
         }
 
         [TestMethod]
@@ -84,7 +83,7 @@ namespace HashBackCoreTests
         public void Validator_WithRequireHostName_AllowsExactMatch()
         {
             var validator = new AuthHeaderParser()
-                .WithRequireHostName("server.example")
+                .WithRequiredHost("server.example")
                 .WithNowTest(_ => true);
 
             string authHeader = CreateValidAuthHeader(host: "server.example");
@@ -97,7 +96,7 @@ namespace HashBackCoreTests
         public void Validator_WithRequireHostName_RejectsNonMatch()
         {
             var validator = new AuthHeaderParser()
-                .WithRequireHostName("server.example")
+                .WithRequiredHost("server.example")
                 .WithNowTest(_ => true);
 
             string authHeader = CreateValidAuthHeader(host: "other.example");
@@ -135,7 +134,7 @@ namespace HashBackCoreTests
         {
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             var validator = new AuthHeaderParser()
-                .WithRequireHostName("server.example")
+                .WithRequiredHost("server.example")
                 .WithTimeTolerance(() => DateTime.UtcNow, 30);
 
             string authHeader = CreateValidAuthHeader(host: "server.example", now: now);
@@ -143,6 +142,25 @@ namespace HashBackCoreTests
 
             Assert.AreEqual("https://client.example/api/hashback?id=502542886", result.VerifyUrl);
             Assert.IsFalse(string.IsNullOrEmpty(result.ExpectedHash));
+        }
+
+        [TestMethod]
+        public void AuthHeaderParser_AsPlaimJson()
+        {
+            /* Create a normal auth-header and decode it back into JSON. */
+            string authHeader = CreateValidAuthHeader("myhost.asjson.example");
+            var jsonBytes = Convert.FromBase64String(authHeader);
+            string jsonHeader = Encoding.UTF8.GetString(jsonBytes);
+
+            /* Run the JSON string through the parser. */
+            var parse = new AuthHeaderParser()
+                .WithHostTest(h => true)
+                .WithNowTest(_ => true)
+                .Parse(jsonHeader);
+
+            /* Check the values came through correctly. */
+            Assert.AreEqual("https://" + "client.example/api/hashback?id=502542886", parse.VerifyUrl);
+            Assert.AreEqual(Helpers.ComputeVerificationHash(jsonBytes), parse.ExpectedHash);
         }
     }
 }

@@ -20,12 +20,12 @@ namespace billpg.HashBackCore
 
         /// <summary>
         /// Parses and validates an Authorization header according to this policy.
-        /// Throws <see cref="AuthorizationParseException"/> if the header is invalid.
+        /// Throws custom exception if the header is invalid.
+        /// (Note that the verification URL will need to be linked to a user and the
+        /// verification hash itself will need to be compared separately.)
         /// </summary>
         /// <param name="authHeader">The Authorization header block in JSON or BASE-64 encoded JSON.</param>
-        /// <returns>
-        /// An <see cref="AuthorizationParseResult"/> containing the verification URL and expected hash.
-        /// </returns>
+        /// <returns>The verification URL and expected hash.</returns>
         /// <exception cref="AuthorizationParseException">
         /// Thrown if the header is invalid or fails policy checks.
         /// </exception>

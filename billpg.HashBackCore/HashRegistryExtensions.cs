@@ -20,7 +20,7 @@ namespace billpg.HashBackCore
              * URL generator and a custom post-build handler that
              * pulls the guid out and passes it to the register function. */
             return builder
-                .WithVerifyGenerator(InternalVerifyGenerator)
+                .WithVerifyGetter(InternalVerifyGenerator)
                 .WithPostBuild(InternalPostBuild);
 
             /* Generated URL from parameters and a new GUID. */

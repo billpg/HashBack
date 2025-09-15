@@ -7,7 +7,7 @@ using Newtonsoft.Json.Linq;
 namespace HashBackCoreTests
 {
     [TestClass]
-    public class ClientToolsTests
+    public class AuthHeaderBuilderTests
     {
         [TestMethod]
         public void BuildAuthorization_KnownInput_ProducesExpectedBase64AndHash()
@@ -27,8 +27,12 @@ namespace HashBackCoreTests
             string expectedHash = "0PptsdmB3W0j06DA1GfI/i88EtDejPTRnZ/0BpmFWZI=";
 
             /* Run the function, expecting the same result every time. */
-            var auth = 
-                AuthHeaderBuilder.BuildAuthorization(host, now, unus, verify);
+            var auth = new AuthHeaderBuilder()
+                .WithHost(host)
+                .WithNow(now)
+                .WithUnus(unus)
+                .WithVerify(verify)
+                .Build();
 
             /* Compare results. */
             Assert.AreEqual(expectedBase64, auth.AuthHeader, 
@@ -46,8 +50,7 @@ namespace HashBackCoreTests
 
             /* ACT - Collecting time before and after to verify 'Now' value. */
             long minimumNow = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds();
-            var auth = 
-                AuthHeaderBuilder.BuildAuthorization(host, verify);
+            var auth = new AuthHeaderBuilder(host, verify).Build();
             long maximumNow = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds();
 
             /* BASE-64 block should decode to valid JSON. */
@@ -91,8 +94,8 @@ namespace HashBackCoreTests
             string host = "example.com";
             string verify = "https://example.com/hashback";
 
-            var auth1 = AuthHeaderBuilder.BuildAuthorization(host, verify);
-            var auth2 = AuthHeaderBuilder.BuildAuthorization(host, verify);
+            var auth1 = new AuthHeaderBuilder(host, verify).Build();
+            var auth2 = new AuthHeaderBuilder(host, verify).Build();
 
             // It's extremely unlikely for two auto-generated requests to have the same hash
             Assert.AreNotEqual(auth1.VerificationHash, auth2.VerificationHash, "Different requests should produce different hashes.");
@@ -134,7 +137,7 @@ namespace HashBackCoreTests
             var authHeader =
                 new AuthHeaderBuilder()
                 .WithHost("host.example")
-                .WithUnusGenerator(() => "YesMyTotallyRandomUnus==")
+                .WithUnusGetter(() => "YesMyTotallyRandomUnus==")
                 .WithNowGetter(() => 529297200)
                 .WithHashRegistry(
                     baseUrl, "id", 
