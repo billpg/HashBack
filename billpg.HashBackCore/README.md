@@ -4,6 +4,10 @@
 
 HashBackCore is designed to be lightweight, testable and protocol-faithful. It supports both client-side and server-side operations, making it suitable for a variety of applications.
 
+> 🦔 "I'm Hashbert, the brainy hedgehog, here to help you with HashBack. I may be small, but I've got a big brain for hashing things out!"
+
+> 🦔 "I never said I was good at puns."
+
 ## 🚀 Features
 
 - 🔒 **Header Building** - Create valid HashBack authorization headers.
@@ -19,6 +23,8 @@ git clone https://github.com/billpg/HashBack
 cd HashBack/HashBackCore
 ```
 Then, add a reference to HashBackCore in your project file (.csproj):
+
+> 🦔 "If you're wondering why it's not on NuGet yet, it's because trust can't be packaged. Also, Bill hasn't signed up yet. Stupid owl."
 
 ## 📚 Usage
 ### Client-Side Example
@@ -59,7 +65,9 @@ Console.WriteLine("Expected Hash: " + parseResult.ExpectedHash);
  * to find the same string as the expected hash. */
 ```
 
-## 🦔 Philosophy
+> 🦔 "Remember, every copy/pasted line is a promise you'll understand it later."
+
+## 🧠 Philosophy
 HashBackCore is built with simplicity and clarity in mind. It focuses on the core aspects of the HashBack protocol, avoiding unnecessary complexity. The library is designed to be easily testable, with a strong emphasis on unit tests to ensure each component functions as intended.
 
 The implementation adheres closely to the HashBack specification, ensuring that it can be used reliably in real-world applications. The library concentrates on the essential tasks of building and parsing headers, calculating hashes, and verifying payloads, leaving the handling of receiving and sending HTTP requests and responses to the developer's discretion.
@@ -71,7 +79,6 @@ HashBack is a protocol inspired by the metaphor:
 
 The protocol is a round trip. The hash, protected by TLS in both directions, is the handshake.
 
-Hashbert the brainy hedgehog says:
 > 🦔 "HashBackCore is a spiky little library that gets the job done without fuss."
 
 ## 🦉 [billpg.com](https://billpg.com) 
