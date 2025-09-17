@@ -55,5 +55,30 @@ namespace HashBackCoreTests
 
             Assert.AreNotEqual(hash1, hash2, "Hashes for different input should not match.");
         }
-    }
-}
+
+
+    public void a()
+        {
+            /* Open a builder object that's configured to use a hash registry. */
+            var builder = new billpg.HashBackCore.AuthHeaderBuilder()
+                .WithHashRegistry(
+                    baseUrl: "https://mywebsite.example/api/hashback",
+                    queryParamName: "id",
+                    register: RegisterHash);
+
+            /* Hash registry. The above object will call this function
+             * when it has generated a verification hash. */
+            void RegisterHash(Guid id, string hash)
+            {
+                /* In a real application, you would store the hash in a 
+                 * database, upload it as a text file to your website's
+                 * SFTP folder, or otherwise save it for later retrieval.
+                 * This example only prints it to the console. */
+                Console.WriteLine($"Register hash for id {id}: {hash}");
+            }
+
+            /* Call the builder to create an Authorization header. */
+
+        }
+    }    }
+

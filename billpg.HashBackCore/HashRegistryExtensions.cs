@@ -13,6 +13,18 @@ namespace billpg.HashBackCore
             this AuthHeaderBuilder builder,
             string baseUrl,
             string queryParamName,
+            Action<Guid, string> register)
+        {
+            /* Call through to the other WithHashRegistry function,
+             * using Guid.NewGuid as the GUID generator. */
+            return builder.WithHashRegistry(
+                baseUrl, queryParamName, Guid.NewGuid, register);
+        }
+
+        public static AuthHeaderBuilder WithHashRegistry(
+            this AuthHeaderBuilder builder,
+            string baseUrl,
+            string queryParamName,
             Func<Guid> guidGenerator,
             Action<Guid, string> register)
         {

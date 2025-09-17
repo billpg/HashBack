@@ -113,6 +113,12 @@ namespace billpg.HashBackCore
         public AuthHeaderBuilder WithNowGetter(Func<long> nowGetter) 
             => this with { NowGetter = nowGetter };
 
+        public AuthHeaderBuilder WithNowGetter(Func<DateTime> nowGetter)
+            => WithNowGetter(() => nowGetter().ToUnixTimeSeconds());
+
+        public AuthHeaderBuilder WithNow(DateTime now)
+            => WithNow(now.ToUnixTimeSeconds());
+
         public AuthHeaderBuilder WithNow(long now)
             => WithNowGetter(() => now);
 
@@ -178,5 +184,15 @@ namespace billpg.HashBackCore
         /// <returns>Authorization header in BASE-64.</returns>
         public string BuildAuthHeader()
             => Build().AuthHeader;
+
+        /// <summary>
+        /// Convenience function to build an Authorization header and
+        /// compute the verification hash in one call.
+        /// </summary>
+        /// <param name="host">Name of host to use in request.</param>
+        /// <param name="verify">Location of verification URL.</param>
+        /// <returns>The authorization header and verification hash.</returns>
+        public static AuthHeaderBuildResult Build(string host, string verify)
+            => new AuthHeaderBuilder(host, verify).Build();
     }
 }
