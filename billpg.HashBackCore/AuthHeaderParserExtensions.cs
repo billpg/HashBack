@@ -12,9 +12,9 @@ namespace billpg.HashBackCore
         /// <param name="nowGetter">Custom now-getter callable.</param>
         /// <param name="secondsTolerance">Number of seconds tolerance.</param>
         /// <returns>New parser object with modified parser.</returns>
-        public static AuthHeaderParser WithTimeTolerance(
-            this AuthHeaderParser parser,
-            Func<DateTime> nowGetter,
+        public static AuthHeaderValidator WithTimeTolerance(
+            this AuthHeaderValidator parser,
+            Func<long> nowGetter,
             long secondsTolerance)
         {
             /* Wrap the provided now-getter and
@@ -26,7 +26,7 @@ namespace billpg.HashBackCore
             bool Internal(long nowPresented)
             {
                 /* Call the now-getter, at the time of the check. */
-                long nowExpected = nowGetter().ToUnixTimeSeconds();
+                long nowExpected = nowGetter();
 
                 /* Check if presented time is within the tolerance window. */
                 long diff = Math.Abs(nowPresented - nowExpected);
@@ -34,15 +34,29 @@ namespace billpg.HashBackCore
             }
         }
 
+
+        public static AuthHeaderValidator WithTimeTolerance(
+            this AuthHeaderValidator parser,
+            Func<DateTime> nowGetter,
+            long secondsTolerance)
+        {
+            /* Call through to the Func<long> varient. */
+            return WithTimeTolerance(parser, WrapNowGetter, secondsTolerance);
+
+            /* Wrap the now-getter functon to convert the result. */
+            long WrapNowGetter()
+                => nowGetter().ToUnixTimeSeconds();
+        }
+
         /// <summary>
-        /// Returns a new AuthHeaderParser with a time tolerance using 
+        /// Returns a new AuthHeaderValidator with a time tolerance using 
         /// DateTime.UtcNow (at the time the parser is called) as the expected time.
         /// </summary>
         /// <param name="parser">The parser to extend.</param>
         /// <param name="seconds">The allowed tolerance in secondsTolerance.</param>
         /// <returns>A new AuthorizationPolicy with the time tolerance applied.</returns>
-        public static AuthHeaderParser WithTimeTolerance(
-            this AuthHeaderParser parser,
+        public static AuthHeaderValidator WithTimeTolerance(
+            this AuthHeaderValidator parser,
             long seconds)
         {
             /* Call through to the other WithTimeTolerance function, 
@@ -66,8 +80,8 @@ namespace billpg.HashBackCore
         /// <param name="parser">Parser object to wrap.</param>
         /// <param name="hostRequired">A single host name to require.</param>
         /// <returns>New parser object with the supplied host parser.</returns>
-        public static AuthHeaderParser WithRequiredHost(
-            this AuthHeaderParser parser,
+        public static AuthHeaderValidator WithRequiredHost(
+            this AuthHeaderValidator parser,
             string hostRequired)
         {
             /* Return new parser with a HostTest 
@@ -84,8 +98,8 @@ namespace billpg.HashBackCore
         /// <param name="parser">Parser object to wrap.</param>
         /// <param name="hostAnyRequired">List of allowed host strings.</param>
         /// <returns>New parser object that wraps the old parser.</returns>
-        public static AuthHeaderParser WithAnyRequiredHost(
-            this AuthHeaderParser parser,
+        public static AuthHeaderValidator WithAnyRequiredHost(
+            this AuthHeaderValidator parser,
             params string[] hostAnyRequired)
         {
             /* Convert the array to a hash-set for faster lookups. */

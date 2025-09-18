@@ -98,6 +98,8 @@ namespace billpg.HashBackCore
             }
         }
 
+        public static string ToShortJson(this JObject j)
+            => j.ToString(Newtonsoft.Json.Formatting.None);
         
     }
 

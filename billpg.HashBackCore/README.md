@@ -80,7 +80,7 @@ The `AuthHeaderBuilder` class is used to create HashBack authorization headers. 
 
 The builder class has a number of "`With`" functions that set various properties. These will return a new builder object with the property set, leaving the original unchanged. You may chain these calls together to set multiple properties. If you call the same `With` function multiple times, the last one will take precedence.
 
-### `WithHost`
+#### `WithHost`
 This function sets the name of the remote host in the authenticaton request. This must be set to a value the remote server expects in order to avoid "passing-along" attacks. This must be set once `Build()` is called, or an exception will be thrown. If your application always uses the same host name, you may prefer to set it once on the builder object and reuse that object for multiple requests.
 
 ```csharp
@@ -89,7 +89,7 @@ var builder = new AuthHeaderBuilder()
     .WithHost("server.example");
 ```
 
-### `WithNow` and `WithNowGetter`
+#### `WithNow` and `WithNowGetter`
 These functions set the source of the "Now" property of the authentication request. The default is to use `DateTime.UtcNow` to get the current time in seconds since the Unix epoch. You can use the applicable function to set a custom time source or provide a fixed value and you may use either a DateTime value or an integer in 1970-Epoch-Seconds. This is useful for testing or if you want to use a different time source, but I anticipate most users will not need to call this function, keeping the default.
 ```csharp
 /* Create a builder object that will use a fixed time. */
@@ -97,7 +97,7 @@ var builder = new AuthHeaderBuilder()
     .WithNow(1700000000); // Fixed time for testing
 ```
 
-### `WithUnus` and `WithUnusGetter`
+#### `WithUnus` and `WithUnusGetter`
 These functions set the "Unus" property of the authentication request. The default is to generate a random 16-character string using a cryptographically secure random number generator. You can use the applicable function to set a custom Unus source or provide a fixed value. This is useful for testing or if you want to use a specific Unus value, but I anticipate most users will not need to call this function, keeping the default.
 ```csharp
 /* Create a builder object that will use a fixed unus. */
@@ -105,7 +105,7 @@ var builder = new AuthHeaderBuilder()
     .WithUnus("fixedunusvalue"); // Fixed unus for testing
 ```
 
-### `WithVerify` and `WithVerifyGetter`
+#### `WithVerify` and `WithVerifyGetter`
 These functions set the URL that the remote server will call to get the verification hash. This must be set once `Build()` is called, or an exception will be thrown. You may provide a fixed string or a function that returns a string. The latter is useful if your verification URLs always follow the same format with a small variation.
 ```csharp
 /* Create a builder object that will use this verify URL in requests. */
@@ -118,7 +118,7 @@ var builder = new AuthHeaderBuilder()
     .WithVerify(() => $"https://client.example/api/hashback?id={random.Next(999999999)});
 ```
 
-## `WithPostBuild`
+### `WithPostBuild`
 This function sets a callback that will be called after the header is built, but before the result is returned. This is useful if you want to log the result or store it somewhere. The callback receives an `AuthHeaderResult` object, which contains the `AuthHeader`, `VerifyUrl` and `VerificationHash` properties. (This mechanism is used with the `WithHashRegistry` function below.)
 ```csharp
 /* Create a builder object that will log the result after building. */
@@ -131,7 +131,7 @@ var builder = new AuthHeaderBuilder()
     });
 ```
 
-### `WithHashRegistry`
+#### `WithHashRegistry`
 This function sets up the builder object with the means to generate the verification URL and to supply a registration function that will deal with the verification hash. This is a convenience function that combines `WithVerify` and `WithPostBuild`. You provide the base URL and query string paarmeter name for the verification URL and a function that will be called to store the calculated verification hash against a Guid identifier.
 
 This allows you to configure a long-lived builder object that can be reused for multiple requests which is already set up to deal with hash registration. Once configured, you can call `BuildAuthHeader()` function that returns only the authorization header string, leaving dealing with the details of the verification hash to the registration function.
@@ -170,7 +170,8 @@ request.AddHeader(
  * this GET request should load the guid from the query string
  * and return the hash string that was registered above. */
 ```
-### `Build` and `BuildAuthHeader`
+
+#### `Build` and `BuildAuthHeader`
 The `Build` function generates the HashBack authorization header and verification hash. The result is an `AuthHeaderResult` object, which contains three properties:
 - `AuthHeader` - The string to send in the HTTP Authorization header.
 - `VerifyUrl` - The URL that the remote server will call to get the verification hash.
@@ -194,6 +195,77 @@ var auth = AuthHeaderBuilder.Build(
 Console.WriteLine("Auth Header: " + auth.AuthHeader);
 Console.WriteLine("Verification Hash: " + auth.VerificationHash);
 ```
+
+### `AuthHeaderParser`
+The `AuthHeaderParser` class is used to parse and validate HashBack authorization headers. Similar to the bulder object, you can set up a parser object the way you want and call the `Parse` function when you have a header. The parser object can be kept long term or discarded when you've finished with it. You may chain multiple "`With`" calls together to set various properties. If you call the same `With` function multiple times, the last one will take precedence.
+
+#### `WithRequiredHost`
+Sets the expected host name in the authentication request. Validation of the Host property is critical to prevent "passing-along" attacks. You service should document one string value that your service will support in client's requests (usually the full domain name of your web server) and call this function with that value to instruct the parser to expect only that value, rejecting any other value. 
+
+```csharp
+/* Create a parser object that will expect this server name in requests. */
+var parser = new AuthHeaderParser()
+    .WithRequiredHost("server.example");
+```
+
+#### `WithAnyRequiredHost`
+Sets multiple acceptable host names in the authentication request. This is a variant of `WithRequiredHost` that allows you to specify more than one acceptable value. This may be useful if your service is known by multiple domain names or if you have multiple subdomains that all point to the same service.
+```csharp
+/* Create a parser object that will expect one of these server names in requests. */
+var parser = new AuthHeaderParser()
+    .WithAnyRequiredHost(new string[] 
+    { 
+        "server.example", 
+        "www.server.example", 
+        "api.server.example" 
+    });
+```
+
+#### `WithHostTest`
+Sets a custom test function to validate the Host property of the authentication request. This is a more flexible variant of `WithRequiredHost` that allows you to provide your own logic for validating the host name. The function receives the host string from the request and should return true if it is acceptable, or false otherwise. This may be useful if your validation logic is more complex than simply matching against a fixed string or list of strings, such as checking against a database or applying custom rules.
+
+```csharp
+/* Create a parser object that will use a custom host validation function. */
+var parser = new AuthHeaderParser()
+    .WithHostTest(host => host.EndsWith(".mydomain.example"));
+```
+
+#### `WithTimeTolerance`
+Sets the allowed time drift in seconds when validating the Now property of the authentication request. By setting up the maximum tollerance, you are specifying exactly how much drift is allowed between the client and server clocks. If the request has a time too far from the current time, the request will be rejected.
+
+A variant of this function allows you to provide a custom clock, if you want to use a different time source than `DateTime.UtcNow`. This may be useful for testing or if your server has a different time source. Variants allow your getter function to return either a `DateTime` or an integer in 1970-Epoch-Seconds.
+
+```csharp
+/* Create a parser object that will allow up to 10 seconds drift. */
+var parser = new AuthHeaderParser()
+    .WithTimeTolerance(10); // Allow 10 seconds drift.
+
+/* Or, use a different clock other than DateTime.UtcNow. */
+var parser = new AuthHeaderParser()
+    .WithTimeTolerance(
+        /* Server clock is 5 seconds fast. */
+        () => DateTime.UtcNow.AddSeconds(5), 
+        10);
+```
+
+#### `WithNowTest`
+This function allows you to configure a parser object with a custom test for the value of a request's `Now` property. The function you supply will take a `DateTime` or `long` value and return `true` if that time is valid or `false` if it isn't.
+
+```csharp
+/* Create a parser that will use the supplied custom Now validator. */
+var parser = new AuthHeaderParser()
+    /* Only timestamps ending in 12 are valid. */
+    .WithNowTest(now => now % 100 == 12);
+```
+
+#### `Parse`
+This function will parse and validate an authorization header block, returning the pertinent details. If the header block fails basic validation, the function will throw a custom exception detailing the reasons for rejecting that block.
+
+If not an exception, the function will return an object with these properties:
+- `VerifyUrl` - The URL that identifies the user and where to retrieve the verification hash.
+- `ExpectedHash` - The hash string expected from this URL.
+
+This function **neither** checks if the verification URL maps to a known user, nor does it retrieve the verification hash itself. That task is left to the caller. A request must not be considered valid until that verification has taken place.
 
 > 🦔 "If you find yourself writing the same `With` calls over and over, consider creating a pre-configured builder object to reuse."
 
