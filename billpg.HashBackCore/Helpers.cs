@@ -100,7 +100,16 @@ namespace billpg.HashBackCore
 
         public static string ToShortJson(this JObject j)
             => j.ToString(Newtonsoft.Json.Formatting.None);
-        
+
+
+        /// <summary>
+        /// DateTime.UtcNow wrapped in a function, 
+        /// so it can be passed as a delegate.
+        /// </summary>
+        /// <returns>Result of calling DateTime.UtcNow 
+        /// at the point it is called.</returns>
+        internal static DateTime DateTimeUtcNowAsDelegate()
+            => DateTime.UtcNow;
     }
 
     public class AuthorizationParseException : Exception
