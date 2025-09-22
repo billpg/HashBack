@@ -1,14 +1,16 @@
-using System;
-using System.Text;
 using billpg.HashBackCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Text;
+using System.Threading.Tasks;
+using System.Xml.Schema;
 
 namespace HashBackCoreTests
 {
     [TestClass]
     public class AuthHeaderParserTests
     {
-#if false
         private static string CreateValidAuthHeader(
             string host = "server.example",
             long? now = null,
@@ -21,132 +23,156 @@ namespace HashBackCoreTests
         }
 
         [TestMethod]
-        public void Validator_Default_AlwaysThrows()
+        public async Task Validator_Default_AlwaysThrowsAsync()
         {
-            var validator = new AuthHeaderValidator();
+            var validator = new HashBackValidator();
             string authHeader = CreateValidAuthHeader();
-            Assert.ThrowsException<AuthorizationParseException>(() => validator.Validate(authHeader));
+            var ex = await Assert.ThrowsExceptionAsync<ApplicationException>(
+                async () => await validator.Validate(authHeader));
+            Assert.AreEqual("OnHostValidate not implemented.", ex.Message);
         }
+       
 
         [TestMethod]
-        public void Validator_WithHostTest_AllowsMatchingHost()
+        public async Task Validator_WithHostTest_AllowsMatchingHostAsync()
         {
-            var validator = new AuthHeaderValidator()
-                .WithHostTest(h => h == "server.example")
-                .WithNowTest(_ => true);
-
             string authHeader = CreateValidAuthHeader(host: "server.example");
-            var result = validator.Validate(authHeader);
 
-            Assert.AreEqual("https://client.example/api/hashback?id=502542886", result.VerifyUrl);
-            Assert.IsFalse(string.IsNullOrEmpty(result.ExpectedHash));
+            var validator = new HashBackValidator();
+            validator.RequireHost("server.example");
+            validator.RequireNowWindow(10);
+            validator.OnIdentifyUser = ValidatorTestHelpers.ExtractUrlHost;
+            validator.OnGetHash = ValidatorTestHelpers.HashGetterFromHeader(authHeader);
+
+            var result = await validator.Validate(authHeader);
+
+            Assert.AreEqual("client.example", result);
         }
 
         [TestMethod]
-        public void Validator_WithHostTest_RejectsNonMatchingHost()
+        public async Task Validator_WithHostTest_RejectsNonMatchingHostAsync()
         {
-            var validator = new AuthHeaderValidator()
-                .WithHostTest(h => h == "server.example")
-                .WithNowTest(_ => true);
+            var validator = new HashBackValidator();
+            validator.RequireHost("server.example");
 
             string authHeader = CreateValidAuthHeader(host: "other.example");
-            Assert.ThrowsException<AuthorizationParseException>(() => validator.Validate(authHeader));
+            var ex = await Assert.ThrowsExceptionAsync<AuthorizationParseException>(
+                async () => await validator.Validate(authHeader));
+            Assert.AreEqual("Host property is not valid for this server.", ex.Message);
+            Assert.AreEqual(ValidateRejectionReason.WrongHost, ex.Reason);
         }
 
         [TestMethod]
-        public void Validator_WithNowTest_AllowsValidNow()
+        public async Task Validator_WithNowTest_AllowsValidNowAsync()
         {
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var validator = new AuthHeaderValidator()
-                .WithHostTest(_ => true)
-                .WithNowTest(n => n == now);
-
             string authHeader = CreateValidAuthHeader(now: now);
-            var result = validator.Validate(authHeader);
 
-            Assert.AreEqual("https://client.example/api/hashback?id=502542886", result.VerifyUrl);
-            Assert.IsFalse(string.IsNullOrEmpty(result.ExpectedHash));
+            var validator = new HashBackValidator();
+            validator.RequireHost("server.example");
+            validator.RequireNowWindow(10);
+            validator.OnIdentifyUser = ValidatorTestHelpers.ExtractUrlHost;
+            validator.OnGetHash = ValidatorTestHelpers.HashGetterFromHeader(authHeader);
+
+            var result = await validator.Validate(authHeader);
+
+            Assert.AreEqual("client.example", result);
         }
 
         [TestMethod]
-        public void Validator_WithNowTest_RejectsInvalidNow()
+        public async Task Validator_WithNowTest_RejectsInvalidNowAsync()
         {
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var validator = new AuthHeaderValidator()
-                .WithHostTest(_ => true)
-                .WithNowTest(n => n == now + 1000);
-
             string authHeader = CreateValidAuthHeader(now: now);
-            Assert.ThrowsException<AuthorizationParseException>(() => validator.Validate(authHeader));
+            var validator = new HashBackValidator();
+            validator.OnHostValidate = (_ => true);
+            validator.OnNowValidate = (n => n == now + 1000);
+            validator.OnIdentifyUser = ValidatorTestHelpers.ExtractUrlHost;
+            validator.OnGetHash = ValidatorTestHelpers.HashGetterFromHeader(authHeader);
+
+            var ex = await Assert.ThrowsExceptionAsync<AuthorizationParseException>(
+                async () => await validator.Validate(authHeader));
+            Assert.AreEqual("Now property is not valid for this server's time policy.", ex.Message);
+            Assert.AreEqual(ValidateRejectionReason.WrongNow, ex.Reason);
         }
 
         [TestMethod]
-        public void Validator_WithRequireHostName_AllowsExactMatch()
+        public async Task Validator_WithRequireHostName_AllowsExactMatch()
         {
-            var validator = new AuthHeaderValidator()
-                .WithRequiredHost("server.example")
-                .WithNowTest(_ => true);
-
             string authHeader = CreateValidAuthHeader(host: "server.example");
-            var result = validator.Validate(authHeader);
+            var validator = new HashBackValidator();
+            validator.RequireHost("server.example");
+            validator.OnNowValidate = _ => true;
+            validator.OnIdentifyUser = _ => Task.FromResult<string?>("alice");
+            validator.OnGetHash = ValidatorTestHelpers.HashGetterFromHeader(authHeader);
 
-            Assert.AreEqual("https://client.example/api/hashback?id=502542886", result.VerifyUrl);
+            var result = await validator.Validate(authHeader);
+
+            Assert.AreEqual("alice", result);
         }
 
         [TestMethod]
-        public void Validator_WithRequireHostName_RejectsNonMatch()
+        public async Task Validator_WithRequireHostName_RejectsNonMatchAsync()
         {
-            var validator = new AuthHeaderValidator()
-                .WithRequiredHost("server.example")
-                .WithNowTest(_ => true);
+            var validator = new HashBackValidator();
+            validator.RequireHost("server.example");
 
             string authHeader = CreateValidAuthHeader(host: "other.example");
-            Assert.ThrowsException<AuthorizationParseException>(() => validator.Validate(authHeader));
+            var ex = await Assert.ThrowsExceptionAsync<AuthorizationParseException>(
+                async () => await validator.Validate(authHeader));
+            Assert.AreEqual("Host property is not valid for this server.", ex.Message);
+            Assert.AreEqual(ValidateRejectionReason.WrongHost, ex.Reason);
         }
 
         [TestMethod]
-        public void Validator_WithTimeTolerance_AllowsWithinTolerance()
+        public async Task Validator_WithTimeTolerance_AllowsWithinTolerance()
         {
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var validator = new AuthHeaderValidator()
-                .WithHostTest(_ => true)
-                .WithTimeTolerance(() => DateTime.UtcNow, 10);
-
             string authHeader = CreateValidAuthHeader(now: now);
+            var validator = new HashBackValidator();
+            validator.OnHostValidate = _ => true;
+            validator.RequireNowWindow(10);
+            validator.OnIdentifyUser = _ => Task.FromResult<string?>("bob");
+            validator.OnGetHash = ValidatorTestHelpers.HashGetterFromHeader(authHeader);
+
             // Should not throw if within 10 seconds
-            var result = validator.Validate(authHeader);
-            Assert.AreEqual("https://client.example/api/hashback?id=502542886", result.VerifyUrl);
+            var result = await validator.Validate(authHeader);
+            Assert.AreEqual("bob", result);
         }
 
         [TestMethod]
-        public void Validator_WithTimeTolerance_RejectsOutsideTolerance()
+        public async Task Validator_WithTimeTolerance_RejectsOutsideToleranceAsync()
         {
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var validator = new AuthHeaderValidator()
-                .WithHostTest(_ => true)
-                .WithTimeTolerance(() => DateTime.UtcNow, 1);
+            var validator = new HashBackValidator();
+            validator.OnHostValidate = _ => true;
+            validator.RequireNowWindow(1);
 
             string authHeader = CreateValidAuthHeader(now: now - 100);
-            Assert.ThrowsException<AuthorizationParseException>(() => validator.Validate(authHeader));
+            var ex = await Assert.ThrowsExceptionAsync<AuthorizationParseException>(
+                async () => await validator.Validate(authHeader));
+            Assert.AreEqual("Now property is not valid for this server's time policy.", ex.Message);
+            Assert.AreEqual(ValidateRejectionReason.WrongNow, ex.Reason);
         }
 
         [TestMethod]
-        public void Validator_FullHappyPath()
+        public async Task Validator_FullHappyPathAsync()
         {
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var validator = new AuthHeaderValidator()
-                .WithRequiredHost("server.example")
-                .WithTimeTolerance(() => DateTime.UtcNow, 30);
-
             string authHeader = CreateValidAuthHeader(host: "server.example", now: now);
-            var result = validator.Validate(authHeader);
+            var validator = new HashBackValidator();
+            validator.RequireHost("server.example");
+            validator.RequireNowWindow(30);
+            validator.OnIdentifyUser = _ => Task.FromResult<string?>("carol");
+            validator.OnGetHash = ValidatorTestHelpers.HashGetterFromHeader(authHeader);
 
-            Assert.AreEqual("https://client.example/api/hashback?id=502542886", result.VerifyUrl);
-            Assert.IsFalse(string.IsNullOrEmpty(result.ExpectedHash));
+            var result = await validator.Validate(authHeader);
+
+            Assert.AreEqual("carol", result);
         }
 
         [TestMethod]
-        public void AuthHeaderParser_AsPlaimJson()
+        public async Task AuthHeaderParser_AsPlaimJsonAsync()
         {
             /* Create a normal auth-header and decode it back into JSON. */
             string authHeader = CreateValidAuthHeader("myhost.asjson.example");
@@ -154,15 +180,58 @@ namespace HashBackCoreTests
             string jsonHeader = Encoding.UTF8.GetString(jsonBytes);
 
             /* Run the JSON string through the parser. */
-            var parse = new AuthHeaderValidator()
-                .WithHostTest(h => true)
-                .WithNowTest(_ => true)
-                .Validate(jsonHeader);
+            var parse = new HashBackValidator();
+            parse.OnHostValidate = _ => true;
+            parse.OnNowValidate = _ => true;
+            parse.OnIdentifyUser = _ => Task.FromResult<string?>("dave");
+            parse.OnGetHash = ValidatorTestHelpers.HashGetterFromClearJson(jsonHeader);
+            var result = await parse.Validate(jsonHeader);
 
             /* Check the values came through correctly. */
-            Assert.AreEqual("https://" + "client.example/api/hashback?id=502542886", parse.VerifyUrl);
-            Assert.AreEqual(Helpers.ComputeVerificationHash(jsonBytes), parse.ExpectedHash);
+            Assert.AreEqual("dave", result);
         }
-#endif
+            
+        [TestMethod]
+        public async Task Validate_SimpleAsync()
+        {
+            /* Build a sample auth request. */
+            var jsonAuth = new JObject
+            {
+                ["Version"] = Helpers.VersionString,
+                ["Host"] = "host.unit-test.example",
+                ["Now"] = (long)1E9,
+                ["Unus"] = "128/bits/of/randomness==",
+                ["Verify"] = "https://verify.unit-test.example/123.txt"
+            }.ToShortJson();
+            var jsonBytes = Encoding.ASCII.GetBytes(jsonAuth);
+
+            /* Set up a validator object. */
+            const string hostExpected = "host.unit-test.example";
+            var logEntries = new List<string>();
+            var validator = new HashBackValidator();
+            validator.RequireHost(hostExpected);
+            validator.RequireNowWindow(1, () => (long)1E9);
+            validator.OnIdentifyUser = ValidatorTestHelpers.ExtractUrlHost;
+            validator.OnGetHash = ValidatorTestHelpers.HashGetterFromHeader(jsonBytes);
+            validator.OnLogWrite = logEntries.Add;
+
+            /* Validate. */
+            string userActual = await validator.Validate(Convert.ToBase64String(jsonBytes));
+
+            /* Assert. */
+            Assert.AreEqual("verify.unit-test.example", userActual);
+            CollectionAssert.AreEqual(new List<string> 
+            {
+                "Start Validate(220 characters)",
+                "OnHostValidate(\"host.unit-test.example\")",
+                "OnNowValidate(\"1000000000\")",
+                "OnIdentifyUser(\"https://verify.unit-test.example/123.txt\")",
+                "OnIdentifyUser returned \"verify.unit-test.example\".",
+                "Expected Hash: \"OlaCV3SLzOIWk9SsyCGd7YB3NGw0Vt/fpVtPYHfLehQ=\"",
+                "OnGetHash(\"https://verify.unit-test.example/123.txt\")",
+                "OnGetHash returned \"OlaCV3SLzOIWk9SsyCGd7YB3NGw0Vt/fpVtPYHfLehQ=\".",
+                "Passed validation."
+            }, logEntries);
+        }
     }
 }

@@ -110,11 +110,31 @@ namespace billpg.HashBackCore
         /// at the point it is called.</returns>
         internal static DateTime DateTimeUtcNowAsDelegate()
             => DateTime.UtcNow;
+
+        internal static void DefaultLogWrite(string logText)
+        {
+            /* Nothing to do. */
+        }
+    }
+
+    public enum ValidateRejectionReason
+    {
+        BadHeader,
+        WrongHost,
+        WrongNow,
+        UnknownUser,
+        WrongHash
     }
 
     public class AuthorizationParseException : Exception
     {
-        public AuthorizationParseException(string message) : base(message) { }
+        public ValidateRejectionReason Reason { get; }
+
+        public AuthorizationParseException(string message, ValidateRejectionReason reason) 
+            : base(message) 
+        {
+            this.Reason = reason;
+        }
     }
 
     public readonly struct AuthorizationParseResult
