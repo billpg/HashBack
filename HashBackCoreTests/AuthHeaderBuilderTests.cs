@@ -27,17 +27,17 @@ namespace HashBackCoreTests
             string expectedHash = "0PptsdmB3W0j06DA1GfI/i88EtDejPTRnZ/0BpmFWZI=";
 
             /* Run the function, expecting the same result every time. */
-            var auth = new AuthHeaderBuilder()
-                .WithHost(host)
-                .WithNow(now)
-                .WithUnus(unus)
-                .WithVerify(verify)
-                .Build();
+            var builder = new HashBackBuilder();
+            builder.Host = host;
+            builder.NowGetter = () => now;
+            builder.UnusGetter = () => unus;
+            builder.VerifyGetter = () => Task.FromResult(verify);
+            var auth = builder.Build().Result;
 
             /* Compare results. */
-            Assert.AreEqual(expectedBase64, auth.AuthHeader, 
+            Assert.AreEqual(expectedBase64, auth, 
                 "BASE-64 block does not match expected value.");
-            Assert.AreEqual(expectedHash, auth.VerificationHash, 
+            Assert.AreEqual(expectedHash, builder.GeneratedHash(verify), 
                 "Verification hash does not match expected value.");
         }
 
@@ -50,11 +50,14 @@ namespace HashBackCoreTests
 
             /* ACT - Collecting time before and after to verify 'Now' value. */
             long minimumNow = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds();
-            var auth = new AuthHeaderBuilder(host, verify).Build();
+            var builder = new HashBackBuilder();
+            builder.Host = host;
+            builder.VerifyGetter = () => Task.FromResult(verify);
+            var auth = builder.Build().Result;
             long maximumNow = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds();
 
             /* BASE-64 block should decode to valid JSON. */
-            byte[] jsonBytes = Convert.FromBase64String(auth.AuthHeader);
+            byte[] jsonBytes = Convert.FromBase64String(auth);
             string json = Encoding.UTF8.GetString(jsonBytes);
             JObject obj = JObject.Parse(json);
             Assert.IsNotNull(obj, "Decoded JSON object should not be null.");
@@ -77,14 +80,20 @@ namespace HashBackCoreTests
             Assert.AreEqual(16, unusBytes.Length, "Unus property should decode to 16 bytes.");
             Assert.AreEqual(verify, (string)obj["Verify"]!, 
                 "Verify property missing or incorrect.");
-            Assert.IsFalse(string.IsNullOrEmpty(auth.VerificationHash),
+
+            /* Get the verification hash from the registry. */
+            Assert.AreEqual(1, builder.GeneratedHashUrls.Count());
+            CollectionAssert.Contains(builder.GeneratedHashUrls.ToList(), verify);
+            var hash = builder.GeneratedHash(verify);
+
+            Assert.IsFalse(string.IsNullOrEmpty(hash),
                 "Verification hash should not be null or empty.");
 
             /* Hash should be 44 chars (BASE-64 SHA-256),
              * but the value itself could be anything. */
-            Assert.AreEqual(44, auth.VerificationHash.Length, 
+            Assert.AreEqual(44, hash.Length, 
                 "Verification hash should be 44 characters.");
-            Assert.AreEqual(32, Convert.FromBase64String(auth.VerificationHash).Length, 
+            Assert.AreEqual(32, Convert.FromBase64String(hash).Length, 
                 "Verification hash should decode to 32 bytes.");
         }
 
@@ -93,67 +102,19 @@ namespace HashBackCoreTests
         {
             string host = "example.com";
             string verify = "https://example.com/hashback";
+            int counter = 1;
 
-            var auth1 = new AuthHeaderBuilder(host, verify).Build();
-            var auth2 = new AuthHeaderBuilder(host, verify).Build();
+            var builder = new HashBackBuilder();
+            builder.Host = host;
+            builder.VerifyGetter = () => Task.FromResult($"{verify}_{counter++}");
+            var auth1 = builder.Build().Result;
+            var auth2 = builder.Build().Result;
 
             // It's extremely unlikely for two auto-generated requests to have the same hash
-            Assert.AreNotEqual(auth1.VerificationHash, auth2.VerificationHash, "Different requests should produce different hashes.");
-            Assert.AreNotEqual(auth1.AuthHeader, auth2.AuthHeader, "Different requests should produce different auth headers.");
-        }
-
-        [TestMethod]
-        public void AuthorizationBuilder_WithHashRegistty_NoQuery()
-            => AuthorizationBuilder_WithHashRegistry_Shared(
-                baseUrl: "https://example.com/hashback",
-                expectedAuthHeader: 
-                "eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJob3N0LmV4Y" +
-                "W1wbGUiLCJOb3ciOjUyOTI5NzIwMCwiVW51cyI6Illlc015VG90YWxseVJhbm" +
-                "RvbVVudXM9PSIsIlZlcmlmeSI6Imh0dHBzOi8vZXhhbXBsZS5jb20vaGFzaGJ" +
-                "hY2s/aWQ9MDE5OTRlMWQtNzAwNi03N2FjLThiNjUtYWYyZjU5ODI2ODYxIn0=",
-                expectedHash: "7TdLab4VfnQnQ0e9avYw8MAC0cU/sFNYII5IWyEbwEY=");
-
-        [TestMethod]
-        public void AuthorizationBuilder_WithHashRegistty_WithQuery()
-            => AuthorizationBuilder_WithHashRegistry_Shared(
-                baseUrl: "https://example.com/hashback?abc=zyx", 
-                expectedAuthHeader: 
-                "eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJob3N0LmV4YW1w" +
-                "bGUiLCJOb3ciOjUyOTI5NzIwMCwiVW51cyI6Illlc015VG90YWxseVJhbmRvbVVu" +
-                "dXM9PSIsIlZlcmlmeSI6Imh0dHBzOi8vZXhhbXBsZS5jb20vaGFzaGJhY2s/YWJj" +
-                "PXp5eCZpZD0wMTk5NGUxZC03MDA2LTc3YWMtOGI2NS1hZjJmNTk4MjY4NjEifQ==",
-                expectedHash: "hQLsjxbE9EuJpg+Mky0Qk5nmKKSCj3WlV/p4Cnvf7/k=");
-
-        private void AuthorizationBuilder_WithHashRegistry_Shared(
-            string baseUrl, string expectedAuthHeader, string expectedHash)
-        {
-            /* Collect registrations here. */
-            var registrations = new Dictionary<Guid, string>();
-
-            /* Expected GUID to register hash. */
-            Guid expectedGuid = Guid.Parse("01994E1D-7006-77AC-8B65-AF2F59826861");
-
-            /* Build an auth header with known values and a hash registry. */
-            var authHeader =
-                new AuthHeaderBuilder()
-                .WithHost("host.example")
-                .WithUnusGetter(() => "YesMyTotallyRandomUnus==")
-                .WithNowGetter(() => 529297200)
-                .WithHashRegistry(
-                    baseUrl, "id", 
-                    () => expectedGuid, 
-                    registrations.Add)
-                .BuildAuthHeader();
-
-            /* Assert results. */
-            Assert.AreEqual(
-                expectedAuthHeader, 
-                authHeader);
-            Assert.AreEqual(1, registrations.Count);
-            Assert.IsTrue(registrations.ContainsKey(expectedGuid));
-            Assert.AreEqual(
-                expectedHash, 
-                registrations[expectedGuid]);
+            var auth1Hash = builder.GeneratedHash(verify + "_1");
+            var auth2Hash = builder.GeneratedHash(verify + "_2");
+            Assert.AreNotEqual(auth1Hash, auth2Hash, "Different requests should produce different hashes.");
+            Assert.AreNotEqual(auth1, auth2, "Different requests should produce different auth headers.");
         }
     }
 }

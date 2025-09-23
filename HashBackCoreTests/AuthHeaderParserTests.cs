@@ -17,9 +17,11 @@ namespace HashBackCoreTests
             string verify = "https://client.example/api/hashback?id=502542886")
         {
             now ??= DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            return new AuthHeaderBuilder(host, verify)
-                .WithNowGetter(() => now.Value)
-                .BuildAuthHeader();
+            var builder = new HashBackBuilder();
+            builder.Host = host;
+            builder.NowGetter = () => now.Value;
+            builder.VerifyGetter = () => Task.FromResult(verify);
+            return builder.Build().Result;
         }
 
         [TestMethod]
