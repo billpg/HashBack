@@ -6,12 +6,7 @@ using Newtonsoft.Json.Linq;
 
 namespace billpg.HashBackCore
 {
-    public class HashBackBuilder /*
-        string? UseHost = null,
-        Func<long> NowGetter = null!,
-        Func<string> UnusGetter = null!,
-        Func<string>? VerifyGetter = null,
-        Action<AuthHeaderBuildResult>? PostBuild = null) */
+    public class HashBackBuilder
     {
         public delegate long OnGetNowDelegate();
         public delegate string OnGetUnusDelegate();
@@ -22,8 +17,17 @@ namespace billpg.HashBackCore
         public OnGetNowDelegate NowGetter { get; set; } = DefaultNowGetter;
         public OnGetUnusDelegate UnusGetter { get; set; } = DefaultUnusGenerator;
         public OnGetVerifyDelegate VerifyGetter { get; set; } = null!;
-        public OnRegisterHashDelegate? HashRegister { get; set; } = null;
+        public OnRegisterHashDelegate HashRegister { get; set; } = null!;
 
+        public void SetSyncVerifyGetter(Func<string> syncVerifyGetter)
+            => this.VerifyGetter = () => Task.FromResult(syncVerifyGetter());
+
+        public void SetVerify(string verify)
+            => this.SetSyncVerifyGetter(() => verify);
+
+        public void SetSyncHashRegister(Action<string, string> hashRegister)
+            => this.HashRegister = (url, hash) => Task.Run(() => hashRegister(url, hash));
+        
         /// <summary>
         /// Funtion to use as the default Now generator, returning
         /// the current time in Unix time seconds. Intended to be
@@ -50,13 +54,6 @@ namespace billpg.HashBackCore
             return Convert.ToBase64String(unusBytes);
         }
 
-        private readonly ConcurrentDictionary<string, string>
-            generatedHashes = new ConcurrentDictionary<string, string>();
-
-        public IEnumerable<string> GeneratedHashUrls => generatedHashes.Keys;
-        public string GeneratedHash(string verifyUrl) => generatedHashes[verifyUrl];
-        public void ClearGeneratedHash(string verifyUrl) => generatedHashes.Remove(verifyUrl, out _);
-
         public async Task<string> Build()
         {
             if (this.Host == null)
@@ -71,6 +68,8 @@ namespace billpg.HashBackCore
                 throw new ApplicationException("Host must be set.");
             if (VerifyGetter == null)
                 throw new ApplicationException("VerifyUrlGetter must be set.");
+            if (HashRegister == null)
+                throw new ApplicationException("HashRegister must be set.");
 
             /* Get the Verify URL, which we'll need when building the return object. */
             string verify = await VerifyGetter();
@@ -91,10 +90,7 @@ namespace billpg.HashBackCore
             string verificationHash = Helpers.ComputeVerificationHash(jsonAsBytes);
 
             /* Register this verify/hash combo to let it be downloaded. */
-            if (this.HashRegister != null)
-                await this.HashRegister(verify, verificationHash);
-            else
-                this.generatedHashes[verify] = verificationHash;
+            await this.HashRegister(verify, verificationHash);
 
             /* Return the result. */
             return authHeader;

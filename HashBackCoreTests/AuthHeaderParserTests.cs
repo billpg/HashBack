@@ -21,6 +21,7 @@ namespace HashBackCoreTests
             builder.Host = host;
             builder.NowGetter = () => now.Value;
             builder.VerifyGetter = () => Task.FromResult(verify);
+            builder.SetSyncHashRegister((u, h) => { });
             return builder.Build().Result;
         }
 
