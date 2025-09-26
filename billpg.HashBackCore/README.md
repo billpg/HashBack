@@ -75,20 +75,23 @@ The implementation adheres closely to the HashBack specification, ensuring that 
 > 🦔 "HashBackCore is a spiky little library that gets the job done without fuss."
 
 ## 🛠️ Usage
-### `HashBackBuilder``
-The `HashBackBuilder` class is used to create HashBack authorization headers. You set up the builder object (keep it long term or throw it away when you're done) and call the `Build` function to generate the final header and verification hash. 
+
+See the demo console app HashBackCore for runnable sample code in a copy-paste-friendly form.
+
+### `HashBackBuilder`
+On the client side, the `HashBackBuilder` class is used to create HashBack authorization headers. You set up the builder object (keep it long term or throw it away when you're done) and call the `Build` function to generate the final header and verification hash. 
 
 The builder class has a number of properties that will control the content of the authentication header and how to capture the verification hash string.
 
-The following properties should be set before calling `Build`:
-- `Host` (Required)
+The following properties should all be set before calling `Build`:
+- `Host`
   - A simple string value that will be used as the `Host` property.
   - The service you are attempting to authenticate to should publish exactly what string it expects here.
-- `VerifyGetter` (Required)
+- `VerifyGetter`
   - An async function that will return a URL string for the `Verify` header. 
   - Set this to a function that will generate that URL, including allocating an ID if needed.
   - Helper functions allow you to set simple strings or sync functions.
-- `HashRegister` (Optional)
+- `HashRegister`
   - An aync function that will be called to register an expected hash with the verify URL generated earlier.
   - Set this to a function that will store the verification hash for retrieval later, perhaps in a database or a file on a web service.
   - The default handler saves hashes to the builder object where they can be retrieved later.
@@ -113,79 +116,40 @@ These properties are for advanced uses only. Normal uses should leave the defaul
 
 The `Build` function calls these various handlers to build the JSON request. On the way, it calls the `HashRegister` handler with the retrieved verification URL and the calculated verification hash. The function returns the encoded header value suitable for embedding into the HTTP `Authorization` header.
 
-See the example HashBackCoreDemo project for a complete demonstration.
+### `HashBackValidator`
+On the server side, the `HashBackValidator` class is used to parse and validate HashBack authorization headers. Similar to the builder object, you can set up a parser object the way you want and call the `Validate` function when you have a header.
 
-### `AuthHeaderParser`
-The `AuthHeaderParser` class is used to parse and validate HashBack authorization headers. Similar to the bulder object, you can set up a parser object the way you want and call the `Parse` function when you have a header. The parser object can be kept long term or discarded when you've finished with it. You may chain multiple "`With`" calls together to set various properties. If you call the same `With` function multiple times, the last one will take precedence.
+To configure a validator object, use the following:
+- `.RequireHost(host)` or `.RequireAnyHost(host1, host2)`
+  - Configures the validator to only accept a supplied string as a `Host` value.
+  - Use your website's full domain name.
+  - Validation of the Host property is critical to prevent "passing-along" attacks. You service should document one string value that your service will support in client's requests (usually the full domain name of your web server) and call this function with that value.
+  - If you have many acceptable `Host` strings, the "Any" varient will accept a collection of strings.
+- `.RequireNowWindow(seconds)`
+  - Configures the validator to only allow up to this many seconds variace from the system clock in the client's `Now` value.
+  - Variants allow for a different number of seconds in the past or future, or to use a different clock to the the system one.
+- `OnIdentifyUser`
+  - Set this property to an async function that will convert a verification URL into the user that owns that URL, or null if the URL doesn't belong to any user your system knows about. This check ensures that verification only proceeds if the URL belongs to an identifiable user.
+  - The string returned by your handler will be the same string returned by the `Validate` functon if all tests pass.
+  - Other than null/not-null, HashBackCore doesn't apply any meaning to the string's value and will blindly pass it along.
+- `OnGetHash`
+  - Set this property to an async handler that will download the verification hash from the supplied URL.
+  - Any exceptions thrown, such as because of network failures, will fall to the caller.
+  - The return value should be text returned from that URL. 
 
-#### `WithRequiredHost`
-Sets the expected host name in the authentication request. Validation of the Host property is critical to prevent "passing-along" attacks. You service should document one string value that your service will support in client's requests (usually the full domain name of your web server) and call this function with that value to instruct the parser to expect only that value, rejecting any other value. 
+If validation is rejected for whatever reason, the function with throw a `AuthorizationParseException` error, with these properties:
+- `Message` (inherited from the `Exception` base class.)
+    - Describes (in English) the reason for rejecting the rquest.
+- `Reason`
+    - An enum value that identifies the specific problem. Allowed values are:
+      - `BadHeader` - The header itself is malformed.
+      - `WrongHost` - The `Host` value is not on the allowed list.
+      - `WrongNow` - The `Now` value is outsode the allowed window.
+      - `UnknownUser` - The `Verify` value doesn't correspond to a known user.
+      - `WrongHash` - The downloaded verification hash did not match the expected hash.
 
-```csharp
-/* Create a parser object that will expect this server name in requests. */
-var parser = new AuthHeaderParser()
-    .WithRequiredHost("server.example");
-```
+## In closing...
 
-#### `WithAnyRequiredHost`
-Sets multiple acceptable host names in the authentication request. This is a variant of `WithRequiredHost` that allows you to specify more than one acceptable value. This may be useful if your service is known by multiple domain names or if you have multiple subdomains that all point to the same service.
-```csharp
-/* Create a parser object that will expect one of these server names in requests. */
-var parser = new AuthHeaderParser()
-    .WithAnyRequiredHost(new string[] 
-    { 
-        "server.example", 
-        "www.server.example", 
-        "api.server.example" 
-    });
-```
-
-#### `WithHostTest`
-Sets a custom test function to validate the Host property of the authentication request. This is a more flexible variant of `WithRequiredHost` that allows you to provide your own logic for validating the host name. The function receives the host string from the request and should return true if it is acceptable, or false otherwise. This may be useful if your validation logic is more complex than simply matching against a fixed string or list of strings, such as checking against a database or applying custom rules.
-
-```csharp
-/* Create a parser object that will use a custom host validation function. */
-var parser = new AuthHeaderParser()
-    .WithHostTest(host => host.EndsWith(".mydomain.example"));
-```
-
-#### `WithTimeTolerance`
-Sets the allowed time drift in seconds when validating the Now property of the authentication request. By setting up the maximum tollerance, you are specifying exactly how much drift is allowed between the client and server clocks. If the request has a time too far from the current time, the request will be rejected.
-
-A variant of this function allows you to provide a custom clock, if you want to use a different time source than `DateTime.UtcNow`. This may be useful for testing or if your server has a different time source. Variants allow your getter function to return either a `DateTime` or an integer in 1970-Epoch-Seconds.
-
-```csharp
-/* Create a parser object that will allow up to 10 seconds drift. */
-var parser = new AuthHeaderParser()
-    .WithTimeTolerance(10); // Allow 10 seconds drift.
-
-/* Or, use a different clock other than DateTime.UtcNow. */
-var parser = new AuthHeaderParser()
-    .WithTimeTolerance(
-        /* Server clock is 5 seconds fast. */
-        () => DateTime.UtcNow.AddSeconds(5), 
-        10);
-```
-
-#### `WithNowTest`
-This function allows you to configure a parser object with a custom test for the value of a request's `Now` property. The function you supply will take a `DateTime` or `long` value and return `true` if that time is valid or `false` if it isn't.
-
-```csharp
-/* Create a parser that will use the supplied custom Now validator. */
-var parser = new AuthHeaderParser()
-    /* Only timestamps ending in 12 are valid. */
-    .WithNowTest(now => now % 100 == 12);
-```
-
-#### `Parse`
-This function will parse and validate an authorization header block, returning the pertinent details. If the header block fails basic validation, the function will throw a custom exception detailing the reasons for rejecting that block.
-
-If not an exception, the function will return an object with these properties:
-- `VerifyUrl` - The URL that identifies the user and where to retrieve the verification hash.
-- `ExpectedHash` - The hash string expected from this URL.
-
-This function **neither** checks if the verification URL maps to a known user, nor does it retrieve the verification hash itself. That task is left to the caller. A request must not be considered valid until that verification has taken place.
-
-> 🦔 "If you find yourself writing the same `With` calls over and over, consider creating a pre-configured builder object to reuse."
+> 🦔 "We hope you find this useful. If you have feedback, please raise a ticket on out github."
 
 ## 🦉 [billpg.com](https://billpg.com) 
