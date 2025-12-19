@@ -7,14 +7,13 @@ If you have any comments or notes, please open an issue on this project's public
 This document is Copyright William Godfrey, 2025. You may use its contents under the terms of the Creative-Commons Attribution license.
 
 ## The elevator pitch.
-(Alice calls Bob.)
-- "Hi Bob. I'm Alice."
-- "Prove it."
-- "You know my number. Call me back."
-               
-(Bob calls Alice.)
-- "Hi Alice. I'm Bob. Did you call me just now?"
-- "That was me."
+<table>
+  <tr>
+    <td><img src="https://owl.billpg.com/wp-content/uploads/2025/12/Copilot_20251219_180227.png" alt="Alice: Hi Bob. I'm Alice." width="200" height="200" /></td>
+    <td><img src="https://owl.billpg.com/wp-content/uploads/2025/12/Copilot_20251219_180234.png" alt="Bob: Prove it." width="200" height="200" /></td>
+    <td><img src="https://owl.billpg.com/wp-content/uploads/2025/12/Copilot_20251219_180240.png" alt="Alice: You know my number. Call me back." width="200" height="200" /></td>
+    <td><img src="https://owl.billpg.com/wp-content/uploads/2025/12/Copilot_20251219_180246.png" alt="Bob: Hi Alice. Did you call me?" width="200" height="200" /></td></tr>
+</table>
 
 Did you notice what **didn't** happen? No-one needed a password, cryptographic tokens, or even recognizing each other's voice.
 
@@ -24,7 +23,7 @@ Now apply that thought to web authentication. The client can be sure (thanks to 
 
 ## &#x1F994; Meet Hashbert, the brainy hedgehog.
 <p align="left">
-  <img src="https://owl.billpg.com/wp-content/uploads/2025/09/Hashbert-cropped-717x717-1.png" alt="Hashbert the brainy hedgehog" width="96" height="96" style="border-radius: 16px; box-shadow: 2px 2px 6px #888;">
+  <img src="https://owl.billpg.com/wp-content/uploads/2025/12/Copilot_20251219_182334.png" alt="Hashbert the brainy hedgehog" width="96" height="96" style="border-radius: 16px; box-shadow: 2px 2px 6px #888;">
 </p>
 
 He's the unofficial mascot of HashBack. Cautious, clever, and always prepared. He's a friendly chap, isn't he? Hashbert is here to help you understand HashBack Authentication.
