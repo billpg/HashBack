@@ -78,7 +78,7 @@ This exchange relies on the server having a clear mapping of which URLs belong t
 
 :heavy_check_mark: `https://example.com/hashback?id=*`   
 :heavy_check_mark: `https://example.com/hashback/*.txt`    
-:x: 'http://example.com/hashback/' (no TLS)   
+:x: `http://example.com/hashback/` (no TLS)   
 :x: `https://example.com/` (too broad)    
 :x: `https://example.com/hashback/` (too broad if you allow subfolders)   
 :x: `https://example.com/blog/` (may allow comments)   
