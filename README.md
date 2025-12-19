@@ -1,6 +1,7 @@
 ﻿# HashBack Authentication: Trust, Verified.
-<img src="https://owl.billpg.com/wp-content/uploads/2025/12/Copilot_20251219_182349.png" align="right" alt="" width="150" height="150" />
 HashBack is a two-step authentication exchange over HTTPS/TLS. Your identity is proven by publishing a hash, not sharing a secret. One Request. One Verification. Zero Secrets.
+
+<img src="https://owl.billpg.com/wp-content/uploads/2025/12/Copilot_20251219_182349.png" align="right" alt="" width="150" height="150" />
 
 This version of the document is a **public-draft** for review and discussion tagged as version **4.1**.
 If you have any comments or notes, please open an issue on this project's public github.
