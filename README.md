@@ -1,45 +1,53 @@
-# HashBack Authentication: Trust, Verified.
+﻿# HashBack Authentication: Trust, Verified.
 HashBack is a two-step authentication exchange over HTTPS/TLS. Your identity is proven by publishing a hash, not sharing a secret. One Request. One Verification. Zero Secrets.
 
-This version of the document is a **public-draft** for review and discussion tagged as version **4.1**.
-If you have any comments or notes, please open an issue on this project's public github.
+<img src="docs/assets/HashBack-Badge-Logo.png" align="right" alt="" width="150" height="150" />
+
+This version of the document is a **public-draft** for review and discussion tagged as version **4.1**. I will update this number if I make any substantive updates. If you have any comments or notes, please open an issue on this project's public github.
 
 This document is Copyright William Godfrey, 2025. You may use its contents under the terms of the Creative-Commons Attribution license.
 
-## The elevator pitch.
-(Alice calls Bob.)
-- "Hi Bob. I'm Alice."
-- "Prove it."
-- "You know my number. Call me back."
-               
-(Bob calls Alice.)
-- "Hi Alice. I'm Bob. Did you call me just now?"
-- "That was me."
+## 🚠 The elevator pitch.
+<table>
+  <tr>
+    <td><img src="docs/assets/PhoneCall-Frame-1.png" alt="Alice: Hi Bob. I'm Alice." width="200" height="200" /></td>
+    <td><img src="docs/assets/PhoneCall-Frame-2.png" alt="Bob: Prove it." width="200" height="200" /></td>
+    <td><img src="docs/assets/PhoneCall-Frame-3.png" alt="Alice: You know my number. Call me back." width="200" height="200" /></td>
+    <td><img src="docs/assets/PhoneCall-Frame-4.png" alt="Bob: Hi Alice. Did you call me?" width="200" height="200" /></td></tr>
+</table>
 
 Did you notice what **didn't** happen? No-one needed a password, cryptographic tokens, or even recognizing each other's voice.
 
 While a recipient of a call *can't* be certain who a caller is, the caller *can* be certain of who they are calling. By both parties calling each other, both can be reassured of each other's identity.
 
-Now apply that thought to web authentication. The client can be sure (thanks to TLS) who the server is, but the server can't be sure who the client is, much like the analogy with phone calls. This document describes how the same "call me back" step could be used to authenticate a web API request.
+Now apply that thought to web authentication. The client can be sure (thanks to TLS) who the server is, but the server can't be sure who the client is, much like the analogy with phone calls. HashBack applies this same "call me back" reassurance to web APIs using two HTTPS transactions.
 
 ## &#x1F994; Meet Hashbert, the brainy hedgehog.
 <p align="left">
-  <img src="https://owl.billpg.com/wp-content/uploads/2025/09/Hashbert-cropped-717x717-1.png" alt="Hashbert the brainy hedgehog" width="96" height="96" style="border-radius: 16px; box-shadow: 2px 2px 6px #888;">
+  <img src="docs/assets/Hashbert-In-Laboratory.png" alt="Hashbert the brainy hedgehog" align="right" width="150" height="150" style="border-radius: 16px; box-shadow: 2px 2px 6px #888;">
 </p>
 
 He's the unofficial mascot of HashBack. Cautious, clever, and always prepared. He's a friendly chap, isn't he? Hashbert is here to help you understand HashBack Authentication.
 
-## What is the problem this is meant to fix?
+> 🦔 *"Hello! I'm Hashbert. Bill thinks this is cute. I'm not so sure."*
+
+## 🔨 What is the problem this is meant to fix?
 If you're running a service out in the cloud which interacts with an external service, you probably have cryptographic keys or a password or token squirreled away somewhere. This is probably encrypted or stored in a purpose-built repository of secret keys and tokens. Either way, your code will need to unlock that material whenever it needs to interact with that external service.
 
 This repository of secrets will need to be managed. The service won't be able to manage these things for itself because it'll need to identify itself to the service that issues these tokens, moving the problem one layer away without eliminating the problem itself. Either that or you make the decision that these secret tokens stay valid for long periods of time.
 
-Repositories of secret tokens or keys. They have to be so secure that passersby can't access them, but so available that your code running in cloud can access them. 
+Repositories of secret tokens or keys. They have to be so secure that passersby can't access them, but so available that your code running in cloud can access them.
 
-## The Exchange
+HashBack Authentication is an attempt to eliminate the need for long-term secret storage entirely.
+
+> 🦔 *"That's a tricky balance to strike. If only there was a way to prove who you are without needing to store secrets."*
+
+## 🤝 The Exchange
 In a nutshell, a client proves their identity by publishing a short string on their TLS-secured website. The server downloads that string and thanks to TLS, is reassured that the client is indeed someone who is in control of that website.
 
 To add a little more detail, the client builds a claim for authentication in the form of a JSON object. That object's bytes are themselves hashed and the hash result string is published on the client's website. To complete the loop, the server gets that string in its own separate HTTP/TLS transaction. Once the server can confirm that the hash published on the client's website matches its own calculated hash for the supplied JSON object's bytes, the server passes the request.
+
+> 🦔 *"It's like we're calling each other to prove who we are."*
 
 ### "Isn't that like ACME?" (Let's Encrypt)
 Yes, the exchange used by ACME has a lot in common with HashBack, especially the "call me back" verification step at its core.
@@ -60,10 +68,22 @@ HashBack requires that both sides already have TLS established and configured be
 
 I am very much open to the next version of this draft exchange reusing parts of ACME. Especially if we can keep it to two transactions, or a security analysis reveals that we really do need that third transaction. 
 
-### Ahead of time.
-Before any of this can take place, the client's administrator (in their administrator role) will need to affirm to the remote server exactly what range of URLs the client has sole control over and wishes to use for HashBack authentication. Ideally, this would be a single fixed URL with a single query string parameter as only variation allowed. This URL must use TLS via the HTTPS scheme.
+> 🦔 *"It's like ACME, but fewer coyotes are maimed."*
 
-This exchange relies on the server having a clear mapping of which URLs belong to which clients, so it is important the range is not too broad.
+### Ahead of time.
+Before any exchange can occur, the client's administrator must declare the exact narrow URL range the client will use for publishing verification hashes. Ideally, this would be a single fixed URL with a single query string parameter as only variation allowed, or a folder without allowing further subfolders. This URL must use TLS via the HTTPS scheme.
+
+This exchange relies on the server having a clear mapping of which URLs belong to which clients, so it is important the range is not too broad. The server must reject any verification URL that is outside the declared range of any user.
+
+:heavy_check_mark: `https://example.com/hashback?id=*`   
+:heavy_check_mark: `https://example.com/hashback/*.txt`    
+:x: `http://example.com/hashback/` (no TLS)   
+:x: `https://example.com/` (too broad)    
+:x: `https://example.com/hashback/` (too broad if you allow subfolders)   
+:x: `https://example.com/blog/` (may allow comments)   
+:x: `https://example.com/wiki/` (may allow public edits)
+
+> 🦔 *"Pick a URL and shake on it. I'd offer a paw, but I'm mostly spines."*
 
 ### The Authorization header
 The header is constructed as follows:
@@ -71,25 +91,28 @@ The header is constructed as follows:
 Authorization: HashBack (BASE64 encoded JSON) 
 ```
 
-The BASE64 encoded block must be a single string with no spaces or end-of-line characters and must include the trailing `=` characters per the rules of BASE64. (The examples in this document split the string into multiple lines for clarity only. The normal rules of HTTP prefer that headers arrive as a single line.) The bytes inside the BASE64 block are the UTF-8 representation of a JSON object with the properties listed below. All are required and the values are string type unless otherwise noted.
+The BASE64 encoded block must be a single string with no spaces or end-of-line characters and must include the trailing `=` characters per the rules of BASE64. (The examples in this document split the string into multiple lines for clarity only. The normal rules of HTTP prefer that headers arrive as a single line.) The bytes inside the BASE64 block are the UTF-8 representation of a JSON object.
 
-- `Version`
+#### JSON Properties
+The JSON object is made from the following properties. All are required and the values are string type unless otherwise noted.
+
+- **`Version`**
   - A string indicating the version of this exchange in use.
   - This version is indicated by the string `"BILLPG_DRAFT_4.1"`.
-- `Host`
+- **`Host`**
   - The full domain name of the server being called in this request.
   - Because load balancers and CDN systems might modify the `Host:` header, a copy is included here so there's no doubt exactly which string was used in the verification hash.
   - The recipient service must reject all requests that come with a name that belongs to someone else or generic names such as `localhost`, as this may be an attacker attempting to re-use a request that was made for a different server.
-- `Now`
+- **`Now`**
   - The current UTC time, expressed as an integer of the number of seconds since the start of 1970.
   - The recipient service should reject this request if the timestamp is too far from its current time. This document does not specify a threshold in either direction but instead this is left to the service's configuration.
   - The integer type should be greater than 32 bits to ensure this exchange will continue to work beyond the year 2038.
-- `Unus`
+- **`Unus`**
   - 128 bits of cryptographic-quality randomness, encoded in BASE-64 including trailing `==`.
   - This is to make reversal of the verification hash practically impossible. The other JSON property values listed here are "predictable". The security of this exchange relies on this one value not being predictable.
   - The value must be unique for each request. Servers should reject any reused value within the allowed drift it places on the `Now` value.
   - I am English and I would prefer not to name this property using a particular five-letter word starting with N, as it has an unfortunate meaning in my culture.
-- `Verify`
+- **`Verify`**
   - An `https://` URL belonging to the client where the verification hash may be retrieved with a GET request.
   - The URL must be one that server knows as belonging to a specific user. Exactly which URLs belong to which users is beyond the scope of this document.
 
@@ -113,6 +136,8 @@ Authorization: HashBack
  aHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9hcGkvaGFzaGJhY2s/aWQ9NTAyNTQyODg2In0=
 ```
 
+> 🦔 *"Secure as a hedgehog in a sleeping bag."*
+
 ### Verification Hash Calculation and Publication
 Once the client has built the request, it will need to find the JSON object's hash in order to publish it on their website. The server will also need to repeat this hashing process in order to verify the request is genuine.
 
@@ -131,7 +156,9 @@ The hashing process takes the following steps.
 
 Note that the hash is performed on the same bytes that were encoded inside the BASE64 block. Because of this, the JSON itself may be flexible with formatting whitespace or JSON character encoding, as long as the JSON object is valid according to the requirements of JSON itself and the rules stated above.
 
-The fixed salt is used to ensure that a valid hash is only meaningful in light of this document, as that salt is not sent over the wire with the request. For your convenience, here is the 32 byte fixed salt block in a variety of encodings:
+The salt ensures that HashBack verification hashes cannot be mistaken or misused in other contexts. Because these extra bytes are not sent over the wire with a request, there's no risk of a general purpose hashing service being misued to perform HashBack verification hash calculations. A valid hash is only meaningful in light of this document. (In case it isn't clear, the salt is fixed and public. It is not a secret.)
+
+For your convenience, here is the 32 byte fixed salt block in a variety of encodings:
 - Base64: `cdpiCQall50uHOUQQltbSJb2RVPY6xXvouWLowZJr8k=`<!--FIXED_SALT_B64-->
 - Hex: `71DA620906A5979D2E1CE510425B5B4896F64553D8EB15EFA2E58BA30649AFC9`<!--FIXED_SALT_HEX-->
 - URL: `q%dab%09%06%a5%97%9d.%1c%e5%10B%5b%5bH%96%f6ES%d8%eb%15%ef%a2%e5%8b%a3%06I%af%c9`<!--FIXED_SALT_URL-->
@@ -153,7 +180,9 @@ The salt string itself was generated by a PBKDF2 call with a high iteration coun
 - Iterations: 477708<!--FIXED_SALT_ITERATIONS-->
 - Output: 256 bits / 32 bytes
 
-## 401 responses and the WWW-Authenticate header
+> 🦔 *"That Bill sure loves his treacle."*
+
+## 💂‍ 401 responses and the WWW-Authenticate header
 HTTP Authentication is typically triggered by the client first attempting to perform a particular transaction without any authentication, but for the response to reject that attempt with a `401` response and a `WWW-Authenticate` header that lists the many available authentication methods the client could use. (Or many such headers, each one listing an available method.)
 
 For a server to respond when HashBack authentication is available, the `WWW-Authenticate` header must include an `<auth-scheme>` of `HashBack`. A `realm` parameter may be present but this is optional.
@@ -166,7 +195,9 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
 
 Clients may skip that initial transaction if it is already known that the server supports HashBack authentication.
 
-## "Do we need to perform this exchange for every API request?"
+> 🦔 *"If you see a 401, don't panic. Even I get those before breakfast."*
+
+## 🍪 "Do we need to perform this exchange for every API request?"
 Yes, but also, No.
 
 Yes, each time you make an API request authenticated by HashBack, you need to make a new header and arrange for the new verification hash to be made available. That is an expensive operation and there's no shortcut. Every single time you want to make an API request with HashBack, you need to start entire process over. Even if you have a thousand requests to make.
@@ -177,12 +208,16 @@ I've avoided specifying that mechanism in this document to keep it focused to th
 
 If you are developing the receiving end of a HashBack request, please add a `Set-Cookie` to the response that the caller can use for a little while. If you're developing the requesting end, please have your code check the response for that cookie and use it next time. Or some other mechanism. 
 
-## Case Study
+> 🦔 *"Cookies are tasty."*
+
+## 💼 Case Study
 **The Rutabaga Republic** is a large agricultural concern that grows and sells rutabagas and other root vegetables. They have a secure API at `RutabagaRepublic.example` for their regular customers use to place orders directly from their own systems.
 
 One such customer is Petunia Parsnip, founder of **The Underground Supper Club**, a high-end vegan patisserie that specializes in root-vegetable-themed banquets. Her clients expect nothing less than the finest rutabaga souffles and parsnip pavlovas, delivered with flair and precision.
 
 Petunia has recently signed up with The Rutabaga Republic and logged into their customer portal. On her authentication page under the *HashBack Authentication* section, she's configured her account affirming that `https://petunia.example/hashback` is under her sole control and where her verification hashes will be made available.
+
+> 🦔 *"All the world's a rutabaga."*
 
 ### Making the request.
 Petunia needs to place a large rutabaga order for an upcoming "Turnip the Volume" gala. Her stock management system constructs the following JSON payload:<!--CASE_STUDY_REQUEST-->
@@ -195,6 +230,8 @@ Petunia needs to place a large rutabaga order for an upcoming "Turnip the Volume
     "Verify": "https://Petunia.example/api/hashback?id=901983180"
 }
 ```
+
+Note the `Verify` property corresponds to the URL Petunia had registered ahead of time. This is where the trust boundary lies. The URL belongs to the client, not the server.
 
 The system calculates the verification hash from this JSON object (`GcBDESw5S+0HjSEY/ia6VQ7NyQvjHvy9Yk/lyQO0bQs=`) and publishes it on their server at the specified URL, ready for retrieval.<!--CASE_STUDY_HASH-->
 
@@ -214,6 +251,8 @@ Content-Type: application/json
 { "Product": "Rutabagas!", "Quality": "Tasty!", "Quantity": "Lots!" }
 ```
 
+> 🦔 *"You can tell someone highly skilled in API design wrote that example JSON."*
+
 ### Checking the request
 The Rutabaga Republic website receives this request and validates it, performing the following checks:
 - :heavy_check_mark: The request arrived via HTTPS.  
@@ -224,6 +263,8 @@ The Rutabaga Republic website receives this request and validates it, performing
 
 The service has passed the request for basic validity, but it still doesn't know if the request has genuinely come from Petunia's service or not. To perform this step, it proceeds to check the verification hash.
 
+> 🦔 *"All checks so far are good. Now to see if Petunia really is Petunia."*
+
 ### Retrieval of the verification hash
 Having the URL to get the client's verification hash, the service performs a GET request for that URL. As part of the request, it makes the following checks:
 - :heavy_check_mark: The TLS certificate is valid.
@@ -231,6 +272,8 @@ Having the URL to get the client's verification hash, the service performs a GET
 - :heavy_check_mark: The response body is 256 bits in BASE-64.
 
 Having successfully retrieved a verification hash, it must now find the expected hash to check it is genuine.
+
+> 🦔 *"Fetching the hash from Petunia's site."*
 
 ### Checking the verification hash
 The service performs the same hashing operation on the block of BASE64-encoded bytes request that the caller performed earlier. If they match, the request is authenticated and may continue processing it, reassured that the client is actually Petunia. <!--CASE_STUDY_SET_COOKIE-->
@@ -249,10 +292,14 @@ Content-Type: application/json
 }
 ```
 
-### Outcome
-Petunia's rutabagas are on their way. Root Haven Farms is confident the request came from a verified source - no secrets, no tokens, no passwords.
+> 🦔 *"Success! Petunia is who she says she is."*
 
-## Answers to Anticipated Questions
+### Outcome
+Petunia's rutabagas are on their way. Rutabaga Republic is confident the request came from a verified source - no secrets, no tokens, no passwords. The entire exchange completed without either side having to manage any long-term secrets.
+
+> 🦔 *"I wagged a spine in approval."*
+
+## ❓ Answers to Anticipated Questions
 
 ### What's wrong with keeping a pre-shared secret long term?
 They require management and secure storage. Your server-side code will need a way to access them without access to your master passwords or MFA codes. There are solutions for secure password storage that your unattended service code can use but they still need to be managed while this exchange utilizes TLS (which both sides will have already made an investment in) to secure the exchange.
@@ -347,7 +394,7 @@ By requiring the published hash to be a *hash of the actual request*, this kind 
 In short: The hash makes the proof specific, unforeseeable, and bound to the request.
 
 ### Why BASE64 the JSON in the `Authorization` header?
-To ensure there's an unambiguous sequence of bytes to feed into the hash. By transferring the JSON block in an encoded set of bytes, the recipient can simply pass the decoded byte array (with salt appended) into the SHA-256 function.
+To ensure there's an unambiguous sequence of bytes to feed into the hash. By transferring the JSON block in an encoded set of bytes, the recipient can simply pass the decoded byte array (with salt prepended) into the SHA-256 function.
 
 ### Shouldn't you have a server challenge like ACME?
 This is something I'd like an expert to confirm, but I don't think we need one. The request is sent over TLS, which prevents an attacker seeing the request itself and also replaying it. The `Host` header prevents "passing along" attacks as described above.
@@ -383,7 +430,7 @@ Instead, generate a fresh header for each request. It's lightweight enough and i
    - Replaced PBKDF2 with a single round of salted SHA-256 for the verification hash. I'm happy the extended hashing isn't needed.
    - Removed the mechanism to retrieve a temporal bearer token to simplify the document.
 
-## Glossary
+## 📘 Glossary
 "HashBack": The name of this exchange, a play on "Call Back".
 
 "Unus": A 128-bit cryptographic-quality random value, encoded in BASE-64. Equivalent to a cryptographic "nonce", but renamed for cultural sensitivity and clarity. The word is Latin for "one" or "single". I remain hopeful this word becomes adopted by the wider cryptographic community.
@@ -404,18 +451,27 @@ Instead, generate a fresh header for each request. It's lightweight enough and i
 
 "WWW-Authenticate header": The standard HTTP header used by a server to advertise the authentication methods it supports.
 
-
-## Next Steps
+## 🥾 Next Steps
 This document is a public draft version. I'm looking (please) for clever people to review it and give feedback. In particular, I'd like some confirmation I'm using SHA-256 with its fixed salt correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm the authenticity of the authentication request. If you have any comments or notes, please raise an issue on this project's github.
 
 In due course, I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform both the role of an authenticating server by downloading your hashes and validating them, as well as perform the role of a client requesting authentication from you and publishing a verification hash for you to download. (And yes, you could point both APIs at each other, just for laughs.)
 
 Ultimately, I hope to publish this as an RFC and establish it as a public standard.
 
-My thanks to Danny Wilson for his feedback and for developing his own service that performs this authentication. Multiple independent implementations are good for establishing a new standard. My thanks also to Ollie Hayman for bringing ACME to my attention.
+<a href="billpg.HashBackCore/">`HashBackCore`</a> is my reference implementation, handling the process for both validating a header and generating one. This is written with hooks for you to supply your own code when needed, including for registering your own verification hashes and retrieving a client's verification hash. (See that project's README file for usage notes.) It deliberately doesn't interface with HTTP, leaving that to your handler code. By calling to handler code, it allows an extensive set of unit tests that bypass that complication. These are implemented in the <a href="HashBackCoreTests">`HashBackCoreTests`</a> libary.
+
+> 🦔 *"Onward, brave hedgehog!"*
+
+## 🙏 Acknowledgements
+
+My thanks to Danny Wilson for his feedback and for developing his own service that performs this authentication. Multiple independent implementations are good for establishing a new standard. 
+
+My thanks to Ollie Hayman for bringing ACME to my attention.
+
+> 🦔 *"I helped too!"*
 
 Thanks to Microsoft Copilot for taking a break from its plans for world domination and destroying all humanity just long enough to review my drafts, suggesting improvements and helping Hashbert sleep better at night.
 
 Thank you to my wife for her love and support while I developed this idea. I couldn't have done this without you.
 
-Regards, Bill. <div><a href="https://billpg.com/"><img src="https://owl.billpg.com/wp-content/uploads/2025/09/wizard-owl-icon-500x500-1.png" alt="billpg.com" align="right" border="0" style="border-radius: 25px; box-shadow: 5px 5px 5px grey;" /></a></div>
+Regards, Bill. <a href="https://billpg.com/">billpg.com</a> 🦉
