@@ -75,12 +75,12 @@ Before any exchange can occur, the client's administrator must declare the exact
 
 This exchange relies on the server having a clear mapping of which URLs belong to which clients, so it is important the range is not too broad.
 
-:heavy_check_mark::heavy_check_mark: `https://example.com/hashback?id=*`
-:heavy_check_mark: `https://example.com/hashback/*.txt` (query strings can be more tightly controlled)
-:x: 'http://example.com/hashback/' (no TLS)
-:x: `https://example.com/` (too broad)
-:x: `https://example.com/hashback/` (too broad if you allow subfolders)
-:x: `https://example.com/blog/` (may allow comments)
+:heavy_check_mark: `https://example.com/hashback?id=*`   
+:heavy_check_mark: `https://example.com/hashback/*.txt`    
+:x: `http://example.com/hashback/` (no TLS)   
+:x: `https://example.com/` (too broad)    
+:x: `https://example.com/hashback/` (too broad if you allow subfolders)   
+:x: `https://example.com/blog/` (may allow comments)   
 :x: `https://example.com/wiki/` (may allow public edits)
 
 > 🦔 *"Pick a URL and shake on it. I'd offer a paw, but I'm mostly spines."*
