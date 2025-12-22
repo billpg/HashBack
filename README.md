@@ -73,7 +73,7 @@ I am very much open to the next version of this draft exchange reusing parts of 
 ### Ahead of time.
 Before any exchange can occur, the client's administrator must declare the exact narrow URL range the client will use for publishing verification hashes. Ideally, this would be a single fixed URL with a single query string parameter as only variation allowed, or a folder without allowing further subfolders. This URL must use TLS via the HTTPS scheme.
 
-This exchange relies on the server having a clear mapping of which URLs belong to which clients, so it is important the range is not too broad.
+This exchange relies on the server having a clear mapping of which URLs belong to which clients, so it is important the range is not too broad. The server must reject any verification URL that is outside the declared range of any user.
 
 :heavy_check_mark: `https://example.com/hashback?id=*`   
 :heavy_check_mark: `https://example.com/hashback/*.txt`    
@@ -231,7 +231,7 @@ Petunia needs to place a large rutabaga order for an upcoming "Turnip the Volume
 }
 ```
 
-Note the `Verify` property corresponds to the URL Petunia had registered ahead of time. This is where the trust boundary lies.
+Note the `Verify` property corresponds to the URL Petunia had registered ahead of time. This is where the trust boundary lies. The URL belongs to the client, not the server.
 
 The system calculates the verification hash from this JSON object (`GcBDESw5S+0HjSEY/ia6VQ7NyQvjHvy9Yk/lyQO0bQs=`) and publishes it on their server at the specified URL, ready for retrieval.<!--CASE_STUDY_HASH-->
 
