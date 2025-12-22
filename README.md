@@ -451,13 +451,18 @@ Instead, generate a fresh header for each request. It's lightweight enough and i
 
 "WWW-Authenticate header": The standard HTTP header used by a server to advertise the authentication methods it supports.
 
-
 ## 🥾 Next Steps
 This document is a public draft version. I'm looking (please) for clever people to review it and give feedback. In particular, I'd like some confirmation I'm using SHA-256 with its fixed salt correctly. I know not to "roll your own crypto" and this is very much using pre-existing components. Almost all the security is done by TLS and the hash is there to confirm the authenticity of the authentication request. If you have any comments or notes, please raise an issue on this project's github.
 
 In due course, I plan to deploy a publicly accessible test API which you could use as the other side of the exchange. It'd perform both the role of an authenticating server by downloading your hashes and validating them, as well as perform the role of a client requesting authentication from you and publishing a verification hash for you to download. (And yes, you could point both APIs at each other, just for laughs.)
 
 Ultimately, I hope to publish this as an RFC and establish it as a public standard.
+
+<a href="billpg.HashBackCore/"`HashBackCore`</a> is my reference implementation, handling the process for both validating a header and generating one. This is written with hooks for you to supply your own code when needed, including for registering your own verification hashes and retrieving a client's verification hash. (See that project's README file for usage notes.) It deliberately doesn't interface with HTTP, leaving that to your handler code. By calling to handler code, it allows an extensive set of unit tests that bypass that complication. These are implemented in the <a href="HashBackCoreTests">`HashBackCoreTests`</a> libary.
+
+> 🦔 *"Onward, brave hedgehog!"*
+
+## 🙏 Acknowledgements
 
 My thanks to Danny Wilson for his feedback and for developing his own service that performs this authentication. Multiple independent implementations are good for establishing a new standard. 
 
