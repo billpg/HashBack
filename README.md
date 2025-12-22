@@ -458,7 +458,7 @@ In due course, I plan to deploy a publicly accessible test API which you could u
 
 Ultimately, I hope to publish this as an RFC and establish it as a public standard.
 
-<a href="billpg.HashBackCore/"`HashBackCore`</a> is my reference implementation, handling the process for both validating a header and generating one. This is written with hooks for you to supply your own code when needed, including for registering your own verification hashes and retrieving a client's verification hash. (See that project's README file for usage notes.) It deliberately doesn't interface with HTTP, leaving that to your handler code. By calling to handler code, it allows an extensive set of unit tests that bypass that complication. These are implemented in the <a href="HashBackCoreTests">`HashBackCoreTests`</a> libary.
+<a href="billpg.HashBackCore/">`HashBackCore`</a> is my reference implementation, handling the process for both validating a header and generating one. This is written with hooks for you to supply your own code when needed, including for registering your own verification hashes and retrieving a client's verification hash. (See that project's README file for usage notes.) It deliberately doesn't interface with HTTP, leaving that to your handler code. By calling to handler code, it allows an extensive set of unit tests that bypass that complication. These are implemented in the <a href="HashBackCoreTests">`HashBackCoreTests`</a> libary.
 
 > 🦔 *"Onward, brave hedgehog!"*
 
