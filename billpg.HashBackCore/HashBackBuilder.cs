@@ -71,23 +71,16 @@ namespace billpg.HashBackCore
             if (HashRegister == null)
                 throw new ApplicationException("HashRegister must be set.");
 
-            /* Get the Verify URL, which we'll need when building the return object. */
+            /* Get the verify URL once. */
             string verify = await VerifyGetter();
 
-            /* Serialize parameters to JSON and encode. */
-            string json = new JObject
-            {
-                ["Version"] = Helpers.VersionString,
-                ["Host"] = host,
-                ["Now"] = this.NowGetter(),
-                ["Unus"] = this.UnusGetter(),
-                ["Verify"] = verify
-            }.ToString(Newtonsoft.Json.Formatting.None);
-            byte[] jsonAsBytes = Encoding.UTF8.GetBytes(json);
-            string authHeader = Convert.ToBase64String(jsonAsBytes);
-
-            /* Compute the verification hash using the Helpers function. */
-            string verificationHash = Helpers.ComputeVerificationHash(jsonAsBytes);
+            /* Call through to the build function. */
+            (string authHeader, string verificationHash) 
+                = Helpers.Build(
+                    host,
+                    this.NowGetter(),
+                    this.UnusGetter(),
+                    verify);
 
             /* Register this verify/hash combo to let it be downloaded. */
             await this.HashRegister(verify, verificationHash);

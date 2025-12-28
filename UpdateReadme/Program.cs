@@ -2,7 +2,7 @@
  * signatures using the crypto-helper functions. */
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
-using System.Net;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -13,7 +13,7 @@ var readmeLines = File.ReadAllLines(readmePath).ToList();
 var readmeOrigText = string.Join("\r\n", readmeLines);
 
 /* Constants from which the fixed salt bytes will be derived. */
-const string fixed_salt_password = "To my Treacle.";
+const string fixed_salt_password = "HashBack is dedicated to my Treacle.";
 const string fixed_salt_salt = "I love you to the moon and back.";
 const int fixed_salt_rounds = 238854 * 2; 
 
@@ -31,14 +31,31 @@ SetTextByMarker(readmeLines, "<!--FIXED_SALT_DEDICATION-->", StringSaltParameter
 SetTextByMarker(readmeLines, "<!--FIXED_SALT_ITERATIONS-->", $"- Iterations: {fixed_salt_rounds}");
 
 /* Look for the fixed salt byte block, two lines after the marker. */
-int fixedSaltIndex = readmeLines.FindIndex(src => src.Contains("<!--FIXED_SALT-->")) + 2;
-readmeLines.RemoveRange(fixedSaltIndex, 4);
-readmeLines.Insert(fixedSaltIndex, DumpByteArray(fixedSaltBytes));
+InsertByteArrayAsText(readmeLines, "<!--FIXED_SALT-->", "```", "```", fixedSaltBytes);
 
 /* Look for the line with the fixed salt in hex/base64. */
 SetTextByMarker(readmeLines, "<!--FIXED_SALT_HEX-->", $"- Hex: `{BytesToHex(fixedSaltBytes)}`");
 SetTextByMarker(readmeLines, "<!--FIXED_SALT_B64-->", $"- Base64: `{Convert.ToBase64String(fixedSaltBytes)}`");
 SetTextByMarker(readmeLines, "<!--FIXED_SALT_URL-->", $"- URL: `{System.Web.HttpUtility.UrlEncode(fixedSaltBytes)}`");
+
+/* Rewrite the HashBackCore copy of the fixed salt in source. */
+string helpersPath = FindFileByName("Helpers.cs");
+var helpersLines = File.ReadAllLines(helpersPath).ToList();
+InsertByteArrayAsText(helpersLines, "FixedSalt42", "[", "]", fixedSaltBytes);
+File.WriteAllLines(helpersPath, helpersLines);
+
+/* Pull out the copy of the fixed salt in memory and complain if it is different. */
+var helperFixedSalt = 
+    (byte[])
+    typeof(billpg.HashBackCore.Helpers)
+    .GetField("FixedSalt42", BindingFlags.NonPublic | BindingFlags.Static)!
+    .GetValue(null)!;
+if (Convert.ToBase64String(helperFixedSalt) != Convert.ToBase64String(fixedSaltBytes))
+{
+    Console.WriteLine("Rebuild and run this app again.");
+    return;
+}
+
 
 /* Populate the main examples in the README. */
 PopulateExample(
@@ -58,7 +75,7 @@ PopulateExample(
 if (readmeOrigText != string.Join("\r\n", readmeLines))
 {
     Console.WriteLine("Saving modified README.md.");
-    File.WriteAllLines(readmePath, readmeLines);
+    File.WriteAllLines(readmePath, readmeLines, new UTF8Encoding(true));
 }
 
 /* Announce end. */
@@ -104,15 +121,10 @@ string StringSaltParameters(string label, string value)
     return $"- {label}: \"{value}\" ({byteCount} bytes, summing to {byteSum}.)";
 }
 
-/* Return the number of seconds since 1970 for the supplied timestamp. */
-long UnixTime(DateTime utc)
-{
-    return (long)(utc.ToUniversalTime() - DateTime.Parse("1970-01-01T00:00:00Z")).TotalSeconds;
-}
-
 /* Look for markers in the readme to populate with specific examples. */
 void PopulateExample(string keyBase, DateTime now, string hostDomainName, string clientDomainName)
 {
+    /* Generate a string to use as the verify URL. */
     var verifyUrl = new UriBuilder("https", clientDomainName)
     {
         Path = "/api/hashback", 
@@ -120,18 +132,23 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     }.ToString();
     string xnHostDomain = new System.Globalization.IdnMapping().GetAscii(hostDomainName);
 
-    /* Build request JSON. */
-    var requestJson = new JObject();
-    requestJson["Version"] = "BILLPG_DRAFT_4.1";
-    requestJson["Host"] = hostDomainName;
-    requestJson["Now"] = UnixTime(now);
-    requestJson["Unus"] = GenerateUnus(128, keyBase);
-    requestJson["Verify"] = verifyUrl;
-    ReplaceJson($"<!--{keyBase}_REQUEST-->", requestJson);
+    /* Use HashBackCore to build the Authorization header JSON. */
+    var builder = new billpg.HashBackCore.HashBackBuilder();
+    builder.Host = hostDomainName;
+    builder.NowGetter = () => billpg.HashBackCore.Helpers.ToUnixTimeSeconds(now);
+    builder.UnusGetter = () => GenerateUnus(128, keyBase);
+    builder.SetVerify(verifyUrl);
+    string verificationHash = "";
+    builder.SetSyncHashRegister((url, hash) => verificationHash = hash);
+    var authHeader = builder.Build().Result;
 
-    /* Encode JSON into bytes. */
-    string jsonAsString = requestJson.ToString(Newtonsoft.Json.Formatting.None);
-    byte[] jsonAsBytes = Encoding.UTF8.GetBytes(jsonAsString);
+    /* Bring the base64 block back into bytes and parse as JSON. */
+    byte[] jsonAsBytes = Convert.FromBase64String(authHeader);
+    string jsonAsString = Encoding.UTF8.GetString(jsonAsBytes);
+    var requestJson = JObject.Parse(jsonAsString);
+
+    /* Insert JSON into readme. */
+    ReplaceJson($"<!--{keyBase}_REQUEST-->", requestJson);
 
     /* Build JSON into an Authorization header. */
     int authHeaderIndex = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_AUTH_HEADER-->"));
@@ -154,13 +171,12 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
         readmeLines.InsertRange(authHeaderStartIndex+1, jsonAsBase64Lines);
     }
 
-    /* Insert the hash of the above JSON into the readme. */
-    string hash1066 = HashRequestJsonBytes(jsonAsBytes);
+    /* Insert the hash of the above JSON into the readme. */    
     int hash1066Index = readmeLines.FindIndex(src => src.Contains($"<!--{keyBase}_HASH-->"));
     if (hash1066Index > 0)
     {
         var lineByQuotes = readmeLines[hash1066Index].Split('`');
-        readmeLines[hash1066Index] = lineByQuotes[0] + "`" + hash1066 + "`" + lineByQuotes[2];
+        readmeLines[hash1066Index] = lineByQuotes[0] + "`" + verificationHash + "`" + lineByQuotes[2];
     }
 
     /* Build Set-Cookie header. */
@@ -208,15 +224,6 @@ string GenerateBearerToken(string keyBase)
 
     /* Completed token. */
     return token;
-}
-
-string HashRequestJsonBytes(byte[] jsonAsBytes)
-{
-    var hashInput = new byte[fixedSaltBytes.Length + jsonAsBytes.Length];
-    Buffer.BlockCopy(fixedSaltBytes, 0, hashInput, 0, fixedSaltBytes.Length);
-    Buffer.BlockCopy(jsonAsBytes, 0, hashInput, fixedSaltBytes.Length, jsonAsBytes.Length);
-    var hashOutput = SHA256.HashData(hashInput);
-    return Convert.ToBase64String(hashOutput);
 }
 
 void ReplaceJson(string tag, JObject insert)
@@ -287,21 +294,39 @@ void SetTextByMarker(List<string> lines, string marker, string line)
     lines[fixedSaltIndex] = line + marker;
 }
 
-string DumpByteArray(IList<byte> bytes)
+static void InsertByteArrayAsText(List<string> lines, string beacon, string startMarker, string endMarker, byte[] bytes)
 {
-    string list = "";
-    for (int i = 0; i < bytes.Count; i++)
+    /* Find the markers, starting from the unique beacon. */
+    int beaconIndex = lines.FindIndex(src => src.Contains(beacon));
+    int startMarkerIndex = lines.FindIndex(beaconIndex + 1, src => src.Contains(startMarker));
+    int endMarkerIndex = lines.FindIndex(startMarkerIndex + 1, src => src.Contains(endMarker));
+
+    /* Pull out the indent to use from the first line in the block already there. */
+    int indentCount = lines[startMarkerIndex+1].TakeWhile(ch => ch == ' ').Count();
+
+    /* Clear out existing lines between the markers. */
+    lines.RemoveRange(startMarkerIndex + 1, endMarkerIndex - startMarkerIndex - 1);
+
+    /* Insert the byte array, 8 bytes per line. */
+    string? currLine = null;
+    int insertIndex = startMarkerIndex + 1;
+    for (int i = 0; i < bytes.Length; i++)
     {
-        if (i > 0 && i % 8 == 0)
-            list += "\r\n";
+        /* New line every 8 bytes. */
         if (i % 8 == 0)
-            list += "       ";
-        if (i == 0)
-            list += "";
-        list += $"{bytes[i]},";
+        {
+            if (currLine != null)
+            {
+                lines.Insert(insertIndex, currLine);
+                insertIndex++;
+            }
+            currLine = new string(' ', indentCount);
+        }
+        currLine += $"{bytes[i]},";
     }
 
-    return list.Trim(',') + "";
+    /* Remove trailing comma and insert last line. */
+    lines.Insert(insertIndex, currLine!.TrimEnd(','));
 }
 
 string BytesToHex(IList<byte> bytes)

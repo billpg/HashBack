@@ -78,9 +78,9 @@ namespace billpg.HashBackCore
                 throw new AuthorizationParseException(
                     "Version property is missing.",
                     ValidateRejectionReason.BadHeader);
-            if (version != Helpers.VersionString)
+            if (!Helpers.IsRecognizedVersion(version))
                 throw new AuthorizationParseException(
-                    $"Version must be '{Helpers.VersionString}'.", 
+                    $"Version must be one of {Helpers.SupportedVersions.Select(v => $"'{v}'").ToStringJoin("/")}.", 
                     ValidateRejectionReason.BadHeader);
 
             /* Validate Host. */
@@ -149,7 +149,7 @@ namespace billpg.HashBackCore
 
             /* If all checks pass, compute the expected 
              * hash from the bytes collected earlier. */
-            string expectedHash = Helpers.ComputeVerificationHash(jsonBytes);
+            string expectedHash = Helpers.ComputeVerificationHash(version, jsonBytes);
             OnLogWrite($"Expected Hash: \"{expectedHash}\"");
 
             /* Call the corresponding verification hash getter function.

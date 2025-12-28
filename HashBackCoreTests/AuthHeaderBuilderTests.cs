@@ -19,13 +19,12 @@ namespace HashBackCoreTests
             string unus = "Rpgt4Fc5nMDq14LOps/hYQ==";
             string verify = "https://client.example/api/hashback?id=502542886";
 
-            /* Expected values from README. */
-            string expectedBase64 = 
-                "eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJzZXJ2ZXIuZXhh" +
-                "bXBsZSIsIk5vdyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYzVuTURxMTRMT3Bz" +
-                "L2hZUT09IiwiVmVyaWZ5IjoiaHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9hcGkvaGFz" +
-                "aGJhY2s/aWQ9NTAyNTQyODg2In0=";
-            string expectedHash = "0PptsdmB3W0j06DA1GfI/i88EtDejPTRnZ/0BpmFWZI=";
+            /* Expected values from 4.2 README. */
+            const string expectedBase64 =
+                "eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMiIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v" +
+                "dyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYzVuTURxMTRMT3BzL2hZUT09IiwiVmVyaWZ5Ijoi" +
+                "aHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9hcGkvaGFzaGJhY2s/aWQ9NTAyNTQyODg2In0=";
+            const string expectedHash = "1bUaiyjhDoxZxPCURbrYRbCdzromLrwkwwTyrh7wVXI=";
 
             /* Run the function, expecting the same result every time. */
             var registeredHashes = new Dictionary<string, string>();
@@ -68,7 +67,7 @@ namespace HashBackCoreTests
             Assert.IsNotNull(obj, "Decoded JSON object should not be null.");
 
             /* JSON should contain all required properties. */
-            Assert.AreEqual("BILLPG_DRAFT_4.1", (string)obj["Version"]!, 
+            Assert.AreEqual("BILLPG_DRAFT_4.2", (string)obj["Version"]!, 
                 "Version property missing or incorrect.");
             Assert.AreEqual(host, (string)obj["Host"]!, 
                 "Host property missing or incorrect.");
