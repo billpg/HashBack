@@ -98,6 +98,8 @@ The JSON object is made from the following properties. All are required and the 
 - **`Version`**
   - A string indicating the version of this exchange in use.
   - This version is indicated by the string `"BILLPG_DRAFT_4.2"`.
+  - Note that as this proceeds to a formal standard, this value may change. I anticipate that the IETF drafts will necessiate a new version string, replacing "BILLPG" with "IETF". The final RFC form will likely be "RFC_xxxx" with the RFC number assigned to the final document.
+  - See also the section describing the `WWW-Authenticate` header below for how servers may advertise which versions they support.
 - **`Host`**
   - The full domain name of the server being called in this request.
   - Because load balancers and CDN systems might modify the `Host:` header, a copy is included here so there's no doubt exactly which string was used in the verification hash.
@@ -149,13 +151,13 @@ The hashing process takes the following steps.
        20,42,34,245,250,230,139,30,
        56,240,40,168,35,184,92,252
        ```
-   - The bytes that the went into the BASE64-encoded block used in the Authorization header.
+   - The bytes that went into the BASE64-encoded block used in the Authorization header.
 2. Hash the combined block using a single round of SHA-256.
 3. Encode the hash result using BASE-64, including the trailing `=` character.
 
 Note that the hash is performed on the same bytes that were encoded inside the BASE64 block. Because of this, the JSON itself may be flexible with formatting whitespace or JSON character encoding, as long as the JSON object is valid according to the requirements of JSON itself and the rules stated above.
 
-The salt ensures that HashBack verification hashes cannot be mistaken or misused in other contexts. Because these extra bytes are not sent over the wire with a request, there's no risk of a general purpose hashing service being misued to perform HashBack verification hash calculations. A valid hash is only meaningful in light of this document. (In case it isn't clear, the salt is fixed and public. It is not a secret.)
+The salt ensures that HashBack verification hashes cannot be mistaken or misused in other contexts. Because these extra bytes are not sent over the wire with a request, there's no risk of a general purpose hashing service being misused to perform HashBack verification hash calculations. A valid hash is only meaningful in light of this document. (In case it isn't clear, the salt is fixed and public. It is not a secret.)
 
 For your convenience, here is the 32 byte fixed salt block in a variety of encodings:
 - Base64: `MGrvPY28enVH8lmkmlksLxQqIvX65oseOPAoqCO4XPw=`<!--FIXED_SALT_B64-->
@@ -186,12 +188,12 @@ HTTP Authentication is typically triggered by the client first attempting to per
 
 For a server to respond when HashBack authentication is available, the `WWW-Authenticate` header must include an `<auth-scheme>` of `HashBack`. A `realm` parameter may be present but this is optional.
 
-The optional `version` parameter is a list of supported versions, separated by spaces, that the server supports. The space separated strings will be the same as the `Version` property used in the JSON object. If this exhange does progress to a published RFC, it could be listed alongside the strings indicating these draft versions. If the version paramter is missing, the server is not indicating any particular version support.
+The optional `version` parameter is a comma-separared list of HashBack version identifiers the server supports. (These match the Version field used in the Authorization JSON.) Clients should select a version that the server advertises. If the parameter is omitted, the server is not advertising support for any particular version. If the server supports multiple versions, it should list them as the most preferable first.
 
 For example:
 ```
 HTTP/1.1 401 Authentication Required
-WWW-Authenticate: HashBack realm="My_Wonderful_Realm" version="BILLPG_DRAFT_4.2 BILLPG_DRAFT_4.1 RFC1234"
+WWW-Authenticate: HashBack realm="My_Wonderful_Realm" version="RFC1234,BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1"
 ```
 
 Clients may skip that initial transaction if it is already known that the server supports HashBack authentication.
@@ -431,7 +433,7 @@ Instead, generate a fresh header for each request. It's lightweight enough and i
    - Replaced PBKDF2 with a single round of salted SHA-256 for the verification hash. I'm happy the extended hashing isn't needed.
    - Removed the mechanism to retrieve a temporal bearer token to simplify the document.
  - **Public Draft 4.2** (This document)
-   - Updated the fixed salt's "nothing up my sleeve" parameters to mention HashBack explictly.
+   - Updated the fixed salt's "nothing up my sleeve" parameters to mention HashBack explicitly. This means the fixed salt is different from previous drafts, but the HashBackCore library will validate both versions for backward compatibility.
    - Updated the 401 WWW-Authenticate header to allow a "version" list that the service will allow.
 
 ## 📘 Glossary
