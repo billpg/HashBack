@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Text;
+using System.Threading.Tasks;
 using billpg.HashBackCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json.Linq;
@@ -11,7 +12,7 @@ namespace HashBackCoreTests
     public class AuthHeaderBuilderTests
     {
         [TestMethod]
-        public void BuildAuthorization_KnownInput_ProducesExpectedBase64AndHash()
+        public async Task BuildAuthorization_KnownInput_ProducesExpectedBase64AndHash()
         {
             /* Example values from README. */
             string host = "server.example";
@@ -34,7 +35,7 @@ namespace HashBackCoreTests
             builder.UnusGetter = () => unus;
             builder.VerifyGetter = () => Task.FromResult(verify);
             builder.SetSyncHashRegister(registeredHashes.Add);
-            var auth = builder.Build().Result;
+            var auth = await builder.Build();
 
             /* Compare results. */
             Assert.AreEqual(expectedBase64, auth, 
@@ -44,7 +45,7 @@ namespace HashBackCoreTests
         }
 
         [TestMethod]
-        public void BuildAuthorization_Auto_ProducesValidBase64AndHash()
+        public async Task BuildAuthorization_Auto_ProducesValidBase64AndHash()
         {
             /* Sample values. */
             string host = "example.com";
@@ -57,7 +58,7 @@ namespace HashBackCoreTests
             builder.Host = host;
             builder.VerifyGetter = () => Task.FromResult(verify);
             builder.SetSyncHashRegister(registeredHashes.Add);
-            var auth = builder.Build().Result;
+            var auth = await builder.Build();
             long maximumNow = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds();
 
             /* BASE-64 block should decode to valid JSON. */
@@ -101,7 +102,7 @@ namespace HashBackCoreTests
         }
 
         [TestMethod]
-        public void BuildAuthorization_DifferentInputs_ProduceDifferentHashes()
+        public async Task BuildAuthorization_DifferentInputs_ProduceDifferentHashes()
         {
             string host = "example.com";
             string verify = "https://example.com/hashback";
@@ -112,8 +113,8 @@ namespace HashBackCoreTests
             builder.Host = host;
             builder.VerifyGetter = () => Task.FromResult($"{verify}_{counter++}");
             builder.SetSyncHashRegister(registeredHashes.Add);
-            var auth1 = builder.Build().Result;
-            var auth2 = builder.Build().Result;
+            var auth1 = await builder.Build();
+            var auth2 = await builder.Build();
 
             // It's extremely unlikely for two auto-generated requests to have the same hash
             var auth1Hash = registeredHashes[verify + "_1"];

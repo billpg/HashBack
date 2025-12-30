@@ -12,7 +12,7 @@ namespace HashBackCoreTests
     public class RoundTripTests
     {
         [TestMethod]
-        public void BuildValidate()
+        public async Task BuildValidate()
         {
             /* Hash resitration handler. */
             string savedUrl = string.Empty;
@@ -46,7 +46,7 @@ namespace HashBackCoreTests
             string verifyUrl = $"https://roundtripclient.example/{Guid.NewGuid()}.txt";
             builder.SetVerify(verifyUrl);
             builder.HashRegister = RegisterHash;
-            string authHeader = builder.Build().Result;
+            string authHeader = await builder.Build();
 
             /* Pass the authorization header to the validator and confirm user ID. */
             var validator = new HashBackValidator();
@@ -54,7 +54,7 @@ namespace HashBackCoreTests
             validator.RequireNowWindow(10);
             validator.OnIdentifyUser = IdentifyUser;
             validator.OnGetHash = GetHash;
-            string identifiedUser = validator.Validate(authHeader).Result;
+            string identifiedUser = await validator.Validate(authHeader);
             Assert.AreEqual("roundtripclient.example", identifiedUser);
         }
     }
