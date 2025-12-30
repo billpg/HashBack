@@ -56,28 +56,23 @@ namespace billpg.HashBackCore
 
         public async Task<string> Build()
         {
+            /* Check the required properties have all been assigned. */
             if (this.Host == null)
                 throw new ApplicationException("Called Build without setting Host property.");
-            return await Build(this.Host);
-        }
-
-        public async Task<string> Build(string host)
-        {
-            /* Check the optional properties have all been assigned. */
             if (string.IsNullOrEmpty(this.Host))
                 throw new ApplicationException("Host must be set.");
-            if (VerifyGetter == null)
+            if (this.VerifyGetter == null)
                 throw new ApplicationException("VerifyUrlGetter must be set.");
-            if (HashRegister == null)
+            if (this.HashRegister == null)
                 throw new ApplicationException("HashRegister must be set.");
 
             /* Get the verify URL once. */
-            string verify = await VerifyGetter();
+            string verify = await this.VerifyGetter();
 
             /* Call through to the build function. */
             (string authHeader, string verificationHash) 
                 = Helpers.Build(
-                    host,
+                    this.Host,
                     this.NowGetter(),
                     this.UnusGetter(),
                     verify);
