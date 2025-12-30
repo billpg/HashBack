@@ -24,7 +24,7 @@ namespace HashBackCoreTests
                 "eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMiIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v" +
                 "dyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYzVuTURxMTRMT3BzL2hZUT09IiwiVmVyaWZ5Ijoi" +
                 "aHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9hcGkvaGFzaGJhY2s/aWQ9NTAyNTQyODg2In0=";
-            const string expectedHash = "1bUaiyjhDoxZxPCURbrYRbCdzromLrwkwwTyrh7wVXI=";
+            const string expectedHash = "/+Zc/xVCVgnnfC69tEybe2TAluOk21ScdystX0/1Ayk=";
 
             /* Run the function, expecting the same result every time. */
             var registeredHashes = new Dictionary<string, string>();

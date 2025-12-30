@@ -60,7 +60,7 @@ namespace HashBackCoreTests
         }
 
         [TestMethod]
-        public void Validator_WithNowTest_AllowsValidNowAsync()
+        public void Validator_WithNowTest_AllowsValidNow()
         {
             string authHeader = CreateValidAuthHeader(now: (long)9E9);
 
@@ -69,7 +69,7 @@ namespace HashBackCoreTests
             validator.RequireNowWindow(10, () => (long)9E9+9);
             validator.OnIdentifyUser = ExtractUrlHost;
             validator.OnGetHash = HashGetter(
-                "drCsDMz3mbteSDQkcJwtPGEiciE5rV38oTGifDL1wpE=");
+                "881HRZEhTULjBEwR715dogqsQ/qfLEIsVNlPTZd5Pz0=");
             var result = validator.Validate(authHeader).Result;
             Assert.AreEqual("client.example", result);
         }
@@ -94,13 +94,13 @@ namespace HashBackCoreTests
         [TestMethod]
         public async Task Validator_WithRequireHostName_AllowsExactMatch()
         {
-            string authHeader = CreateValidAuthHeader(host: "server.example");
+            string authHeader = CreateValidAuthHeader(host: "exact-match.example");
             var validator = new HashBackValidator();
-            validator.RequireHost("server.example");
+            validator.RequireHost("exact-match.example");
             validator.OnNowValidate = _ => true;
             validator.OnIdentifyUser = _ => Task.FromResult<string?>("alice");
             validator.OnGetHash = HashGetter(
-                "TnEsaW72a5Ns/7KGNMpYiyYa8y5zN1OdZfVVj0t1XX0=");
+                "9giW4gByafJzA9mNJfu9smkQDKM5J8/4uKP71raPWZo=");
             var result = await validator.Validate(authHeader);
             Assert.AreEqual("alice", result);
         }
@@ -147,7 +147,7 @@ namespace HashBackCoreTests
             parse.OnNowValidate = _ => true;
             parse.OnIdentifyUser = _ => Task.FromResult<string?>("dave");
             parse.OnGetHash = HashGetter(
-                "rj84NJKSHujYtTp1pLR3uY2iBun0C4QnJ+vdZTrBtdA=");
+                "bO05G1bx2yC2TXEahq7bYV3PFG7eWaqK+2Kecm609c0=");
             var result = await parse.Validate(jsonHeader);
 
             /* Check the values came through correctly. */
@@ -171,12 +171,12 @@ namespace HashBackCoreTests
                 "0PptsdmB3W0j06DA1GfI/i88EtDejPTRnZ/0BpmFWZI=");
 
         [TestMethod]
-        public void Validate_AsBase64() 
+        public void Validate_Readme42_AsBase64() 
             => Validate_Readme_Shared(
                 "eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMiIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v" +
                 "dyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYzVuTURxMTRMT3BzL2hZUT09IiwiVmVyaWZ5Ijoi" +
                 "aHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9hcGkvaGFzaGJhY2s/aWQ9NTAyNTQyODg2In0=",
-                "1bUaiyjhDoxZxPCURbrYRbCdzromLrwkwwTyrh7wVXI=");
+                "/+Zc/xVCVgnnfC69tEybe2TAluOk21ScdystX0/1Ayk=");
 
         [TestMethod]
         public void Validate_Readme42_AsJson()
@@ -184,7 +184,7 @@ namespace HashBackCoreTests
                 "{\"Version\":\"BILLPG_DRAFT_4.2\"," + "\"Host\":\"server.example\"," +
                 "\"Now\":529297200," + "\"Unus\":\"Rpgt4Fc5nMDq14LOps/hYQ==\"," +
                 "\"Verify\":\"https://client.example/api/hashback?id=502542886\"}",
-                "1bUaiyjhDoxZxPCURbrYRbCdzromLrwkwwTyrh7wVXI=");
+                "/+Zc/xVCVgnnfC69tEybe2TAluOk21ScdystX0/1Ayk=");
 
         /// <summary>
         /// Shared code for validating the README examples for versions 4.1 and 4.2.

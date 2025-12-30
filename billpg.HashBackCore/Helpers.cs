@@ -102,7 +102,7 @@ namespace billpg.HashBackCore
         {
             /* Combine salt and input. */
             byte[] salted = new byte[salt.Length + input.Length];
-            Buffer.BlockCopy(FixedSalt41, 0, salted, 0, FixedSalt41.Length);
+            Buffer.BlockCopy(salt, 0, salted, 0, salt.Length);
             Buffer.BlockCopy(input, 0, salted, salt.Length, input.Length);
 
             /* Hash with SHA-256. */

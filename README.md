@@ -167,7 +167,7 @@ For your convenience, here is the 32 byte fixed salt block in a variety of encod
 Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The returned string itself must be one line with the BASE-64 encoded hash in ASCII as that only line. It must either have no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence. The response must be `200 OK` and the TLS certificate must be valid.
 
 The expected hash of the above example is: 
-- `1bUaiyjhDoxZxPCURbrYRbCdzromLrwkwwTyrh7wVXI=`<!--1066_EXAMPLE_HASH-->
+- `/+Zc/xVCVgnnfC69tEybe2TAluOk21ScdystX0/1Ayk=`<!--1066_EXAMPLE_HASH-->
 
 Once the service has downloaded that verification hash, it should compare it against the result of hashing the bytes inside the BASE64 block. If the two hashes match, the server may be reassured that the client is indeed the user identified by the URL from where the hash was downloaded and proceed to process the remainder of the request.
 
@@ -236,7 +236,7 @@ Petunia needs to place a large rutabaga order for an upcoming "Turnip the Volume
 
 Note the `Verify` property corresponds to the URL Petunia had registered ahead of time. This is where the trust boundary lies. The URL belongs to the client, not the server.
 
-The system calculates the verification hash from this JSON object (`p8af797X9yJzbsKy3Fz5jDuqWhhTI/9A6eNvBGUk+BI=`) and publishes it on their server at the specified URL, ready for retrieval.<!--CASE_STUDY_HASH-->
+The system calculates the verification hash from this JSON object (`f2LOcgshQAytGFDcLhk9J0cD3ZPKW4rQTOQxFkeU37g=`) and publishes it on their server at the specified URL, ready for retrieval.<!--CASE_STUDY_HASH-->
 
 To complete the request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows.<!--CASE_STUDY_AUTH_HEADER-->
 ```
