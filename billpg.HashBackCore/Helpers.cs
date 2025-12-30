@@ -1,8 +1,9 @@
 using Newtonsoft.Json.Linq;
-using System;
-using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+
+[assembly:InternalsVisibleTo("UpdateReadme")]
 
 namespace billpg.HashBackCore
 {
@@ -34,7 +35,7 @@ namespace billpg.HashBackCore
         /// Fixed salt value used for hashing,
         /// as specified in HashBack version 4.2.
         /// </summary>
-        private static readonly byte[] FixedSalt42 =
+        internal static readonly byte[] FixedSalt42 =
         [
             48,106,239,61,141,188,122,117,
             71,242,89,164,154,89,44,47,
@@ -87,7 +88,7 @@ namespace billpg.HashBackCore
         /// <param name="input">The byte array to hash (typically the 
         /// decoded BASE-64 Authorization payload).</param>
         /// <returns>BASE-64 encoded salted SHA-256 hash string.</returns>
-        public static string ComputeVerificationHash(string version, byte[] input)
+        internal static string ComputeVerificationHash(string version, byte[] input)
         {
             /* Select salt based on version and call though to the other
              * function that operates on two byte arrays. */
@@ -98,7 +99,14 @@ namespace billpg.HashBackCore
             return ComputeVerificationHash(salt, input);
         }
 
-        public static string ComputeVerificationHash(byte[] salt, byte[] input)
+        /// <summary>
+        /// Computes the salted SHA-256 hash of the input bytes as described in the HashBack README,
+        /// and returns the result as a BASE-64 string (with trailing =).
+        /// </summary>
+        /// <param name="salt">Salt bytes.</param>
+        /// <param name="input">Payload bytes.</param>
+        /// <returns>Base-64 encoded salted hash string.</returns>
+        internal static string ComputeVerificationHash(byte[] salt, byte[] input)
         {
             /* Combine salt and input. */
             byte[] salted = new byte[salt.Length + input.Length];
@@ -181,7 +189,7 @@ namespace billpg.HashBackCore
         /// is used instead.</param>
         /// <returns>A single string that consists of the elements in <paramref name="items"/> delimited by the <paramref
         /// name="separator"/> string.</returns>
-        internal static string ToStringJoin(this IEnumerable<string> items, string separator)
+        internal static string ToSeparatedString(this IEnumerable<string> items, string separator)
             => string.Join(separator, items);
     }
 
@@ -204,17 +212,4 @@ namespace billpg.HashBackCore
             this.Reason = reason;
         }
     }
-
-    public readonly struct AuthorizationParseResult
-    {
-        public string VerifyUrl { get; }
-        public string ExpectedHash { get; }
-
-        public AuthorizationParseResult(string verifyUrl, string expectedHash)
-        {
-            VerifyUrl = verifyUrl;
-            ExpectedHash = expectedHash;
-        }
-    }
-
 }

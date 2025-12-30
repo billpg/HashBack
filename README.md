@@ -162,7 +162,6 @@ The salt ensures that HashBack verification hashes cannot be mistaken or misused
 For your convenience, here is the 32 byte fixed salt block in a variety of encodings:
 - Base64: `MGrvPY28enVH8lmkmlksLxQqIvX65oseOPAoqCO4XPw=`<!--FIXED_SALT_B64-->
 - Hex: `306AEF3D8DBC7A7547F259A49A592C2F142A22F5FAE68B1E38F028A823B85CFC`<!--FIXED_SALT_HEX-->
-- URL: `0j%ef%3d%8d%bczuG%f2Y%a4%9aY%2c%2f%14*%22%f5%fa%e6%8b%1e8%f0(%a8%23%b8%5c%fc`<!--FIXED_SALT_URL-->
 
 Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The returned string itself must be one line with the BASE-64 encoded hash in ASCII as that only line. It must either have no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence. The response must be `200 OK` and the TLS certificate must be valid.
 

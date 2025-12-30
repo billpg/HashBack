@@ -5,7 +5,6 @@ using System;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Schema;
-using static billpg.HashBackCore.HashBackValidator;
 
 namespace HashBackCoreTests
 {
@@ -15,7 +14,7 @@ namespace HashBackCoreTests
         private static Task<string?> ExtractUrlHost(string url)
             => Task.FromResult<string?>(new Uri(url).Host);
 
-        private static OnGetHashDelegate HashGetter(string hash)
+        private static HashBackValidator.OnGetHashDelegate HashGetter(string hash)
         {
             return url => Task.FromResult(hash);
         }

@@ -36,7 +36,6 @@ InsertByteArrayAsText(readmeLines, "<!--FIXED_SALT-->", "```", "```", fixedSaltB
 /* Look for the line with the fixed salt in hex/base64. */
 SetTextByMarker(readmeLines, "<!--FIXED_SALT_HEX-->", $"- Hex: `{BytesToHex(fixedSaltBytes)}`");
 SetTextByMarker(readmeLines, "<!--FIXED_SALT_B64-->", $"- Base64: `{Convert.ToBase64String(fixedSaltBytes)}`");
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_URL-->", $"- URL: `{System.Web.HttpUtility.UrlEncode(fixedSaltBytes)}`");
 
 /* Rewrite the HashBackCore copy of the fixed salt in source. */
 string helpersPath = FindFileByName("Helpers.cs");
@@ -44,18 +43,13 @@ var helpersLines = File.ReadAllLines(helpersPath).ToList();
 InsertByteArrayAsText(helpersLines, "FixedSalt42", "[", "]", fixedSaltBytes);
 File.WriteAllLines(helpersPath, helpersLines);
 
-/* Pull out the copy of the fixed salt in memory and complain if it is different. */
-var helperFixedSalt = 
-    (byte[])
-    typeof(billpg.HashBackCore.Helpers)
-    .GetField("FixedSalt42", BindingFlags.NonPublic | BindingFlags.Static)!
-    .GetValue(null)!;
-if (Convert.ToBase64String(helperFixedSalt) != Convert.ToBase64String(fixedSaltBytes))
+/* Pull out the compiled copy of the fixed salt and complain if it is different. */
+if (Convert.ToBase64String(billpg.HashBackCore.Helpers.FixedSalt42) 
+    != Convert.ToBase64String(fixedSaltBytes))
 {
     Console.WriteLine("Rebuild and run this app again.");
     return;
 }
-
 
 /* Populate the main examples in the README. */
 PopulateExample(

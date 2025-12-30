@@ -80,7 +80,7 @@ namespace billpg.HashBackCore
                     ValidateRejectionReason.BadHeader);
             if (!Helpers.IsRecognizedVersion(version))
                 throw new AuthorizationParseException(
-                    $"Version must be one of {Helpers.SupportedVersions.Select(v => $"'{v}'").ToStringJoin("/")}.", 
+                    $"Version must be one of {Helpers.SupportedVersions.Select(v => $"'{v}'").ToSeparatedString("/")}.", 
                     ValidateRejectionReason.BadHeader);
 
             /* Validate Host. */
