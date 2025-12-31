@@ -187,7 +187,7 @@ HTTP Authentication is typically triggered by the client first attempting to per
 
 For a server to respond when HashBack authentication is available, the `WWW-Authenticate` header must include an `<auth-scheme>` of `HashBack`. A `realm` parameter may be present but this is optional.
 
-The optional `version` parameter is a comma-separared list of HashBack version identifiers the server supports. (These match the Version field used in the Authorization JSON.) Clients should select a version that the server advertises. If the parameter is omitted, the server is not advertising support for any particular version. If the server supports multiple versions, it should list them as the most preferable first.
+The optional `version` parameter is a comma-separated list of HashBack version identifiers the server supports. (These match the Version field used in the Authorization JSON.) Clients should select a version that the server advertises. If the parameter is omitted, the server is not advertising support for any particular version. If the server supports multiple versions, it should list them as the most preferable first.
 
 For example:
 ```

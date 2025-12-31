@@ -180,5 +180,11 @@ namespace billpg.HashBackCore
             => authHeader.StartsWith('{') &&
                authHeader.EndsWith('}') &&
                authHeader.Any(char.IsWhiteSpace) == false;
+
+        public void SetSyncGetHash(Func<string, string> getHash)        
+            => this.OnGetHash = url => Task.FromResult<string>(getHash(url));
+
+        public void SetSyncIdentifyUser(Func<string, string?> identifyUser)
+            => this.OnIdentifyUser = url => Task.FromResult<string?>(identifyUser(url));
     }
 }

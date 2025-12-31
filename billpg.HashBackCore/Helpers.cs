@@ -47,7 +47,7 @@ namespace billpg.HashBackCore
         /// Validates if a version string is recognized by 
         /// the currently running HashBackCore library.
         /// </summary>
-        /// <param name="version">Version strig that may have been supplied in an Authorization: header.</param>
+        /// <param name="version">Version string that may have been supplied in an Authorization: header.</param>
         /// <returns>True if this version of the HashBackCore library knows about this version.</returns>
         public static bool IsRecognizedVersion(string version)
             => SupportedVersions.Contains(version);

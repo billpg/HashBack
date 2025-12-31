@@ -57,12 +57,10 @@ namespace billpg.HashBackCore
         public async Task<string> Build()
         {
             /* Check the required properties have all been assigned. */
-            if (this.Host == null)
-                throw new ApplicationException("Called Build without setting Host property.");
             if (string.IsNullOrEmpty(this.Host))
                 throw new ApplicationException("Host must be set.");
             if (this.VerifyGetter == null)
-                throw new ApplicationException("VerifyUrlGetter must be set.");
+                throw new ApplicationException("VerifyGetter must be set.");
             if (this.HashRegister == null)
                 throw new ApplicationException("HashRegister must be set.");
 
