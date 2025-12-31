@@ -1,15 +1,23 @@
-﻿using Newtonsoft.Json.Linq;
-using System;
+using Newtonsoft.Json.Linq;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
+using System.Text;
+
+[assembly:InternalsVisibleTo("UpdateReadme")]
 
 namespace billpg.HashBackCore
 {
     public static class Helpers
     {
+        // HashBack version strings.
+        private const string VersionString41 = "BILLPG_DRAFT_4.1";
+        private const string VersionString42 = "BILLPG_DRAFT_4.2";
+
         /// <summary>
-        /// The version string for HashBack protocol.
+        /// Returns an immutable list of supported HashBack version strings.
         /// </summary>
-        public const string VersionString = "BILLPG_DRAFT_4.1";
+        public static IEnumerable<string> SupportedVersions 
+            => new List<string> { VersionString41, VersionString42 }.AsReadOnly();
 
         /// <summary>
         /// Fixed salt value used for hashing, 
@@ -24,36 +32,93 @@ namespace billpg.HashBackCore
         ];
 
         /// <summary>
+        /// Fixed salt value used for hashing,
+        /// as specified in HashBack version 4.2.
+        /// </summary>
+        internal static readonly byte[] FixedSalt42 =
+        [
+            48,106,239,61,141,188,122,117,
+            71,242,89,164,154,89,44,47,
+            20,42,34,245,250,230,139,30,
+            56,240,40,168,35,184,92,252
+        ];
+
+        /// <summary>
+        /// Validates if a version string is recognized by 
+        /// the currently running HashBackCore library.
+        /// </summary>
+        /// <param name="version">Version string that may have been supplied in an Authorization: header.</param>
+        /// <returns>True if this version of the HashBackCore library knows about this version.</returns>
+        public static bool IsRecognizedVersion(string version)
+            => SupportedVersions.Contains(version);
+
+        /// <summary>
+        /// Builds a HashBack Authorization header value and its corresponding
+        /// verification hash, using draft version 4.2 format.
+        /// </summary>
+        /// <param name="host">Host property.</param>
+        /// <param name="now">Now property.</param>
+        /// <param name="unus">Unus property.</param>
+        /// <param name="verify">Verify property.</param>
+        /// <returns>Authenticate header and verification hash.</returns>
+        public static (string authHeader, string verificationHash) Build(string host, long now, string unus, string verify)
+        {
+            /* Serialize parameters to JSON and encode. */
+            string json = new JObject
+            {
+                ["Version"] = VersionString42,
+                ["Host"] = host,
+                ["Now"] = now,
+                ["Unus"] = unus,
+                ["Verify"] = verify
+            }.ToString(Newtonsoft.Json.Formatting.None);
+            byte[] jsonAsBytes = Encoding.UTF8.GetBytes(json);
+
+            /* Compute the verification hash from the above byte array and return. */
+            return (
+                Convert.ToBase64String(jsonAsBytes), 
+                ComputeVerificationHash(FixedSalt42, jsonAsBytes));
+        }
+
+        /// <summary>
         /// Computes the salted SHA-256 hash of the input bytes as described in the HashBack README,
         /// and returns the result as a BASE-64 string (with trailing =).
         /// </summary>
+        /// <param name="version">The HashBack version string.</param>
         /// <param name="input">The byte array to hash (typically the 
         /// decoded BASE-64 Authorization payload).</param>
         /// <returns>BASE-64 encoded salted SHA-256 hash string.</returns>
-        public static string ComputeVerificationHash(byte[] input)
+        internal static string ComputeVerificationHash(string version, byte[] input)
+        {
+            /* Select salt based on version and call though to the other
+             * function that operates on two byte arrays. */
+            byte[] salt = 
+                (version == VersionString41) ? FixedSalt41 : 
+                (version == VersionString42) ? FixedSalt42 :
+                throw new ArgumentException("Unrecognized version string.", nameof(version));
+            return ComputeVerificationHash(salt, input);
+        }
+
+        /// <summary>
+        /// Computes the salted SHA-256 hash of the input bytes as described in the HashBack README,
+        /// and returns the result as a BASE-64 string (with trailing =).
+        /// </summary>
+        /// <param name="salt">Salt bytes.</param>
+        /// <param name="input">Payload bytes.</param>
+        /// <returns>Base-64 encoded salted hash string.</returns>
+        internal static string ComputeVerificationHash(byte[] salt, byte[] input)
         {
             /* Combine salt and input. */
-            byte[] salted = new byte[FixedSalt41.Length + input.Length];
-            Buffer.BlockCopy(FixedSalt41, 0, salted, 0, FixedSalt41.Length);
-            Buffer.BlockCopy(input, 0, salted, FixedSalt41.Length, input.Length);
+            byte[] salted = new byte[salt.Length + input.Length];
+            Buffer.BlockCopy(salt, 0, salted, 0, salt.Length);
+            Buffer.BlockCopy(input, 0, salted, salt.Length, input.Length);
 
             /* Hash with SHA-256. */
-            using var sha256 = SHA256.Create();
-            byte[] hash = sha256.ComputeHash(salted);
+            byte[] hash = SHA256.HashData(salted);
 
             /* Return BASE-64 string, with trailing equals. */
             return Convert.ToBase64String(hash);
         }
-
-        /// <summary>
-        /// Computes the salted SHA-256 hash of the input BASE-64 string 
-        /// as described in the HashBack README, and returns the result 
-        /// as a BASE-64 string.
-        /// </summary>
-        /// <param name="base64Input">The BASE-64 encoded string to decode and hash.</param>
-        /// <returns>BASE-64 encoded salted SHA-256 hash string.</returns>
-        public static string ComputeVerificationHash(string base64Input)
-            => ComputeVerificationHash(Convert.FromBase64String(base64Input));
 
         /// <summary>
         /// Converts a DateTime to Unix time seconds, converting to UTC if necessary.
@@ -115,6 +180,17 @@ namespace billpg.HashBackCore
         {
             /* Nothing to do. */
         }
+
+        /// <summary>
+        /// Concatenates the elements of a sequence, using the specified separator between each element.
+        /// </summary>
+        /// <param name="items">The sequence of strings to concatenate. If <paramref name="items"/> is empty, the result is an empty string.</param>
+        /// <param name="separator">The string to use as a separator. If <paramref name="separator"/> is <see langword="null"/>, an empty string
+        /// is used instead.</param>
+        /// <returns>A single string that consists of the elements in <paramref name="items"/> delimited by the <paramref
+        /// name="separator"/> string.</returns>
+        internal static string ToSeparatedString(this IEnumerable<string> items, string separator)
+            => string.Join(separator, items);
     }
 
     public enum ValidateRejectionReason
@@ -136,17 +212,4 @@ namespace billpg.HashBackCore
             this.Reason = reason;
         }
     }
-
-    public readonly struct AuthorizationParseResult
-    {
-        public string VerifyUrl { get; }
-        public string ExpectedHash { get; }
-
-        public AuthorizationParseResult(string verifyUrl, string expectedHash)
-        {
-            VerifyUrl = verifyUrl;
-            ExpectedHash = expectedHash;
-        }
-    }
-
 }

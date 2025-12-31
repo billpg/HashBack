@@ -3,7 +3,7 @@ HashBack is a two-step authentication exchange over HTTPS/TLS. Your identity is 
 
 <img src="docs/assets/HashBack-Badge-Logo.png" align="right" alt="" width="150" height="150" />
 
-This version of the document is a **public-draft** for review and discussion tagged as version **4.1**. I will update this number if I make any substantive updates. If you have any comments or notes, please open an issue on this project's public github.
+This version of the document is a **public-draft** for review and discussion tagged as version **4.2**. I will update this number if I make any substantive updates. If you have any comments or notes, please open an issue on this project's public github.
 
 This document is Copyright William Godfrey, 2025. You may use its contents under the terms of the Creative-Commons Attribution license.
 
@@ -77,11 +77,10 @@ This exchange relies on the server having a clear mapping of which URLs belong t
 
 :heavy_check_mark: `https://example.com/hashback?id=*`   
 :heavy_check_mark: `https://example.com/hashback/*.txt`    
-:x: `http://example.com/hashback/` (no TLS)   
-:x: `https://example.com/` (too broad)    
-:x: `https://example.com/hashback/` (too broad if you allow subfolders)   
-:x: `https://example.com/blog/` (may allow comments)   
-:x: `https://example.com/wiki/` (may allow public edits)
+:x: `http://example.com/hashback/*` (no TLS)   
+:x: `https://example.com/*` (too broad)    
+:x: `https://example.com/blog/*` (may allow comments)   
+:x: `https://example.com/wiki/*` (may allow public edits)
 
 > 🦔 *"Pick a URL and shake on it. I'd offer a paw, but I'm mostly spines."*
 
@@ -98,7 +97,9 @@ The JSON object is made from the following properties. All are required and the 
 
 - **`Version`**
   - A string indicating the version of this exchange in use.
-  - This version is indicated by the string `"BILLPG_DRAFT_4.1"`.
+  - This version is indicated by the string `"BILLPG_DRAFT_4.2"`.
+  - Note that as this proceeds to a formal standard, this value may change. I anticipate that the IETF drafts will necessiate a new version string, replacing "BILLPG" with "IETF". The final RFC form will likely be "RFC_xxxx" with the RFC number assigned to the final document.
+  - See also the section describing the `WWW-Authenticate` header below for how servers may advertise which versions they support.
 - **`Host`**
   - The full domain name of the server being called in this request.
   - Because load balancers and CDN systems might modify the `Host:` header, a copy is included here so there's no doubt exactly which string was used in the verification hash.
@@ -121,7 +122,7 @@ If either or both of the two properties that include domain names (`Host` and `V
 For example:<!--1066_EXAMPLE_REQUEST-->
 ```
 {
-    "Version": "BILLPG_DRAFT_4.1",
+    "Version": "BILLPG_DRAFT_4.2",
     "Host": "server.example",
     "Now": 529297200,
     "Unus": "Rpgt4Fc5nMDq14LOps/hYQ==",
@@ -131,7 +132,7 @@ For example:<!--1066_EXAMPLE_REQUEST-->
 This JSON string is BASE64 encoded and added to the end of the `Authorization:` header.<!--1066_EXAMPLE_AUTH_HEADER-->
 ```
 Authorization: HashBack
- eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v
+ eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMiIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v
  dyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYzVuTURxMTRMT3BzL2hZUT09IiwiVmVyaWZ5Ijoi
  aHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9hcGkvaGFzaGJhY2s/aWQ9NTAyNTQyODg2In0=
 ```
@@ -145,28 +146,27 @@ The hashing process takes the following steps.
 1. Join two byte blocks together:
    - The following 32 bytes of salt.<!--FIXED_SALT-->
      - ```
-       113,218,98,9,6,165,151,157,
-       46,28,229,16,66,91,91,72,
-       150,246,69,83,216,235,21,239,
-       162,229,139,163,6,73,175,201
+       48,106,239,61,141,188,122,117,
+       71,242,89,164,154,89,44,47,
+       20,42,34,245,250,230,139,30,
+       56,240,40,168,35,184,92,252
        ```
-   - The bytes that the went into the BASE64-encoded block used in the Authorization header.
+   - The bytes that went into the BASE64-encoded block used in the Authorization header.
 2. Hash the combined block using a single round of SHA-256.
 3. Encode the hash result using BASE-64, including the trailing `=` character.
 
 Note that the hash is performed on the same bytes that were encoded inside the BASE64 block. Because of this, the JSON itself may be flexible with formatting whitespace or JSON character encoding, as long as the JSON object is valid according to the requirements of JSON itself and the rules stated above.
 
-The salt ensures that HashBack verification hashes cannot be mistaken or misused in other contexts. Because these extra bytes are not sent over the wire with a request, there's no risk of a general purpose hashing service being misued to perform HashBack verification hash calculations. A valid hash is only meaningful in light of this document. (In case it isn't clear, the salt is fixed and public. It is not a secret.)
+The salt ensures that HashBack verification hashes cannot be mistaken or misused in other contexts. Because these extra bytes are not sent over the wire with a request, there's no risk of a general purpose hashing service being misused to perform HashBack verification hash calculations. A valid hash is only meaningful in light of this document. (In case it isn't clear, the salt is fixed and public. It is not a secret.)
 
 For your convenience, here is the 32 byte fixed salt block in a variety of encodings:
-- Base64: `cdpiCQall50uHOUQQltbSJb2RVPY6xXvouWLowZJr8k=`<!--FIXED_SALT_B64-->
-- Hex: `71DA620906A5979D2E1CE510425B5B4896F64553D8EB15EFA2E58BA30649AFC9`<!--FIXED_SALT_HEX-->
-- URL: `q%dab%09%06%a5%97%9d.%1c%e5%10B%5b%5bH%96%f6ES%d8%eb%15%ef%a2%e5%8b%a3%06I%af%c9`<!--FIXED_SALT_URL-->
+- Base64: `MGrvPY28enVH8lmkmlksLxQqIvX65oseOPAoqCO4XPw=`<!--FIXED_SALT_B64-->
+- Hex: `306AEF3D8DBC7A7547F259A49A592C2F142A22F5FAE68B1E38F028A823B85CFC`<!--FIXED_SALT_HEX-->
 
 Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The returned string itself must be one line with the BASE-64 encoded hash in ASCII as that only line. It must either have no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence. The response must be `200 OK` and the TLS certificate must be valid.
 
 The expected hash of the above example is: 
-- `0PptsdmB3W0j06DA1GfI/i88EtDejPTRnZ/0BpmFWZI=`<!--1066_EXAMPLE_HASH-->
+- `/+Zc/xVCVgnnfC69tEybe2TAluOk21ScdystX0/1Ayk=`<!--1066_EXAMPLE_HASH-->
 
 Once the service has downloaded that verification hash, it should compare it against the result of hashing the bytes inside the BASE64 block. If the two hashes match, the server may be reassured that the client is indeed the user identified by the URL from where the hash was downloaded and proceed to process the remainder of the request.
 
@@ -174,7 +174,7 @@ If there is any problem with the authentication process, including errors downlo
 
 #### Generation of the fixed salt block
 The salt string itself was generated by a PBKDF2 call with a high iteration count. For reference, the following parameters were used:
-- Password: "To my Treacle." (14 bytes, summing to 1239.)<!--FIXED_SALT_PASSWORD-->
+- Password: "HashBack is dedicated to my Treacle." (36 bytes, summing to 3263.)<!--FIXED_SALT_PASSWORD-->
 - Salt: "I love you to the moon and back." (32 bytes, summing to 2827.)<!--FIXED_SALT_DEDICATION-->
 - Hash Algorithm: SHA512
 - Iterations: 477708<!--FIXED_SALT_ITERATIONS-->
@@ -187,10 +187,12 @@ HTTP Authentication is typically triggered by the client first attempting to per
 
 For a server to respond when HashBack authentication is available, the `WWW-Authenticate` header must include an `<auth-scheme>` of `HashBack`. A `realm` parameter may be present but this is optional.
 
+The optional `version` parameter is a comma-separated list of HashBack version identifiers the server supports. (These match the Version field used in the Authorization JSON.) Clients should select a version that the server advertises. If the parameter is omitted, the server is not advertising support for any particular version. If the server supports multiple versions, it should list them as the most preferable first.
+
 For example:
 ```
 HTTP/1.1 401 Authentication Required
-WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
+WWW-Authenticate: HashBack realm="My_Wonderful_Realm" version="RFC1234,BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1"
 ```
 
 Clients may skip that initial transaction if it is already known that the server supports HashBack authentication.
@@ -223,7 +225,7 @@ Petunia has recently signed up with The Rutabaga Republic and logged into their 
 Petunia needs to place a large rutabaga order for an upcoming "Turnip the Volume" gala. Her stock management system constructs the following JSON payload:<!--CASE_STUDY_REQUEST-->
 ```
 {
-    "Version": "BILLPG_DRAFT_4.1",
+    "Version": "BILLPG_DRAFT_4.2",
     "Host": "RutabagaRepublic.example",
     "Now": 682718520,
     "Unus": "sGhK1rIbEWjW6Sg25s+KPg==",
@@ -233,7 +235,7 @@ Petunia needs to place a large rutabaga order for an upcoming "Turnip the Volume
 
 Note the `Verify` property corresponds to the URL Petunia had registered ahead of time. This is where the trust boundary lies. The URL belongs to the client, not the server.
 
-The system calculates the verification hash from this JSON object (`GcBDESw5S+0HjSEY/ia6VQ7NyQvjHvy9Yk/lyQO0bQs=`) and publishes it on their server at the specified URL, ready for retrieval.<!--CASE_STUDY_HASH-->
+The system calculates the verification hash from this JSON object (`f2LOcgshQAytGFDcLhk9J0cD3ZPKW4rQTOQxFkeU37g=`) and publishes it on their server at the specified URL, ready for retrieval.<!--CASE_STUDY_HASH-->
 
 To complete the request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows.<!--CASE_STUDY_AUTH_HEADER-->
 ```
@@ -241,7 +243,7 @@ POST /api/order HTTP/1.1
 Host: RutabagaRepublic.example
 User-Agent: Petunia's Wonderful Stock Management System.
 Authorization: HashBack
- eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMSIsIkhvc3QiOiJSdXRhYmFnYVJlcHVibGljLmV4
+ eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMiIsIkhvc3QiOiJSdXRhYmFnYVJlcHVibGljLmV4
  YW1wbGUiLCJOb3ciOjY4MjcxODUyMCwiVW51cyI6InNHaEsxckliRVdqVzZTZzI1cytLUGc9PSIs
  IlZlcmlmeSI6Imh0dHBzOi8vUGV0dW5pYS5leGFtcGxlL2FwaS9oYXNoYmFjaz9pZD05MDE5ODMx
  ODAifQ==
@@ -426,9 +428,12 @@ Instead, generate a fresh header for each request. It's lightweight enough and i
 - [Public Draft 4.0](https://github.com/billpg/HashBack/blob/5cef44b500f6885202d24eda51aa81fe865b8495/README.md)
   - Another substantial refactoring. The JSON request is now sent by the client in the form of an HTTP `Authorization` header.
   - The transaction being authenticated could be anything, including a request for a Bearer token, but not just that. This has the advantage of allowing a once-off request to skip the extra transaction to fetch a Bearer token and act more like traditional HTTP authentication. Also, as this header payload is BASE64 encoded, we don't need to canonicalize the JSON as the hash can be done on the BASE64 encoded bytes.
- - Public Draft 4.1 (This Document)
+ - [Public Draft 4.1](https://github.com/billpg/HashBack/blob/a1777518463d7b5867d32f5e45dde353f10a770d/README.md)
    - Replaced PBKDF2 with a single round of salted SHA-256 for the verification hash. I'm happy the extended hashing isn't needed.
    - Removed the mechanism to retrieve a temporal bearer token to simplify the document.
+ - **Public Draft 4.2** (This document)
+   - Updated the fixed salt's "nothing up my sleeve" parameters to mention HashBack explicitly. This means the fixed salt is different from previous drafts, but the HashBackCore library will validate both versions for backward compatibility.
+   - Updated the 401 WWW-Authenticate header to allow a "version" list that the service will allow.
 
 ## 📘 Glossary
 "HashBack": The name of this exchange, a play on "Call Back".

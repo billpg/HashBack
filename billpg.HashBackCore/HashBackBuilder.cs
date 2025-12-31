@@ -56,38 +56,24 @@ namespace billpg.HashBackCore
 
         public async Task<string> Build()
         {
-            if (this.Host == null)
-                throw new ApplicationException("Called Build without setting Host property.");
-            return await Build(this.Host);
-        }
-
-        public async Task<string> Build(string host)
-        {
-            /* Check the optional properties have all been assigned. */
+            /* Check the required properties have all been assigned. */
             if (string.IsNullOrEmpty(this.Host))
                 throw new ApplicationException("Host must be set.");
-            if (VerifyGetter == null)
-                throw new ApplicationException("VerifyUrlGetter must be set.");
-            if (HashRegister == null)
+            if (this.VerifyGetter == null)
+                throw new ApplicationException("VerifyGetter must be set.");
+            if (this.HashRegister == null)
                 throw new ApplicationException("HashRegister must be set.");
 
-            /* Get the Verify URL, which we'll need when building the return object. */
-            string verify = await VerifyGetter();
+            /* Get the verify URL once. */
+            string verify = await this.VerifyGetter();
 
-            /* Serialize parameters to JSON and encode. */
-            string json = new JObject
-            {
-                ["Version"] = Helpers.VersionString,
-                ["Host"] = host,
-                ["Now"] = this.NowGetter(),
-                ["Unus"] = this.UnusGetter(),
-                ["Verify"] = verify
-            }.ToString(Newtonsoft.Json.Formatting.None);
-            byte[] jsonAsBytes = Encoding.UTF8.GetBytes(json);
-            string authHeader = Convert.ToBase64String(jsonAsBytes);
-
-            /* Compute the verification hash using the Helpers function. */
-            string verificationHash = Helpers.ComputeVerificationHash(jsonAsBytes);
+            /* Call through to the build function. */
+            (string authHeader, string verificationHash) 
+                = Helpers.Build(
+                    this.Host,
+                    this.NowGetter(),
+                    this.UnusGetter(),
+                    verify);
 
             /* Register this verify/hash combo to let it be downloaded. */
             await this.HashRegister(verify, verificationHash);
