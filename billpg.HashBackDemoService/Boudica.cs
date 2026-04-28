@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Net;
@@ -30,7 +32,7 @@ public class Boudica
 
     public delegate BoudicaResponse RequestHandler(BoudicaRequest req);
 
-    public static Boudica Start(int port, bool useTls, RequestHandler handler)
+    public static Boudica Start(int port, RequestHandler handler)
     {
         /* Set up a listener and something to stop it. */
         var cancel = new CancellationTokenSource();
@@ -60,23 +62,28 @@ public class Boudica
             /* Keep looping until cancelled. */
             while (!cancel.IsCancellationRequested)
             {
-                /* Remove all completed tasks from the open collection. */
-                foreach (var openTask in openTasks)
+                /* Remove a single completed task from the open collection. */
+                var disposeTask = openTasks.Where(t => t.IsCompleted).FirstOrDefault();
+                if (disposeTask != null)
                 {
-                    if (!openTask.IsCompleted)
-                        continue;
-                    await openTask;
-                    openTask.Dispose();
-                    openTasks.Remove(openTask);
+                    await disposeTask;
+                    disposeTask.Dispose();
+                    openTasks.Remove(disposeTask);
                 }
 
                 /* Wait for a connection. */
-                var tcp = await listen.AcceptTcpClientAsync(cancel.Token);
-                if (tcp == null)
+                TcpClient tcp;
+                try
+                {
+                    tcp = await listen.AcceptTcpClientAsync(cancel.Token);
+                }
+                catch (OperationCanceledException)
+                {
                     continue;
+                }
 
                 /* Pass control to the handler as a task and store. */
-                var handlerTask = HandleConnection(tcp, useTls, handler);
+                var handlerTask = HandleConnection(tcp, handler);
                 openTasks.Add(handlerTask);               
             }
 
@@ -87,14 +94,130 @@ public class Boudica
     }
 
     private static async Task HandleConnection(
-        TcpClient tcp, bool useTls, RequestHandler handler)
+        TcpClient tcp, RequestHandler handler)
     {
+        /* Open a new stream from the caller. */
         using var stream = tcp.GetStream();
-        using var reader = new StreamReader(stream);
 
-        var banner = await reader.ReadLineAsync();
-
+        /* Open a try block to catc any HTTP excpeptions. */
+        BoudicaResponse resp;
+        try
+        {
+            var req = await ParseRequest(stream);
+            resp = handler(req);
+            await SendResponse(stream, resp);
+        }
+        catch (BoudicaExceptionBase ex)
+        {
+            resp = ex.ToResponse();
+        }
     }
+
+    private static async Task<BoudicaRequest> ParseRequest(NetworkStream stream)
+    { 
+        var reader = new BufferReader(stream);
+
+        /* Read and parse the HTTP banner line. */
+        var banner = await reader.ReadLineAsString();
+        (string httpMethod, string resource, string httpVersion) 
+            = ParseHttpBanner(banner);
+
+        /* Keep looping over the header until an empty line. */
+        var headerLines = new List<string>();
+        while (true)
+        {
+            var headerLine = await reader.ReadLineAsString();
+            if (string.IsNullOrEmpty(headerLine))
+                break;
+            headerLines.Add(headerLine);
+        }
+
+        /* Loop header into dictionary. */
+        var headerDict = new Dictionary<string, string>();
+        foreach (var line in headerLines)
+        {
+            int colonIndex = line.IndexOf(':');
+            if (colonIndex < 0)
+                throw new BadRequestException("Header is missing a colon.");
+            string headerName = line.Substring(0, colonIndex);
+            string headerValue = line.Substring(colonIndex + 1).TrimStart(' ');
+            AddToHeader(headerDict, headerName, headerValue);
+        }
+
+        /* Load the body. */
+        byte[]? requestBody = null;
+        if (headerDict.TryGetValue("Content-Transfer-Encoding", out string? cte))
+        {
+            if (cte != "chunked")
+                throw new BadRequestException("Only Chunked and Content-Length modes suppored.");
+        }
+        else if (headerDict.TryGetValue("Content-Length", out string? contentLength))
+        {
+            int bodyLength = int.Parse(contentLength);
+            if (bodyLength > 64 * 1024)
+                throw new BadRequestException("Request body too large.");
+            if (bodyLength < 0)
+                throw new BadRequestException("Request body can't have negative length.");
+
+            requestBody = new byte[bodyLength];
+            int bodyIndex = 0;
+            while (bodyIndex < bodyLength)
+            {
+                var bodyBlock = await reader.ReadBlock(bodyLength - bodyIndex);
+                Buffer.BlockCopy(bodyBlock, 0, requestBody, bodyIndex, bodyBlock.Length);
+                bodyIndex += bodyBlock.Length;
+            }
+        }
+
+        return new BoudicaRequest(httpMethod, resource, httpVersion, headerDict, requestBody);
+    }
+
+    private static async Task SendResponse(NetworkStream stream, BoudicaResponse resp)
+    {
+        var respText = new List<string>
+            { $"HTTP/1.1 {resp.StatusCode} {resp.StatusDescription}" };
+        respText.AddRange(resp.Headers.Select(kv => $"{kv.Key}: {kv.Value}"));
+        respText.Add("");
+        string respAsString = string.Concat(respText.Select(s => s + "\r\n"));
+        var respAsBytes = Encoding.UTF8.GetBytes(respAsString);
+        await stream.WriteAsync(respAsBytes, 0, respAsBytes.Length);
+        await stream.WriteAsync(resp.BodyBytes, 0, resp.BodyBytes.Length);
+    }
+
+    private static void AddToHeader(Dictionary<string, string> header, string name, string value)
+    {
+        int counter = 0;
+        while (true)
+        {
+            var suffix = "";
+            if (counter > 0)
+                suffix = $"({counter})";
+            string tryKey = name + suffix;
+            if (header.ContainsKey(tryKey))
+            {
+                counter++;
+                continue;
+            }
+            header.Add(tryKey, value);
+            break;
+        }
+    }
+
+    private static (string httpMethod, string resource, string httpVersion)
+        ParseHttpBanner(string? banner)
+    {
+        if (string.IsNullOrEmpty(banner))
+            throw new BadRequestException("Missing banner line.");
+        int firstSp = banner.IndexOf(' ');
+        int lastSp = banner.LastIndexOf(' ');
+        if (firstSp < 0 || lastSp <= firstSp)
+            throw new BadRequestException("Malformed banner line.");
+        string httpMethod = banner.Substring(0, firstSp);
+        string resource = banner.Substring(firstSp+1, lastSp-firstSp-1);
+        string httpVersion = banner.Substring(lastSp+1);
+        return (httpMethod, resource.Trim(), httpVersion);
+    }
+
 
     public async Task Stop()
     {
@@ -104,10 +227,46 @@ public class Boudica
     }
 }
 
-public class BoudicaResponse
+public record BoudicaResponse(
+        int StatusCode,
+    string StatusDescription,
+    IEnumerable<KeyValuePair<string, string>> Headers,
+    byte[] BodyBytes)
 {
+    public static BoudicaResponse Create()
+        => new BoudicaResponse(
+            200, "OK",
+            [],
+            []);
+
+    public BoudicaResponse WithStatus(int code, string desc)
+        => this with { StatusCode = code, StatusDescription = desc };
+
+    public BoudicaResponse WithHeader(string name, string value)
+    {
+        var newHeaders = new Dictionary<string, string>(this.Headers);
+        newHeaders.Add(name, value);
+        return this with { Headers = newHeaders };
+    }
+
+    public BoudicaResponse WithBody(string body)
+        => this with { BodyBytes = Encoding.UTF8.GetBytes(body) };
 }
 
 public class BoudicaRequest
 {
+    public BoudicaRequest(string httpMethod, string resource, string httpVersion, Dictionary<string, string> headerDict, byte[]? requestBody)
+    {
+        HttpMethod = httpMethod;
+        Resource = resource;
+        HttpVersion = httpVersion;
+        HeaderDict = headerDict;
+        RequestBody = requestBody;
+    }
+
+    public string HttpMethod { get; }
+    public string Resource { get; }
+    public string HttpVersion { get; }
+    public Dictionary<string, string> HeaderDict { get; }
+    public byte[]? RequestBody { get; }
 }
