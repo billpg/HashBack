@@ -7,6 +7,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Docs\GetHashRoot.md" />
+  </ItemGroup>
+
   <!-- ASP.NET Core shared framework -->
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -15,6 +19,8 @@
   <!-- Add Swashbuckle for OpenAPI generation -->
   <ItemGroup>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+    <PackageReference Include="Markdig" Version="1.3.2" />
+    <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="10.2.3" />
   </ItemGroup>
 
 </Project>

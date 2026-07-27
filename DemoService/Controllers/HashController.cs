@@ -1,93 +1,90 @@
 using System;
 using System.Net;
-using System.IO;
-using System.Collections.Generic;
-using System.Collections.Concurrent;
-using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Markdig;
+using Swashbuckle.AspNetCore.Annotations;
 using Microsoft.AspNetCore.Http;
+
+namespace DemoService.Controllers;
 
 [ApiController]
 [Route("hash")]
 public class HashController : ControllerBase
 {
-    // In-memory store for demonstration. Thread-safe.
-    private static readonly ConcurrentDictionary<Guid, StoredHashResult> _store
-        = new ConcurrentDictionary<Guid, StoredHashResult>();
+    private readonly ServiceData data;
+
+    public HashController(ServiceData data)
+    {
+        this.data = data;
+    }
 
     // GET /hash/
     [HttpGet]
-    public ActionResult<HashResult> Get()
+    [Produces("text/html")]
+    [SwaggerOperation(Summary = "HTML index for hash service", Description = "Returns an HTML page describing how to use the HashBack demo service.")]
+    public ActionResult Get()
+        => Content(
+            GetHashRootHtml.Value
+            .Replace("https://demo.hashback.example/", $"{Request.Scheme}://{Request.Host.Value}/"), 
+            "text/html", Encoding.UTF8);
+    private readonly Lazy<string> GetHashRootHtml = new Lazy<string>(GetHashRootHtmlInternal);
+    private static string GetHashRootHtmlInternal()
     {
-        var result = new HashResult();
-        result.StoredHashes.AddRange(_store.Values);
-        return Ok(result);
+        /* Get the embedded stream and convert to HTML. If anything is missing a null
+         * exception will fall, resulting in a 500 error. This is intentional. */
+        var asm = typeof(HashController).Assembly;
+        using var stream = asm.GetManifestResourceStream("DemoService.Docs.GetHashRoot.md");
+        using var reader = new StreamReader(stream!, Encoding.UTF8);
+        var md = reader.ReadToEnd();
+        var body = Markdown.ToHtml(md);
+        return $"<html>{body}</html>";
     }
 
     // GET /hash/{id}
-    // Returns plain-text hash (text/plain)
     [HttpGet("{id:guid}")]
     [Produces("text/plain")]
+    [SwaggerOperation(Summary = "Get stored hash", Description = "Returns the base64-encoded 32-byte hash previously stored for the given id if found.")]
+    [SwaggerResponse(StatusCodes.Status200OK, "Hash found", typeof(string))]
+    [SwaggerResponse(StatusCodes.Status404NotFound, "No entry found for the given id")]
     public ActionResult GetById(Guid id)
     {
-        if (!_store.TryGetValue(id, out var entry))
+        var entry = data.TryGetHash(id, Request.RequestIP());
+        if (entry == null)
             return NotFound();
-
-        // Increment GetCount
-        entry.GetCount++;
-
-        // Return the stored hash as plain text
-        return Content(entry.Hash, "text/plain");
+        return Content(entry.HashAsString, "text/plain");
     }
 
     // PUT /hash/{id}
-    // Read raw request body (works regardless of input formatters)
     [HttpPut("{id:guid}")]
     [Produces("text/plain")]
+    [Consumes("text/plain")]
+    [SwaggerOperation(Summary = "Store a hash", Description = "Store a base64-encoded 32-byte hash at the given id. Returns 200 OK on success, 400 on bad input, 409 if id exists.")]
+    [SwaggerResponse(StatusCodes.Status200OK, "Hash stored", typeof(string))]
+    [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid request body")]
+    [SwaggerResponse(StatusCodes.Status409Conflict, "Entry already exists")]
     public async Task<ActionResult> Put(Guid id)
     {
+        /* Load the request body as a plain text entry. */
         using var reader = new StreamReader(Request.Body, Encoding.UTF8);
         var newHash = await reader.ReadToEndAsync();
         if (string.IsNullOrWhiteSpace(newHash))
-            return BadRequest("Request body must contain a non-empty plain text hash.");
-        
-        var hashAsBytes = Encoding.UTF8.GetBytes(newHash.Trim());
-        if (hashAsBytes.Length != 256/8)
-            return BadRequest($"Hash must be exactly {256/8} bytes encoded as base64.");
+            return BadRequest("Request body must contain a non-empty plain text entry.");
 
-        var hashRecord = new StoredHashResult
-        {
-            Id = id,
-            Hash = Convert.ToBase64String(hashAsBytes),
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = IPAddress.None.ToString(),
-            GetCount = 0
-        };
-        if (!_store.TryAdd(id, hashRecord))
-            return Conflict($"A hash with ID {id} already exists.");
+        /* Parse the string after trimming and validate as right size. */
+        byte[]? hashAsBytes = Helpers.TryParseBase64(newHash.Trim(), 256 / 8);
+        if (hashAsBytes == null)
+            return BadRequest($"Hash must be a valid base64-encoded block of {256/8} bytes.");
 
-        return Content(hashRecord.Hash, "text/plain");
+        /* Store the hash in the database. */
+        var entry = new StoredHash(hashAsBytes, DateTime.UtcNow, IPAddress.None);
+        var added = data.TryAddHash(id, entry);
+
+        /* Return success or otherwise. */
+        if (added)
+            return Content(entry.HashAsString, "text/plain");
+        else
+            return Conflict($"An entry with ID {id} already exists.");
     }
-}
-
-public class HashResult
-{
-    public List<StoredHashResult> StoredHashes { get; set; }
-        = new List<StoredHashResult>();
-}
-
-public class StoredHashResult
-{
-    public Guid Id { get; set; }
-    public string Hash { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; }
-    public string CreatedBy { get; set; } = IPAddress.None.ToString();
-    public int GetCount { get; set; }
-}
-
-public class UpdateHashRequest
-{
-    public string Hash { get; set; } = string.Empty;
 }

@@ -2,18 +2,35 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.OpenApi.Models;
 using Microsoft.Extensions.DependencyInjection;
+using DemoService;
+using System.Reflection;
+using System.IO;
+using Swashbuckle.AspNetCore.Annotations;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add controllers and OpenAPI/Swagger generator
 builder.Services.AddControllers();
+
+// Persist ServiceData as a singleton service so state is kept across requests
+builder.Services.AddSingleton<ServiceData>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "DemoService", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "DemoService", Version = "v1", Description = "Demo HashBack service API" });
+
+    // Enable attribute annotations like [SwaggerOperation]
+    c.EnableAnnotations();
+
+    // Include XML comments (requires GenerateDocumentationFile in .csproj)
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+        c.IncludeXmlComments(xmlPath);
 });
+
 
 // Configure Kestrel to listen on localhost:9001 (HTTP only, loopback)
 builder.WebHost.ConfigureKestrel(options =>
