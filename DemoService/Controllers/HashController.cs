@@ -25,22 +25,7 @@ public class HashController : ControllerBase
     [Produces("text/html")]
     [SwaggerOperation(Summary = "HTML index for hash service", Description = "Returns an HTML page describing how to use the HashBack demo service.")]
     public ActionResult Get()
-        => Content(
-            GetHashRootHtml.Value
-            .Replace("https://demo.hashback.example/", $"{Request.Scheme}://{Request.Host.Value}/"), 
-            "text/html", Encoding.UTF8);
-    private readonly Lazy<string> GetHashRootHtml = new Lazy<string>(GetHashRootHtmlInternal);
-    private static string GetHashRootHtmlInternal()
-    {
-        /* Get the embedded stream and convert to HTML. If anything is missing a null
-         * exception will fall, resulting in a 500 error. This is intentional. */
-        var asm = typeof(HashController).Assembly;
-        using var stream = asm.GetManifestResourceStream("DemoService.Docs.GetHashRoot.md");
-        using var reader = new StreamReader(stream!, Encoding.UTF8);
-        var md = reader.ReadToEnd();
-        var body = Markdown.ToHtml(md);
-        return $"<html>{body}</html>";
-    }
+        => Content(HtmlPages.HashRoot(), "text/html", Encoding.UTF8);
 
     // GET /hash/{id}
     [HttpGet("{id:guid}")]

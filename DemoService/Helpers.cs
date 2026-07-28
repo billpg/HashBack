@@ -10,21 +10,23 @@ namespace DemoService;
 
 internal static class Helpers
 {
-    public static byte[]? TryParseBase64(string base64String, int expectedByteCount)
+    public static byte[]? TryParseBase64(string base64String)
     {
-        byte[] bin;
         try
         {
-            bin = Convert.FromBase64String(base64String);
+            return Convert.FromBase64String(base64String.Trim());
         }
         catch (FormatException)
         {
             return null;
         }
+    }
 
-        if (bin.Length != expectedByteCount)
+    public static byte[]? TryParseBase64(string base64String, int expectedByteCount)
+    {
+        byte[]? bin = TryParseBase64(base64String);
+        if (bin == null || bin.Length != expectedByteCount)
             return null;
-
         return bin;
     }
 

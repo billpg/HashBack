@@ -6,7 +6,7 @@ This demo service hosts HashBack hashes so you can test clients that generate an
 
 ## 🦔 Adding a hash (PUT)
 1. Create your HashBack JSON and include a VerifyUrl in this form:
-   `https://demo.hashback.example/hash/{uuid}` — choose a fresh UUID for each upload.
+   `https://demo.hashback.dev/hash/{uuid}` — choose a fresh UUID for each upload.
 
 2. Calculate the salted SHA-256 hash for your JSON package and base64-encode the resulting 256-bit (32-byte) hash. The service expects a base64-encoded 32-byte value.
 
@@ -14,13 +14,13 @@ This demo service hosts HashBack hashes so you can test clients that generate an
 
 Examples
 ``` bash 
-curl -X PUT "https://demo.hashback.example/hash/01234567-89ab-cdef-0123-456789abcdef" \
+curl -X PUT "https://demo.hashback.dev/hash/01234567-89ab-cdef-0123-456789abcdef" \
     -H "Content-Type: text/plain" \
     --data "YourSHA256HashResultGoesHere+++++++++++++++="
 ```
 
 ``` PowerShell
-Invoke-WebRequest -Uri "https://demo.hashback.example/hash/01234567-89ab-cdef-0123-456789abcdef"
+Invoke-WebRequest -Uri "https://demo.hashback.dev/hash/01234567-89ab-cdef-0123-456789abcdef"
     -Method PUT -Headers @{ "Content-Type" = "text/plain" } -Body "YourSHA256HashResultGoesHere+++++++++++++++="
 ```
 
@@ -36,7 +36,7 @@ After the PUT is accepted, you can GET the hash at the same URL for a short time
 
 Example
 ``` bash
-curl "https://demo.hashback.example/hash/01234567-89ab-cdef-0123-456789abcdef"
+curl "https://demo.hashback.dev/hash/01234567-89ab-cdef-0123-456789abcdef"
 ```
 The GET response is `text/plain` and returns the stored base64-encoded 32-byte hash.
 
