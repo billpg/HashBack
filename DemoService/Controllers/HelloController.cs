@@ -34,7 +34,7 @@ public class HelloController : ControllerBase
         /* If authentication succeeded and the cookie was not set, set it now. */
         if (authDomain != null && !isCookieValid)
         {
-            Response.Cookies.Append(HashBackCookieName, GenerateJWT(authDomain), new CookieOptions
+            Response.Cookies.Append(HashBackCookieName, JWT.Create(authDomain), new CookieOptions
             {
                 HttpOnly = true,
                 Secure = true,
@@ -59,7 +59,7 @@ public class HelloController : ControllerBase
         /* Check the cookie first. */
         if (!string.IsNullOrEmpty(cookieValue))
         {
-            string domainInCookie = ParseJWT(cookieValue);
+            string domainInCookie = JWT.ParseAndValidateReturnSub(cookieValue);
             if (domainInCookie != null)
                 return (domainInCookie, true);
         }
@@ -71,7 +71,7 @@ public class HelloController : ControllerBase
             val.RequireHost("demo.hashback.dev");
             val.RequireNowWindow(500);
             val.SetSyncIdentifyUser(url => new Uri(url).Host);
-            val.OnGetHash = GetHash;
+            val.OnGetHash = OverrideGetHash ?? GetHash;
             var authDomain = await val.Validate(authHeader);
             if (authDomain != null)
                 return (authDomain, false);
@@ -79,6 +79,13 @@ public class HelloController : ControllerBase
 
         return (null, false);
     }
+
+    /// <summary>
+    /// Override the default GetHash function for testing purposes. 
+    /// If set, this delegate will be used instead of the default HTTP
+    /// GET to retrieve the verification hash.
+    /// </summary>
+    private HashBackValidator.OnGetHashDelegate? OverrideGetHash = null;
 
     private async Task<string> GetHash(string url)
     {
@@ -89,15 +96,5 @@ public class HelloController : ControllerBase
 
         var hash = await resp.Content.ReadAsStringAsync();
         return hash;
-    }
-
-    private string GenerateJWT(string authDomain)
-    {
-        throw new NotImplementedException();
-    }
-
-    private string ParseJWT(string cookieValue)
-    {
-        throw new NotImplementedException();
     }
 }

@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DemoService", "DemoService.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "billpg.HashBackCore", "..\..\..\..\..\Documents\GitHub\HashBack_main\billpg.HashBackCore\billpg.HashBackCore.csproj", "{D2D56507-7D7A-AB28-231A-6B39DCC306A2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DemoServiceTests", "..\DemoServiceTests\DemoServiceTests.csproj", "{8B0625CE-BD42-46A8-AEFD-A3C8D3AC562F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{D2D56507-7D7A-AB28-231A-6B39DCC306A2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D2D56507-7D7A-AB28-231A-6B39DCC306A2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D2D56507-7D7A-AB28-231A-6B39DCC306A2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8B0625CE-BD42-46A8-AEFD-A3C8D3AC562F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8B0625CE-BD42-46A8-AEFD-A3C8D3AC562F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8B0625CE-BD42-46A8-AEFD-A3C8D3AC562F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8B0625CE-BD42-46A8-AEFD-A3C8D3AC562F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
