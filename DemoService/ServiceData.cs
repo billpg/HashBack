@@ -74,8 +74,8 @@ public class ServiceData
 
 public record StoredHash(IList<byte> Hash, DateTime AddedAt, IPAddress AddedBy)
 {
-    internal string HashAsString => Convert.ToBase64String(Hash.ToArray());
-    internal DateTime ExpiresAt => AddedAt.AddHours(1);
+    public string HashAsString => Convert.ToBase64String(Hash.ToArray());
+    public DateTime ExpiresAt => AddedAt.AddHours(1);
 }
 
 public record class HashGetEvent(Guid Id, DateTime GotAt, IPAddress GotBy)
