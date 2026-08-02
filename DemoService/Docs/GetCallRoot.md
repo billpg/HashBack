@@ -18,3 +18,14 @@ The response (if a 200) will be a text/plain log of the call, including any atte
 The log will include the `VerifyUrl` and the base64-encoded hash.
 
 If the service can't or won't perform the request, an applicable HTTP error code will be returned.
+
+## Demo-Service-Ception!
+
+You can call this demo service and have it call this service's own `/hello/` service. Pointing the two services at each other.
+
+Here's an example of how to do that:
+``` PowerShell
+Invoke-WebRequest -Uri "https://demo.hashback.dev/call/" -Method POST
+    -Headers @{ "Content-Type" = "text/plain" } 
+    -Body "https://demo.hashback.dev/hello/"
+```

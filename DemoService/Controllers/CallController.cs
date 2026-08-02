@@ -36,9 +36,11 @@ public class CallController : ControllerBase
 
         /* Initialize the HashBackBuilder with the necessary callbacks for 
          * generating verification URLs and registering hashes. */
-        this.builder = new();
-        this.builder.VerifyGetter = GenerateVerifyUrl;
-        this.builder.HashRegister = RegisterHash;
+        this.builder = new()
+        {
+            VerifyGetter = GenerateVerifyUrl,
+            HashRegister = RegisterHash
+        };
     }
 
     /// <summary>

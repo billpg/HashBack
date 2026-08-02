@@ -9,13 +9,12 @@
 
   <ItemGroup>
     <None Remove="Docs\GetCallRoot.md" />
-    <None Remove="Docs\HelloRoot.md" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Docs\GetCallRoot.md" />
     <EmbeddedResource Include="Docs\GetHashRoot.md" />
-    <EmbeddedResource Include="Docs\HelloRoot.md" />
+    <EmbeddedResource Include="Docs\GetHelloRoot.md" />
   </ItemGroup>
 
   <!-- ASP.NET Core shared framework -->

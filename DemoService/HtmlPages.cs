@@ -14,7 +14,7 @@ internal class HtmlPages
         => GetHtmlByResource("DemoService.Docs.GetHashRoot.md");
 
     internal static string HelloRoot()
-        => GetHtmlByResource("DemoService.Docs.HelloRoot.md");
+        => GetHtmlByResource("DemoService.Docs.GetHelloRoot.md");
 
     internal static string CallRoot()
         => GetHtmlByResource("DemoService.Docs.GetCallRoot.md");
