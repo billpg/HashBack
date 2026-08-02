@@ -16,6 +16,9 @@ internal class HtmlPages
     internal static string HelloRoot()
         => GetHtmlByResource("DemoService.Docs.HelloRoot.md");
 
+    internal static string CallRoot()
+        => GetHtmlByResource("DemoService.Docs.GetCallRoot.md");
+
     private static string GetHtmlByResource(string resourceName)
     {
         /* Get the embedded stream and convert to HTML. If anything is missing a null

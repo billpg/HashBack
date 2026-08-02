@@ -6,12 +6,12 @@ using Newtonsoft.Json.Linq;
 
 namespace billpg.HashBackCore
 {
-    public class HashBackBuilder
+    public class HashBackBuilder<TSession>
     {
         public delegate long OnGetNowDelegate();
         public delegate string OnGetUnusDelegate();
-        public delegate Task<string> OnGetVerifyDelegate();
-        public delegate Task OnRegisterHashDelegate(string verifyUrl, string hash);
+        public delegate Task<string> OnGetVerifyDelegate(TSession session);
+        public delegate Task OnRegisterHashDelegate(TSession session, string verifyUrl, string hash);
 
         public string Host { get; set; } = null!;
         public OnGetNowDelegate NowGetter { get; set; } = DefaultNowGetter;
@@ -19,15 +19,6 @@ namespace billpg.HashBackCore
         public OnGetVerifyDelegate VerifyGetter { get; set; } = null!;
         public OnRegisterHashDelegate HashRegister { get; set; } = null!;
 
-        public void SetSyncVerifyGetter(Func<string> syncVerifyGetter)
-            => this.VerifyGetter = () => Task.FromResult(syncVerifyGetter());
-
-        public void SetVerify(string verify)
-            => this.SetSyncVerifyGetter(() => verify);
-
-        public void SetSyncHashRegister(Action<string, string> hashRegister)
-            => this.HashRegister = (url, hash) => Task.Run(() => hashRegister(url, hash));
-        
         /// <summary>
         /// Funtion to use as the default Now generator, returning
         /// the current time in Unix time seconds. Intended to be
@@ -54,29 +45,35 @@ namespace billpg.HashBackCore
             return Convert.ToBase64String(unusBytes);
         }
 
-        public async Task<string> Build()
+        public async Task<string> Build(TSession session)
         {
             /* Check the required properties have all been assigned. */
             if (string.IsNullOrEmpty(this.Host))
                 throw new ApplicationException("Host must be set.");
+
+            return await this.BuildWithHost(session, this.Host);
+        }
+
+        public async Task<string> BuildWithHost(TSession session, string host)
+        { 
             if (this.VerifyGetter == null)
                 throw new ApplicationException("VerifyGetter must be set.");
             if (this.HashRegister == null)
                 throw new ApplicationException("HashRegister must be set.");
 
             /* Get the verify URL once. */
-            string verify = await this.VerifyGetter();
+            string verify = await this.VerifyGetter(session);
 
             /* Call through to the build function. */
             (string authHeader, string verificationHash) 
                 = Helpers.Build(
-                    this.Host,
+                    host,
                     this.NowGetter(),
                     this.UnusGetter(),
                     verify);
 
             /* Register this verify/hash combo to let it be downloaded. */
-            await this.HashRegister(verify, verificationHash);
+            await this.HashRegister(session, verify, verificationHash);
 
             /* Return the result. */
             return authHeader;

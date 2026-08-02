@@ -35,6 +35,11 @@ namespace billpg.HashBackCore
 
         public async Task<string> Validate(string authHeader)
         {
+            /* If the header starts with "HashBack ", trim it. */
+            const string authPrefix = "HashBack ";
+            if (authHeader.StartsWith(authPrefix))
+                authHeader = authHeader.Substring(authPrefix.Length).Trim();
+
             /* Announce start of Validate for log. */
             OnLogWrite($"Start Validate({authHeader.Length} characters)");
 
@@ -133,7 +138,7 @@ namespace billpg.HashBackCore
                 throw new AuthorizationParseException(
                     "Verify property must be a valid URL.",
                     ValidateRejectionReason.BadHeader);
-            if (uri.Scheme != Uri.UriSchemeHttps)
+            if (!IsSecure(uri))
                 throw new AuthorizationParseException(
                     "Verify URL must be HTTPS.",
                     ValidateRejectionReason.BadHeader);
@@ -168,6 +173,17 @@ namespace billpg.HashBackCore
              * Return the user returned by the user id function earlier. */
             OnLogWrite("Passed validation.");
             return user;
+        }
+
+        private bool IsSecure(Uri uri)
+        {
+            if (uri.Scheme == Uri.UriSchemeHttps)
+                return true;
+
+            if (uri.Scheme == Uri.UriSchemeHttp && uri.Host == "localhost")
+                return true;
+
+            return false;
         }
 
         /// <summary>

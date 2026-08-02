@@ -5,7 +5,7 @@ VisualStudioVersion = 17.14.36414.22
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DemoService", "DemoService.csproj", "{85455C4A-C3A1-4C10-AF43-7F84FA45728E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "billpg.HashBackCore", "..\..\..\..\..\Documents\GitHub\HashBack_main\billpg.HashBackCore\billpg.HashBackCore.csproj", "{D2D56507-7D7A-AB28-231A-6B39DCC306A2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "billpg.HashBackCore", "..\\billpg.HashBackCore\billpg.HashBackCore.csproj", "{D2D56507-7D7A-AB28-231A-6B39DCC306A2}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DemoServiceTests", "..\DemoServiceTests\DemoServiceTests.csproj", "{8B0625CE-BD42-46A8-AEFD-A3C8D3AC562F}"
 EndProject

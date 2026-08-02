@@ -9,15 +9,22 @@ using System.Threading.Tasks;
 namespace DemoService;
 public class ServiceData
 {
+    public string ConfigServiceHost { get; set; } = "localhost:9001";
+
     private readonly ConcurrentDictionary<Guid, StoredHash> hashes
         = new();
 
     private readonly ConcurrentDictionary<Guid, List<HashGetEvent>> hashGetEvents = new();
 
+    public IList<HashGetEvent> ListGetHashEvents(Guid id)
+        => hashGetEvents.TryGetValue(id, out var events) 
+            ? events.ToList().AsReadOnly() 
+            : new List<HashGetEvent>();
+
     public bool TryAddHash(Guid id, StoredHash hash)
         => hashes.TryAdd(id, hash);
 
-    public StoredHash? TryGetHash(Guid id, IPAddress gotBy)
+    public StoredHash? TryGetHash(Guid id, IPAddress gotBy, string requestHeaders)
     {
         /* Remove expired hash records. */
         ClearExpired();
@@ -28,7 +35,7 @@ public class ServiceData
             return null;
 
         /* Log the GET request. */
-        var eventRecord = new HashGetEvent(id, DateTime.UtcNow, gotBy);
+        var eventRecord = new HashGetEvent(id, DateTime.UtcNow, gotBy, requestHeaders);
         var events = hashGetEvents.AddOrUpdate(id,
             /* If the key does not exist, create a new list with the event. */
             _ => [eventRecord],
@@ -78,7 +85,7 @@ public record StoredHash(IList<byte> Hash, DateTime AddedAt, IPAddress AddedBy)
     public DateTime ExpiresAt => AddedAt.AddHours(1);
 }
 
-public record class HashGetEvent(Guid Id, DateTime GotAt, IPAddress GotBy)
+public record class HashGetEvent(Guid Id, DateTime GotAt, IPAddress GotBy, string RequestHeaders)
 {   
     internal DateTime ExpiresAt => GotAt.AddDays(1);
 }

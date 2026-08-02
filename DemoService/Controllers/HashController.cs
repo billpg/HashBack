@@ -35,7 +35,12 @@ public class HashController : ControllerBase
     [SwaggerResponse(StatusCodes.Status404NotFound, "No entry found for the given id")]
     public ActionResult GetById(Guid id)
     {
-        var entry = data.TryGetHash(id, Request.RequestIP());
+        var requestHeaders = new StringBuilder();
+        foreach (var h in Request.Headers)
+            foreach (var sh in h.Value)
+                requestHeaders.AppendLine($"{h.Key}: {sh}");
+
+        var entry = data.TryGetHash(id, Request.RequestIP(), requestHeaders.ToString());
         if (entry == null)
             return NotFound();
         return Content(entry.HashAsString, "text/plain");

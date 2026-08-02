@@ -7,17 +7,21 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using billpg.HashBackCore;
 using DemoService.Controllers;
+using DemoService;
 
 namespace DemoServiceTests;
 
 [TestClass]
 public sealed class HelloControllerTests
 {
+    ServiceData GetServiceData()
+        => new ServiceData {  ConfigServiceHost = $"{Guid.NewGuid()}.example" };
+
     [TestMethod]
     public async Task Authenticate_NoCookieNoHeader_ReturnsNull()
     {
         // Arrange
-        var controller = new HelloController();
+        var controller = new HelloController(GetServiceData());
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         // Use reflection to call the private Authenticate method.
@@ -38,7 +42,7 @@ public sealed class HelloControllerTests
     public async Task Get_NoCookieNoHeader_Returns401AndWwwAuthenticateHeader()
     {
         // Arrange
-        var controller = new HelloController();
+        var controller = new HelloController(GetServiceData());
         var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
@@ -68,20 +72,21 @@ public sealed class HelloControllerTests
     {
         // Arrange: in-memory registration for verification hashes
         var registeredHashes = new ConcurrentDictionary<string, string>();
+        var serviceData = GetServiceData();
 
         // Deterministic verify URL
         var verifyUrl = $"https://client.example/verify/{Guid.NewGuid()}";
 
         // Build a real HashBack header and register the verification hash into our dictionary.
-        var builder = new HashBackBuilder();
-        builder.Host = "demo.hashback.dev";
-        builder.SetSyncVerifyGetter(() => verifyUrl);
-        builder.SetSyncHashRegister((url, hash) => registeredHashes[url] = hash);
+        var builder = new HashBackBuilder<int>();
+        builder.Host = serviceData.ConfigServiceHost;
+        builder.VerifyGetter = s => Task.FromResult(verifyUrl);
+        builder.HashRegister = (s, url, hash) => Task.Run(() => registeredHashes[url] = hash);
 
-        string authToken = await builder.Build();
+        string authToken = await builder.Build(1);
 
         // Create controller and set OverrideGetHash (private field) via reflection
-        var controller = new HelloController();
+        var controller = new HelloController(serviceData);
 
         var field = typeof(HelloController).GetField("OverrideGetHash", BindingFlags.NonPublic | BindingFlags.Instance)
             ?? throw new InvalidOperationException("OverrideGetHash field not found.");
@@ -147,7 +152,7 @@ public sealed class HelloControllerTests
     public async Task Get_WithMalformedAuthorizationHeader_ThrowsAuthorizationParseException()
     {
         // Arrange
-        var controller = new HelloController();
+        var controller = new HelloController(GetServiceData());
         var ctx = new DefaultHttpContext();
         // A header that is neither valid base64 nor JSON
         ctx.Request.Headers["Authorization"] = "HashBack not-a-base64-or-json!";
@@ -164,14 +169,13 @@ public sealed class HelloControllerTests
         var registeredHashes = new ConcurrentDictionary<string, string>();
         var verifyUrl = $"https://client.example/verify/{Guid.NewGuid()}";
 
-        var builder = new HashBackBuilder();
+        var builder = new HashBackBuilder<int>();
         builder.Host = "demo.hashback.dev";
-        builder.SetSyncVerifyGetter(() => verifyUrl);
-        builder.SetSyncHashRegister((url, hash) => registeredHashes[url] = hash);
+        builder.VerifyGetter = s => Task.FromResult(verifyUrl);
+        builder.HashRegister = (s, url, hash) => Task.Run(() => registeredHashes[url] = hash);
 
-        string authToken = await builder.Build();
-
-        var controller = new HelloController();
+        string authToken = await builder.Build(1);
+        var controller = new HelloController(GetServiceData());
 
         // Set OverrideGetHash to return a wrong hash (tampered)
         var field = typeof(HelloController).GetField("OverrideGetHash", BindingFlags.NonPublic | BindingFlags.Instance)
@@ -194,7 +198,7 @@ public sealed class HelloControllerTests
     public async Task Get_WithInvalidCookie_ThrowsInvalidOperationException()
     {
         // Arrange: provide a malformed/tampered cookie value
-        var controller = new HelloController();
+        var controller = new HelloController(GetServiceData());
         var ctx = new DefaultHttpContext();
         ctx.Request.Headers["Cookie"] = "HashBackDemoService=invalid.jwt.parts";
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };

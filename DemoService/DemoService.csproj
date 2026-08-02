@@ -8,10 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Docs\GetCallRoot.md" />
     <None Remove="Docs\HelloRoot.md" />
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Docs\GetCallRoot.md" />
     <EmbeddedResource Include="Docs\GetHashRoot.md" />
     <EmbeddedResource Include="Docs\HelloRoot.md" />
   </ItemGroup>
@@ -28,7 +30,7 @@
     <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="10.2.3" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\..\Documents\GitHub\HashBack_main\billpg.HashBackCore\billpg.HashBackCore.csproj" />
+    <ProjectReference Include="..\billpg.HashBackCore\billpg.HashBackCore.csproj" />
   </ItemGroup>
 
 </Project>

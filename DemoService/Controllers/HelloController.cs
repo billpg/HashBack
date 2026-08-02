@@ -15,6 +15,13 @@ namespace DemoService.Controllers;
 [Route("hello")]
 public class HelloController : ControllerBase
 {
+    private readonly ServiceData data;
+
+    public HelloController(ServiceData data)
+    {
+        this.data = data;
+    }
+
     private const string HashBackCookieName = "HashBackDemoService";
 
     // GET /hello/
@@ -68,7 +75,7 @@ public class HelloController : ControllerBase
         if (!string.IsNullOrEmpty(authHeader))
         {
             HashBackValidator val = new();
-            val.RequireHost("demo.hashback.dev");
+            val.RequireHost(data.ConfigServiceHost);
             val.RequireNowWindow(500);
             val.SetSyncIdentifyUser(url => new Uri(url).Host);
             val.OnGetHash = OverrideGetHash ?? GetHash;
