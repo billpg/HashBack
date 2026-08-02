@@ -1,0 +1,91 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<span>
+  <!--ctype ht-->
+  <html lang="en">
+    <head>
+      <meta name="generator" content="Hugo 0.157.0" />
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width,initial-scale=1" />
+      <title>HashBack | Trusted authentication without secret storage</title>
+      <meta name="description" content="HashBack lets services prove identity without long-lived secrets by using a two-step HTTPS exchange and verification hashes." />
+      <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+      <main class="container">
+        <section class="hero">
+          <div>
+            <span class="pill">HashBack Authentication</span>
+            <h1>Trust without storing secrets.</h1>
+            <p>
+              <b>HashBack</b> gives services a simple way to prove identity over HTTPS using a two-step
+exchange and verification hashes. Instead of keeping long-lived passwords or API
+tokens in a vault, the caller and server can mutually reassure each other that the
+right party is present using the same TLS infrastructure they've already got.</p>
+            <p>🦉 Engineered by William Godfrey, <a href="https://billpg.com" target="_blank" rel="noreferrer">billpg industries</a></p>
+            <div class="btn-row">
+              <a class="btn btn-primary" href="https://github.com/billpg/HashBack" target="_blank" rel="noreferrer">GitHub Project</a>
+              <a class="btn btn-secondary" href="example-session.html">See an example session</a>
+              <a class="btn btn-secondary" href="acme.html">Isn't that ACME?</a>
+              <a class="btn btn-secondary" href="demo-server.html">Try the demo server</a>
+            </div>
+          </div>
+          <div class="badge-card">
+            <img src="HashBack-Badge-Logo.png" alt="HashBack circular badge icon" />
+          </div>
+        </section>
+        <section class="cards">
+          <article class="card">
+            <h3>Zero secret storage</h3>
+            <p>Remove the need to keep and manage cryptographic keys or bearer tokens around for long periods of time.</p>
+            <p>You've already invested in TLS. <b>Use it!</b></p>
+          </article>
+          <article class="card">
+            <h3>Two HTTPS transactions</h3>
+            <p>HashBack keeps the exchange short and friendly. One call out, one call back.</p>
+          </article>
+          <article class="card">
+            <h3>Built for APIs</h3>
+            <p>Use it for general-purpose API authentication between two machines.</p>
+          </article>
+        </section>
+        <section class="panel">
+          <h2>From a simple analogy to a practical authentication mechanism</h2>
+          <p>HashBack takes inspiration from a phone-call analogy: The caller knows who they are calling, but the
+recipient doesn't know who that call is coming from. But if the recipient can call that original caller back,
+they can be reassured that the caller is who they say they are.</p>
+          <div class="gallery">
+            <img src="PhoneCall-Frame-1.png" alt="Hi Bob. I'm Alice!" />
+            <img src="PhoneCall-Frame-2.png" alt="Prove it." />
+            <img src="PhoneCall-Frame-3.png" alt="You know my number. Call me back." />
+            <img src="PhoneCall-Frame-4.png" alt="Hi Alice. Did you call me just now?" />
+          </div>
+          <p>Did you see what <b>didn't</b> happen? No-one needed a cryptographic key or secret token.</p>
+          <p>Now apply that concept to web authentication. The client knows, thanks to TLS, who they are connecting
+to, but the server doesn't know who that incoming connection is from. If the server can call the client
+back, this time the server knows, thanks again to TLS, that the client is who they say they are. The two
+connections in opposite directions complete the loop.</p>
+        </section>
+        <section class="panel">
+          <h2>How the flow works</h2>
+          <ol>
+            <li>The client prepares an authentication claim and calculates a verification hash.</li>
+            <li>The client publishes that hash on a TLS-protected URL it controls.</li>
+            <li>The server fetches the verification hash, confirms it matches, and accepts the request.</li>
+          </ol>
+        </section>
+        <section class="panel">
+          <h2>Why it matters</h2>
+          <p>
+            <b>HashBack</b> means you don't need to store and manage long-term shared secrets. Use your existing TLS
+infrastructure to build a more secure and manageable authentication system.</p>
+          <div class="btn-row">
+            <a class="btn btn-primary" href="example-session.html">Next: See an example session</a>
+            <a class="btn btn-secondary" href="acme.html">Isn't that ACME?</a>
+            <a class="btn btn-secondary" href="demo-server.html">Try the demo server</a>
+          </div>
+        </section>
+        <p class="footer">© William Godfrey, 2026. <a href="https://billpg.com" target="_blank" rel="noreferrer">billpg industries</a>. Hosted by <a href="https://statichost.uk" target="_blank" rel="noreferrer">statichost.uk</a>. May your rutabagas be tasty.</p>
+      </main>
+    </body>
+  </html>
+</span>

@@ -1,0 +1,65 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<span>
+  <!--ctype ht-->
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width,initial-scale=1" />
+      <title>HashBack | Try the Demo Server</title>
+      <meta name="description" content="Try a working HashBack implementation with an interactive demo server." />
+      <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+      <main class="container">
+        <nav class="topbar">
+          <a href=".html">HashBack</a>
+          <a href="https://github.com/billpg/HashBack" target="_blank" rel="noreferrer">Technical draft on GitHub</a>
+        </nav>
+        <header class="hero">
+          <div>
+            <h1>Try the Demo Server</h1>
+            <p>Experience HashBack authentication in action. Use our interactive demo to see how client and server exchange proofs.</p>
+            <p>(I've not deployed this service yet. But that's because I'm still working on it and you're reading the draft website.)</p>
+          </div>
+          <img class="badge" src="HashBack-Badge-Logo.png" alt="HashBack circular badge icon" />
+        </header>
+        <section class="panel">
+          <h2>What the demo includes</h2>
+          <div class="feature-list">
+            <div class="feature-item">
+              <strong>Test your client code</strong>
+Send a <code>GET https://demo.hashback.dev/hello/</code> request and the service will respond with a cheery "Hello"
+message and randomly chosen quip,
+but only if a valid HashBack authentication header is included in the request. Use this to test your client code will
+generate a valid claim and will publish valid hashes.</div>
+            <div class="feature-item">
+              <strong>Test your server code</strong>
+Send a <code>POST https://demo.hashback.dev/call/</code> request, including the URL of <i>your</i> service in the request body,
+and this demo service will make properly-formed HashBack authenticated GET request to that URL. Once completed, the demo
+service will return a full log of the request and response, including who (if anyone) tried to GET the verification hash.</div>
+            <div class="feature-item">
+              <strong>Public verification hash service</strong>
+Not ready to host verification hashes on the public internet? Use the demo server as your temporary hash host.<br /><br />Pick a UUID and upload your verification hash with a <code>PUT https://demo.hashback.dev/hash/&lt;your-uuid&gt;</code> request and
+the demo service will host your hash for you. This is useful during early development when you're coding at a workstation on your
+desk and you've not thought about building an actual web server yet.</div>
+          </div>
+          <p class="hashbert">
+            <strong>Hashbert says:</strong> "You can even point both the client and server tests at each other. Very recursive. The demo becomes a complete authentication loop that proves both sides are working correctly. Lovely."</p>
+        </section>
+        <section class="panel">
+          <h2>Start testing</h2>
+          <p>Visit <a href="https://demo.hashback.dev/" target="_blank" rel="noreferrer"><code>https://demo.hashback.dev/</code></a>
+to access the demo server endpoints and documentation, all with sample Python and C# code.</p>
+        </section>
+        <section class="panel">
+          <div class="btn-row">
+            <a class="btn btn-primary" href="https://github.com/billpg/HashBack" target="_blank" rel="noreferrer">Next:
+Visit the Github project for full technical details</a>
+            <a class="btn btn-secondary" href=".html">Return to overview</a>
+          </div>
+        </section>
+        <p class="footer">© William Godfrey, 2026. <a href="https://billpg.com" target="_blank" rel="noreferrer">billpg industries</a>. Hosted by <a href="https://statichost.uk" target="_blank" rel="noreferrer">statichost.uk</a>. May your rutabagas be tasty.</p>
+      </main>
+    </body>
+  </html>
+</span>

@@ -1,0 +1,161 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<span>
+  <!--ctype ht-->
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width,initial-scale=1" />
+      <title>HashBack | An example session</title>
+      <meta name="description" content="A guided HashBack authentication exchange, explained by Hashbert the Hedgehog." />
+      <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+      <main class="container">
+        <nav class="topbar">
+          <a href=".html">HashBack</a>
+          <a href="https://github.com/billpg/HashBack" target="_blank" rel="noreferrer">Technical draft on GitHub</a>
+        </nav>
+        <header class="hero">
+          <div>
+            <h1>An example HashBack session</h1>
+            <p>Let's follow one request from the client's first thought to the server's final nod. Hashbert the Hedgehog will annotate the important bits, because authentication is easier to understand when someone points at the spiky details.</p>
+          </div>
+          <img class="badge" src="HashBack-Badge-Logo.png" alt="HashBack circular badge icon" />
+        </header>
+        <section class="step">
+          <div class="step-header">
+            <span class="number">Step 01</span>
+            <h2>Declare the verification URL range</h2>
+          </div>
+          <p>Ahead of time, the client administrator registers the exact narrow HTTPS URL or folder where verification hashes will be published. The service uses this declaration to map the URL back to the client and must reject URLs outside it.</p>
+          <div class="preprecode">
+            <tt>My hashes will be published at:</tt>
+            <br />
+            <tt>https://client.example/api/hashback?id=*</tt>
+            <br />
+          </div>
+          <p class="hashbert">
+            <strong>Hashbert says:</strong> "Choose a small patch of HTTPS ground that you control. A single doorway is splendid; handing over the whole house is a bit much, even for a hedgehog with a clipboard."</p>
+        </section>
+        <section class="step">
+          <div class="step-header">
+            <span class="number">Step 02</span>
+            <h2>Write the authentication JSON</h2>
+          </div>
+          <p>When the client wants to make an authenticated request, it creates a fresh JSON claim. It names the protocol version, destination host, current UTC time, a unique random value, and the HTTPS URL where the server can retrieve the verification hash.</p>
+          <div class="preprecode">
+            <tt>{</tt>
+            <br />
+            <tt>    "Version": "BILLPG_DRAFT_4.2",</tt>
+            <br />
+            <tt>    "Host": "server.example",</tt>
+            <br />
+            <tt>    "Now": 529297200,</tt>
+            <br />
+            <tt>    "Unus": "Rpgt4Fc5nMDq14LOps/hYQ==",</tt>
+            <br />
+            <tt>    "Verify": "https://client.example/api/hashback?id=502542886"</tt>
+            <br />
+            <tt>}</tt>
+            <br />
+          </div>
+          <p class="hashbert">
+            <strong>Hashbert says:</strong> "This claim is fresh, specific, and meant for one destination. The <code>Unus</code> value must be unpredictable and unique, so a stale claim cannot simply wander back in wearing a fake moustache."</p>
+        </section>
+        <section class="step">
+          <div class="step-header">
+            <span class="number">Step 03</span>
+            <h2>Hash the JSON and publish the result</h2>
+          </div>
+          <p>The client encodes the JSON as UTF-8 bytes, combines those bytes with HashBack's fixed public salt, and calculates a SHA-256 hash. It Base64-encodes the result, then publishes that one-line value at the exact <code>Verify</code> URL from the JSON.</p>
+          <div class="preprecode">
+            <tt>GET /api/hashback?id=502542886 HTTP/1.1</tt>
+            <br />
+            <tt>Host: client.example</tt>
+            <br />
+            <tt> </tt>
+            <br />
+            <tt>HTTP/1.1 200 OK</tt>
+            <br />
+            <tt>Content-Type: text/plain</tt>
+            <br />
+            <tt> </tt>
+            <br />
+            <tt>/+Zc/xVCVgnnfC69tEybe2TAluOk21ScdystX0/1Ayk=</tt>
+            <br />
+          </div>
+          <p class="hashbert">
+            <strong>Hashbert says:</strong> "The hash waits on the client's own HTTPS site. Nothing secret needs to live there forever; this value belongs to this one fresh claim and should be replaced for the next request."</p>
+        </section>
+        <section class="step">
+          <div class="step-header">
+            <span class="number">Step 04</span>
+            <h2>Make the HTTP request</h2>
+          </div>
+          <p>The client Base64-encodes the JSON bytes and places that string in the HTTP <code>Authorization</code> header using the <code>HashBack</code> authentication scheme. The request can then carry its normal API method, path, and body.</p>
+          <div class="preprecode">
+            <tt>POST /api/order HTTP/1.1</tt>
+            <br />
+            <tt>Host: server.example</tt>
+            <br />
+            <tt>Authorization: HashBack</tt>
+            <br />
+            <tt>    eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMiIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v</tt>
+            <br />
+            <tt>    dyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYzVuTURxMTRMT3BzL2hZUT09IiwiVmVyaWZ5Ijoi</tt>
+            <br />
+            <tt>    aHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9hcGkvaGFzaGJhY2s/aWQ9NTAyNTQyODg2In0=</tt>
+            <br />
+            <tt>Accept: application/json</tt>
+            <br />
+          </div>
+          <p class="hashbert">
+            <strong>Hashbert says:</strong> "The header carries the claim, not a permanent password. The server can decode it, but the proof still depends on the matching hash being available from the HTTPS URL you declared."</p>
+        </section>
+        <section class="step">
+          <div class="step-header">
+            <span class="number">Step 05</span>
+            <h2>Load the published hash</h2>
+          </div>
+          <p>The server decodes the authorization claim, checks the version, host, timestamp, one-use value, and registered URL, then performs a separate HTTPS GET to the <code>Verify</code> URL supplied by the client.</p>
+          <div class="preprecode">
+            <tt>GET https://client.example/api/hashback?id=502542886</tt>
+            <br />
+            <tt> </tt>
+            <br />
+            <tt>Expected response body:</tt>
+            <br />
+            <tt>/+Zc/xVCVgnnfC69tEybe2TAluOk21ScdystX0/1Ayk=</tt>
+            <br />
+          </div>
+          <p class="hashbert">
+            <strong>Hashbert says:</strong> "Now the server is calling back. It follows only the pre-approved route, checks the TLS certificate, and expects one plain-text Base64 hash. No detours through suspicious bramble patches."</p>
+        </section>
+        <section class="step">
+          <div class="step-header">
+            <span class="number">Step 06</span>
+            <h2>Repeat the hash and confirm identity</h2>
+          </div>
+          <p>The server repeats the same hashing process on the JSON bytes from the decoded header. If its result exactly matches the hash retrieved from the client's declared HTTPS location, the server can be reassured that the client controls that location and may process the request.</p>
+          <div class="flow">
+            <div>
+              <strong>1. Decode</strong>Read the JSON claim from the header.</div>
+            <div>
+              <strong>2. Recalculate</strong>Hash the claim with the fixed salt.</div>
+            <div>
+              <strong>3. Compare</strong>Accept an exact match.</div>
+          </div>
+          <p class="hashbert">
+            <strong>Hashbert says:</strong> "A matching result confirms control of the registered website. The server has not been handed a long-lived secret; it has checked a fresh proof from the right HTTPS location. That is a very satisfactory conclusion."</p>
+        </section>
+        <section class="panel">
+          <div class="btn-row">
+            <a class="btn btn-primary" href="acme.html">Next: Isn't that ACME?</a>
+            <a class="btn btn-secondary" href="demo-server.html">Try the demo server</a>
+          </div>
+        </section>
+        <p class="footer">© William Godfrey, 2026. <a href="https://billpg.com" target="_blank" rel="noreferrer">billpg industries</a>. Hosted by <a href="https://statichost.uk" target="_blank" rel="noreferrer">statichost.uk</a>. May your rutabagas be tasty.</p>
+      </main>
+    </body>
+  </html>
+</span>
