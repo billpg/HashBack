@@ -1,21 +1,17 @@
-/* -------------------------------------------------
-   Theme variables
---------------------------------------------------*/
+/* Theme variables */
 :root {
-  color-scheme: light;
-  --bg: #f8fafc;
-  --panel: #ffffff;
-  --ink: #0f172a;
-  --muted: #475569;
-  --accent: #2563eb;
-  --teal: #0f766e;
-  --border: #dbe4ef;
-  --code: #102033;
+    color-scheme: light;
+    --bg: #f8fafc;
+    --panel: #ffffff;
+    --ink: #0f172a;
+    --muted: #475569;
+    --accent: #2563eb;
+    --teal: #0f766e;
+    --border: #1010C0;
+    --code: #102033;
 }
 
-/* -------------------------------------------------
-   Base
---------------------------------------------------*/
+/* Base */
 * { box-sizing: border-box; }
 
 body {
@@ -43,14 +39,11 @@ h1 {
 
 h2 { line-height: 1.2; margin-top: 0; }
 
-/* -------------------------------------------------
-   Buttons
---------------------------------------------------*/
+/* Buttons */
 .btn-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin-top: 1.25rem;
 }
 
 .btn {
@@ -63,22 +56,27 @@ h2 { line-height: 1.2; margin-top: 0; }
 .btn-primary { background: var(--accent); color: white; }
 .btn-secondary { background: #eef2ff; color: #3730a3; }
 
-/* -------------------------------------------------
-   Layout: Topbar & Hero
---------------------------------------------------*/
+.btn-big-center {
+    font-size: large;
+    display: block;
+    text-align: center;
+    margin: 0 auto;
+}
+
+/* Layout: Topbar & Hero */
 .topbar {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: center;
-  margin-bottom: 2.5rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 2.5rem;
 }
 
 .topbar a { font-weight: 700; }
 
 .hero {
   display: grid;
-  grid-template-columns: 1fr 180px; /* final cascade winner */
+  grid-template-columns: 1fr 180px;
   gap: 2rem;
   align-items: center;
   margin-bottom: 2rem;
@@ -86,11 +84,13 @@ h2 { line-height: 1.2; margin-top: 0; }
 
 .hero p { color: var(--muted); }
 
-/* -------------------------------------------------
-   Components
---------------------------------------------------*/
+.introduction {
+    font-size: large;
+}
+
+/* Components */
 .badge {
-  width: 160px;
+  width: 200px;
   border-radius: 50%;
   background: #fff;
   padding: .5rem;
@@ -113,7 +113,8 @@ h2 { line-height: 1.2; margin-top: 0; }
 }
 
 .card,
-.panel {
+.panel,
+.step {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 1rem;
@@ -142,15 +143,6 @@ h2 { line-height: 1.2; margin-top: 0; }
   background: #eff6ff;
   color: #1d4ed8;
   border-radius: .5rem;
-}
-
-.step {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 1rem;
-    padding: 1.35rem;
-    margin: 1rem 0;
-    box-shadow: 0 10px 25px rgba(15,23,42,4%)
 }
 
 .step-header {
@@ -186,9 +178,7 @@ h2 { line-height: 1.2; margin-top: 0; }
   line-height: 1.5;
 }
 
-/* -------------------------------------------------
-   Grids
---------------------------------------------------*/
+/* Grids */
 .cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -229,9 +219,7 @@ h2 { line-height: 1.2; margin-top: 0; }
   color: var(--accent);
 }
 
-/* -------------------------------------------------
-   Comparison Table
---------------------------------------------------*/
+/* Comparison Table */
 .comparison {
   width: 100%;
   border-collapse: collapse;
@@ -259,9 +247,7 @@ h2 { line-height: 1.2; margin-top: 0; }
 .yes { color: var(--teal); }
 .no { color: #b91c1c; }
 
-/* -------------------------------------------------
-   URL List
---------------------------------------------------*/
+/* URL List */
 .url-list {
   display: grid;
   gap: .65rem;
@@ -280,9 +266,7 @@ h2 { line-height: 1.2; margin-top: 0; }
 .url-list .good { border-left: 4px solid var(--teal); }
 .url-list .bad { border-left: 4px solid #dc2626; }
 
-/* -------------------------------------------------
-   Feature List
---------------------------------------------------*/
+/* Feature List */
 .feature-list {
   display: grid;
   gap: 1rem;
@@ -302,9 +286,7 @@ h2 { line-height: 1.2; margin-top: 0; }
   margin-bottom: .35rem;
 }
 
-/* -------------------------------------------------
-   CTA Section
---------------------------------------------------*/
+/* CTA Section */
 .cta-section {
   background: linear-gradient(135deg, var(--accent) 0%, #1e40af 100%);
   color: #fff;
@@ -324,18 +306,14 @@ h2 { line-height: 1.2; margin-top: 0; }
   text-decoration: underline;
 }
 
-/* -------------------------------------------------
-   Footer
---------------------------------------------------*/
+/* Footer */
 .footer {
   margin-top: 2rem;
   color: var(--muted);
   font-size: 0.95rem;
 }
 
-/* -------------------------------------------------
-   Media Queries
---------------------------------------------------*/
+/* Media Queries */
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; }
   .cards { grid-template-columns: 1fr; }

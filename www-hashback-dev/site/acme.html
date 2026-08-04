@@ -1,91 +1,85 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<span>
-  <!--ctype ht-->
-  <html lang="en">
-    <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width,initial-scale=1" />
-      <title>HashBack | Isn't that ACME?</title>
-      <meta name="description" content="How HashBack relates to ACME and Let's Encrypt." />
-      <link rel="stylesheet" href="style.css" />
-    </head>
-    <body>
-      <main class="container">
-        <nav class="topbar">
-          <a href=".html">HashBack</a>
-          <a href="example-session.html">See the example session</a>
-        </nav>
-        <header class="hero">
-          <div>
-            <h1>Isn't that ACME?</h1>
-            <p>Yes, HashBack has something in common with ACME, especially the "call me back" verification idea. The important difference is what each protocol is for.</p>
-          </div>
-          <img class="badge" src="HashBack-Badge-Logo.png" alt="HashBack circular badge icon" />
-        </header>
-        <section class="panel">
-          <h2>Two related ideas, different jobs</h2>
-          <p>ACME, the protocol behind Let's Encrypt, is designed to establish and renew TLS certificates. HashBack assumes both sides already have working HTTPS and uses that secure connection to authenticate API callers.</p>
-          <table class="comparison">
-            <thead>
-              <tr>
-                <th>Question</th>
-                <th>ACME</th>
-                <th>HashBack</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Transactions needed to complete authentication</td>
-                <td>3</td>
-                <td>2</td>
-              </tr>
-              <tr>
-                <td>General-purpose API authentication</td>
-                <td class="no">No</td>
-                <td class="yes">Yes</td>
-              </tr>
-              <tr>
-                <td>Works without TLS already configured</td>
-                <td class="yes">Yes</td>
-                <td class="no">No</td>
-              </tr>
-              <tr>
-                <td>Useful for establishing TLS</td>
-                <td class="yes">Yes</td>
-                <td class="no">No</td>
-              </tr>
-            </tbody>
-          </table>
-          <p class="hashbert">
-            <strong>Hashbert says:</strong> "ACME helps put the lock on the door. HashBack checks which caller is holding the right, freshly made proof. Both jobs matter, but they are not the same job. Also, I strongly recommend the lock."</p>
-        </section>
-        <section class="panel">
-          <h2>HashBack needs TLS first</h2>
-          <p>HashBack relies on TLS to reassure the server that the verification hash came from the HTTPS site the client controls. Without valid HTTPS on both sides, the protocol cannot provide its intended identity check.</p>
-          <p>In that sense, ACME helped make HashBack practical: widespread, automated TLS gives HashBack a trustworthy channel to build on.</p>
-          <p class="hashbert">
-            <strong>Hashbert says:</strong> "No HTTPS, no HashBack. Please establish the secure tunnel before inviting me to inspect the proof. I am brainy, but I cannot negotiate with an unsecured puddle."</p>
-        </section>
-        <section class="panel">
-          <h2>What HashBack adds for APIs</h2>
-          <p>Once TLS is already in place, HashBack provides general-purpose caller authentication without requiring a long-lived password, token, or private key to be stored by the client service.</p>
-          <ul>
-            <li>The client publishes a fresh verification hash on its own HTTPS site.</li>
-            <li>The server retrieves that hash in a separate HTTPS transaction.</li>
-            <li>The server repeats the calculation and accepts the request only when the values match.</li>
-          </ul>
-          <p>That exchange can be completed in two transactions: the API request and the server's callback to the client's verification URL.</p>
-          <p class="hashbert">
-            <strong>Hashbert says:</strong>"HashBack is just like ACME, only fewer coyotes are maimed."</p>
-        </section>
-        <section class="panel">
-          <div class="btn-row">
-            <a class="btn btn-primary" href="demo-server.html">Next: Try the demo server</a>
-            <a class="btn btn-secondary" href="example-session.html">Back: See an example session</a>
-          </div>
-        </section>
-        <p class="footer">© William Godfrey, 2026. <a href="https://billpg.com" target="_blank" rel="noreferrer">billpg industries</a>. Hosted by <a href="https://statichost.uk" target="_blank" rel="noreferrer">statichost.uk</a>. May your rutabagas be tasty.</p>
-      </main>
-    </body>
-  </html>
-</span>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>HashBack | Isn't that ACME?</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <nav class="topbar">
+        <a href=".">🦔 HashBack Authentication</a>
+        <a href="https://github.com/billpg/HashBack" target="_blank">🔨 GitHub</a>
+        <a href="https://billpg.com/" target="_blank">🦉 billpg.com</a>
+      </nav>
+      <section class="hero">
+        <div>
+          <h1>Isn't that like ACME?</h1>
+          <div class="panel introduction">Yes, HashBack has a lot in common with ACME, in particular the "call me back" verification idea at its core. The important difference is the problem each of the two serves.</div>
+        </div>
+        <img class="badge" src="HashBack-Badge-Logo.png" alt="HashBack Logo" />
+      </section>
+      <section class="panel">
+        <h2>Two related ideas, different jobs</h2>
+        <p>ACME, the protocol behind <b>Let's Encrypt</b>, is designed to <i>establish</i> TLS certificates. HashBack, in contrast, is simpler in operation because both sides <i>already have TLS</i>  working.</p>
+        <table class="comparison">
+          <thead>
+            <tr>
+              <th>Question</th>
+              <th>ACME</th>
+              <th>HashBack</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Number of transactions needed</td>
+              <td>3</td>
+              <td>2</td>
+            </tr>
+            <tr>
+              <td>General-purpose API authentication</td>
+              <td class="no">No</td>
+              <td class="yes">Yes</td>
+            </tr>
+            <tr>
+              <td>Works without TLS already configured</td>
+              <td class="yes">Yes</td>
+              <td class="no">No</td>
+            </tr>
+            <tr>
+              <td>Useful for establishing TLS</td>
+              <td class="yes">Yes</td>
+              <td class="no">No</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="hashbert">
+          <strong>🦔 Hashbert says:</strong> “ACME helps put the lock on the door. HashBack uses the lock. Both jobs matter, but they are not the same job. Also, I strongly recommend the lock.”</p>
+      </section>
+      <section class="panel">
+        <h2>HashBack needs TLS first</h2>
+        <p>HashBack relies on TLS to reassure the server that the verification hash came from the site the client controls. Without valid TLS on both sides, the protocol cannot provide its intended identity check.</p>
+        <p>In that sense, HashBack only works because <b>ACME</b> and <b>Let's Encrypt</b> made it possible. HashBack only works because TLS protection is now widespread and automated, giving it the trustworthy channel it needs to build on.</p>
+        <p>Thank you ACME!</p>
+        <p class="hashbert">
+          <strong>🦔 Hashbert says:</strong> “HashBack is just like ACME, only fewer coyotes are maimed.”</p>
+      </section>
+      <section class="panel">
+        <div class="btn-row">
+          <a class="btn btn-primary" href="demo.html">Next: Do you have a demo service?</a>
+          <a class="btn btn-secondary" href=".">Home</a>
+          <a class="btn btn-secondary" href="example.html">Example Walk-Through</a>
+          <a class="btn btn-secondary" href="help.html">Can you Help?</a>
+        </div>
+      </section>
+      <p class="footer">
+        <span>HashBack was engineered and © William Godfrey, 2026.</span>
+        <span>
+          <a href="https://billpg.com" target="_blank">🦉 billpg industries</a>.</span>
+        <span>Hosted by <a href="https://statichost.uk" target="_blank">statichost.uk</a>.</span>
+        <span>May your rutabagas be tasty.</span>
+      </p>
+    </main>
+  </body>
+</html>
