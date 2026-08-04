@@ -3,6 +3,7 @@
     color-scheme: light;
     --bg: #f8fafc;
     --panel: #ffffff;
+    --tableoddrow: #eeeeee;
     --ink: #0f172a;
     --muted: #475569;
     --accent: #2563eb;
@@ -176,6 +177,23 @@ h2 { line-height: 1.2; margin-top: 0; }
   color: #e2e8f0;
   font-size: .88rem;
   line-height: 1.5;
+}
+
+.questions {
+    border-spacing: 2px;
+}
+.questionmark {
+    font-size: large;
+}
+.questions-evenrow {
+    background-color: var(--panel);
+    padding-left: 1em;
+    padding-right: 1em;
+}
+.questions-oddrow {
+    background-color: var(--tableoddrow);
+    padding-left: 1em;
+    padding-right: 1em;
 }
 
 /* Grids */
