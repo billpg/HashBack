@@ -1,6 +1,6 @@
-﻿# hashBack Call Demo Service
+﻿# HashBack Call Demo Service
 
-This is a simple service that will call **your** URL with a valid HashBack hheader, including a varification hash puublished
+This is a simple service that will call **your** URL with a valid HashBack header, including a varification hash published
 in the right place ready for you to read. The response to the POST will be a log of call, including any attempts to get the
 verification hash.
 

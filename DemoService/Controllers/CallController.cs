@@ -6,6 +6,7 @@ using Swashbuckle.AspNetCore.Annotations;
 using Microsoft.AspNetCore.Http;
 using billpg.HashBackCore;
 using System.Net;
+using DemoService.Services;
 
 namespace DemoService.Controllers;
 
@@ -19,20 +20,26 @@ public class CallController : ControllerBase
     private readonly ServiceData data;
 
     /// <summary>
+    /// HTTP Getter service.
+    /// </summary>
+    private readonly IHttpGetter httpGetter;
+
+    /// <summary>
     /// Represents the builder used to construct hash-based data structures.
     /// </summary>
     private readonly HashBackBuilder<CallSession> builder;
 
-    private record CallSession(string serviceHost, Guid id, Uri callerUrl, DateTime now, IPAddress caller)
+    private record CallSession(string ServiceHost, Guid Id, Uri CallerUrl, DateTime Now, IPAddress Caller)
     {
-        public string VerifyUrl => $"http://{serviceHost}/hash/{id}";
+        public string VerifyUrl => $"http://{ServiceHost}/hash/{Id}";
     }
 
-    public CallController(ServiceData data)
+    public CallController(ServiceData data, IHttpGetter httpGetter)
     {
         /* Store the data object for later use.
          * This is the persistent service data that will be shared across requests. */
         this.data = data;
+        this.httpGetter = httpGetter;
 
         /* Initialize the HashBackBuilder with the necessary callbacks for 
          * generating verification URLs and registering hashes. */
@@ -51,18 +58,27 @@ public class CallController : ControllerBase
     private static Task<string> GenerateVerifyUrl(CallSession session)
         => Task.FromResult(session.VerifyUrl);
 
+    /// <summary>
+    /// Called by the HashBackBuilder class when it has a verification
+    ///  URL and a corresponding verification hash to serve.
+    /// </summary>
+    /// <param name="session">Caller's session data.</param>
+    /// <param name="_">Ignored verification URL. (Uses ID in session.)</param>
+    /// <param name="hash">The veirifcation hash to return.</param>
+    /// <returns>Async task.</returns>
     private Task RegisterHash(CallSession session, string _, string hash)
     {
         var storedHash = new StoredHash(
-            Convert.FromBase64String(hash), session.now, session.caller);
-        data.TryAddHash(session.id, storedHash);
+            Convert.FromBase64String(hash), session.Now, session.Caller);
+        data.TryAddHash(session.Id, storedHash);
         return Task.CompletedTask;
     }
 
     // GET /call/
     [HttpGet]
     [Produces("text/html")]
-    [SwaggerOperation(Summary = "HTML index for call endpoint", Description = "Returns an HTML page describing how to use the Call demo endpoint.")]
+    [SwaggerOperation(Summary = "HTML index for call endpoint", 
+        Description = "Returns an HTML page describing how to use the Call demo endpoint.")]
     public ActionResult Get()
         => Content(HtmlPages.CallRoot(), "text/html", Encoding.UTF8);
 
@@ -70,7 +86,8 @@ public class CallController : ControllerBase
     [HttpPost]
     [Produces("text/plain")]
     [Consumes("text/plain")]
-    [SwaggerOperation(Summary = "Submit a call requestBody", Description = "Accepts a plain-text requestBody and returns a simple acknowledgement.")]
+    [SwaggerOperation(Summary = "Submit a call requestBody", 
+        Description = "Accepts a plain-text requestBody and returns a simple acknowledgement.")]
     [SwaggerResponse(StatusCodes.Status200OK, "Payload received", typeof(string))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid request body")]
     public async Task<ActionResult> Post()
@@ -96,23 +113,23 @@ public class CallController : ControllerBase
         /* Build a report of the response, including status code, headers, and body. */
         var report = new StringBuilder();
         report.AppendLine($"GET {caller}:");
-        report.AppendLine($"Status: {resp.StatusCode}");
+        report.AppendLine($"Status: {(int)resp.StatusCode}");
         foreach (var header in resp.Headers)
             report.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
         report.AppendLine("Body:");
         var body = await resp.Content.ReadAsStringAsync();
         report.AppendLine(body);
         report.AppendLine();
-        var getHashEvents = data.ListGetHashEvents(session.id);
-        report.AppendLine($"Logged GET /hash/{session.id} events: ({getHashEvents.Count})");
+        var getHashEvents = data.ListGetHashEvents(session.Id);
+        report.AppendLine($"Logged GET /hash/{session.Id} events: ({getHashEvents.Count})");
         for (int eventIndex = 0; eventIndex < getHashEvents.Count; eventIndex++)
         {
             var e = getHashEvents[eventIndex];
-            report.AppendLine($"[{eventIndex+1}/{getHashEvents.Count}] {e.GotAt} from {e.GotBy}");
+            report.AppendLine($"[{eventIndex + 1}/{getHashEvents.Count}] {e.GotAt} from {e.GotBy}");
             report.AppendLine(e.RequestHeaders);
         }
 
-        /* Return eport to caller as plain text. */
+        /* Return report to caller as plain text. */
         var reportAsString = report.ToString();
         return Content(reportAsString, "text/plain");
     }
@@ -127,17 +144,20 @@ public class CallController : ControllerBase
         if (OverrideCallerResponse != null)
             return OverrideCallerResponse;
 
-        HttpClient http = new HttpClient();
-        http.DefaultRequestHeaders.Add("Authorization", "HashBack " + authHeader);
-        var resp = await http.GetAsync(caller);
+        var headers = new Dictionary<string, string>
+        {
+            ["Authorization"] = "HashBack " + authHeader
+        };
+
+        var resp = await httpGetter.GetAsync(caller, headers);
         return resp;
     }
 
     private bool IsSecure(Uri url)
     {
         /* Allow HTTP for localhost only, and only when configured as running as localhost. */
-        if (url.Scheme == Uri.UriSchemeHttp && 
-            url.Host == "localhost" && 
+        if (url.Scheme == Uri.UriSchemeHttp &&
+            url.Host == "localhost" &&
             url.Authority == data.ConfigServiceHost)
             return true;
 

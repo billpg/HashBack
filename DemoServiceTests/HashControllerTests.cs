@@ -102,7 +102,7 @@ public sealed class HashControllerTests
         Assert.AreEqual(base64, content.Content, "Put should return the stored base64 string.");
 
         // Assert stored in ServiceData
-        var fetched = data.TryGetHash(id, IPAddress.Loopback);
+        var fetched = data.TryGetHash(id, IPAddress.Loopback, "");
         Assert.IsNotNull(fetched, "Expected hash to be stored in ServiceData.");
         Assert.AreEqual(base64, fetched!.HashAsString, "Stored hash string did not match input.");
     }

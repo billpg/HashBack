@@ -8,6 +8,7 @@ using System.Reflection;
 using System.IO;
 using Swashbuckle.AspNetCore.Annotations;
 using Microsoft.OpenApi;
+using DemoService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +17,10 @@ builder.Services.AddControllers();
 
 // Persist ServiceData as a singleton service so state is kept across requests
 builder.Services.AddSingleton<ServiceData>();
+
+// Register IHttpGetter as a typed HttpClient service
+builder.Services.AddHttpClient<IHttpGetter, HttpGetter>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

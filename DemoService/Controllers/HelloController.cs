@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.DataProtection.AuthenticatedEncryption.ConfigurationM
 using billpg.HashBackCore;
 using Microsoft.OpenApi;
 using System.Net;
+using DemoService.Services;
 
 namespace DemoService.Controllers;
 
@@ -16,10 +17,12 @@ namespace DemoService.Controllers;
 public class HelloController : ControllerBase
 {
     private readonly ServiceData data;
+    private readonly IHttpGetter httpGetter;
 
-    public HelloController(ServiceData data)
+    public HelloController(ServiceData data, IHttpGetter httpGetter)
     {
         this.data = data;
+        this.httpGetter = httpGetter;
     }
 
     private const string HashBackCookieName = "HashBackDemoService";
@@ -27,7 +30,7 @@ public class HelloController : ControllerBase
     // GET /hello/
     [HttpGet]
     [Produces("text/plain", "text/html")]
-    [SwaggerOperation(Summary = "Hello endpoint", 
+    [SwaggerOperation(Summary = "Hello endpoint",
         Description = "Returns a simple hello message. but only if you've passed HashBack authentication.")]
     [SwaggerResponse(StatusCodes.Status200OK, "Hello message", typeof(string))]
     [SwaggerResponse(StatusCodes.Status401Unauthorized, "Your request did not pass authentication.")]
@@ -55,7 +58,7 @@ public class HelloController : ControllerBase
             return Content($"Hello {authDomain}!", "text/plain");
 
         /* Failed authentication, return a 401 with some text. */
-        Response.Headers["WWW-Authenticate"] 
+        Response.Headers["WWW-Authenticate"]
             = $"HashBack realm=\"demo.hashback.dev\" set-cookie=\"{HashBackCookieName}\" version=\"BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1\"";
         Response.StatusCode = 401;
         return Content(HtmlPages.HelloRoot(), "text/html", Encoding.UTF8);
@@ -78,7 +81,7 @@ public class HelloController : ControllerBase
             val.RequireHost(data.ConfigServiceHost);
             val.RequireNowWindow(500);
             val.SetSyncIdentifyUser(url => new Uri(url).Host);
-            val.OnGetHash = OverrideGetHash ?? GetHash;
+            val.OnGetHash = GetHash;
             var authDomain = await val.Validate(authHeader);
             if (authDomain != null)
                 return (authDomain, false);
@@ -87,21 +90,10 @@ public class HelloController : ControllerBase
         return (null, false);
     }
 
-    /// <summary>
-    /// Override the default GetHash function for testing purposes. 
-    /// If set, this delegate will be used instead of the default HTTP
-    /// GET to retrieve the verification hash.
-    /// </summary>
-    private HashBackValidator.OnGetHashDelegate? OverrideGetHash = null;
-
     private async Task<string> GetHash(string url)
     {
-        var http = new HttpClient();
-        var resp = await http.GetAsync(url);
-        if (resp.StatusCode != HttpStatusCode.OK)
-            throw new ApplicationException($"GET {url} returned {resp.StatusCode}");
-
-        var hash = await resp.Content.ReadAsStringAsync();
-        return hash;
+        var resp = await httpGetter.GetAsync(new Uri(url));
+        resp.EnsureSuccessStatusCode();
+        return await resp.Content.ReadAsStringAsync();        
     }
 }

@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using DemoService;
 using DemoService.Controllers;
+using DemoService.Services;
 
 namespace DemoServiceTests;
 
@@ -24,7 +25,8 @@ public sealed class CallControllerTests
     {
         // Arrange
         var data = GetServiceData();
-        var controller = new CallController(data);
+        var fake = new MockHttpGetter();
+        var controller = new CallController(data, fake);
         var ctx = new DefaultHttpContext();
         // Empty body
         ctx.Request.Body = new MemoryStream(Array.Empty<byte>());
@@ -42,7 +44,8 @@ public sealed class CallControllerTests
     {
         // Arrange
         var data = GetServiceData();
-        var controller = new CallController(data);
+        var fake = new MockHttpGetter();
+        var controller = new CallController(data, fake);
         var ctx = new DefaultHttpContext();
         // Provide an invalid (non-HTTPS) URL
         var body = "http://insecure.example";
@@ -57,28 +60,26 @@ public sealed class CallControllerTests
     }
 
     [TestMethod]
-    public async Task Post_ValidHttps_UsesOverrideCallerResponseAndReturnsReport()
+    public async Task Post_ValidHttps_UsesFakeHttpGetterAndReturnsReport()
     {
         // Arrange
         var data = GetServiceData();
-        var controller = new CallController(data);
+        var fake = new MockHttpGetter();
+        var controller = new CallController(data, fake);
 
-        var callerUrl = "https://client.example";
+        var callerUrl = "https://client.example/";
         var ctx = new DefaultHttpContext();
         ctx.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(callerUrl));
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
 
-        // Prepare a fake response from the remote caller and set it via the private OverrideCallerResponse field.
+        // Prepare a fake response from the remote caller and set it on the fake getter.
         var fakeResp = new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent("Hello from remote caller")
         };
         fakeResp.Headers.Add("X-Remote", "value");
 
-        var field = typeof(CallController).GetField("OverrideCallerResponse", BindingFlags.NonPublic | BindingFlags.Instance)
-            ?? throw new InvalidOperationException("OverrideCallerResponse field not found.");
-
-        field.SetValue(controller, fakeResp);
+        fake.Response = fakeResp;
 
         // Act
         var result = await controller.Post().ConfigureAwait(false);

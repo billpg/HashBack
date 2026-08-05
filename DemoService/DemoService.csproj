@@ -12,6 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="..\www-hashback-dev\BuildHBDSite\SiteTemplate.xml" Link="Docs\SiteTemplate.xml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Docs\GetCallRoot.md" />
     <EmbeddedResource Include="Docs\GetHashRoot.md" />
     <EmbeddedResource Include="Docs\GetHelloRoot.md" />
