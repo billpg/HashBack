@@ -18,8 +18,9 @@ builder.Services.AddControllers();
 // Persist ServiceData as a singleton service so state is kept across requests
 builder.Services.AddSingleton<ServiceData>();
 
-// Register IHttpGetter as a typed HttpClient service
-builder.Services.AddHttpClient<IHttpGetter, HttpGetter>();
+// Register IP filter and IHttpGetter implementation
+builder.Services.AddSingleton<IIpFilter, IpFilter>();
+builder.Services.AddSingleton<IHttpGetter, HttpGetter>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -44,6 +45,11 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 var app = builder.Build();
+
+// Add IP rate limiting middleware early so it applies to all requests.
+// The middleware will return 429 Too Many Requests when a single IP exceeds
+// the configured request limit in the sliding window.
+app.UseMiddleware<IpRateLimitMiddleware>();
 
 // Serve generated OpenAPI JSON at /openapi/v1.json and expose a friendly /openapi redirect
 app.UseSwagger(c =>

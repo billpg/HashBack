@@ -65,7 +65,7 @@ public sealed class HelloControllerTests
         Assert.IsNotNull(contentResult, "Expected a ContentResult when unauthorized.");
         Assert.IsTrue(contentResult.ContentType?.StartsWith("text/html", StringComparison.OrdinalIgnoreCase) == true,
             "Expected content type to be HTML.");
-        Assert.IsTrue(!string.IsNullOrEmpty(contentResult.Content) && contentResult.Content.Contains("<html>"),
+        Assert.IsTrue(!string.IsNullOrEmpty(contentResult.Content) && contentResult.Content.Contains("<html lang=\"en\">"),
             "Expected HTML content to contain an <html> element.");
     }
 

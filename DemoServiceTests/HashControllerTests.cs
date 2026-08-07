@@ -31,7 +31,7 @@ public sealed class HashControllerTests
         Assert.IsNotNull(content, "Expected a ContentResult from Get()");
         Assert.IsTrue(content.ContentType?.StartsWith("text/html", StringComparison.OrdinalIgnoreCase) == true,
             "Expected content type text/html");
-        Assert.IsTrue(!string.IsNullOrEmpty(content.Content) && content.Content.Contains("<html>"),
+        Assert.IsTrue(!string.IsNullOrEmpty(content.Content) && content.Content.Contains("<html lang=\"en\">"),
             "Expected returned content to contain HTML.");
     }
 

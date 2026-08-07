@@ -1,6 +1,11 @@
+using Microsoft.Extensions.Hosting;
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Http;
+using System.Net.Security;
+using System.Net.Sockets;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace DemoService.Services;
@@ -12,26 +17,99 @@ public interface IHttpGetter
 
 public class HttpGetter : IHttpGetter
 {
-    private readonly HttpClient _client;
+    private readonly ServiceData data;
+    private readonly IIpFilter ipFilter;
 
-    public HttpGetter(HttpClient client)
+    public HttpGetter(ServiceData data, IIpFilter ipFilter)
     {
-        _client = client;
+        this.data = data;
+        this.ipFilter = ipFilter;
     }
 
-    public async Task<HttpResponseMessage> GetAsync(Uri uri, IDictionary<string, string>? headers = null)
+    public async Task<HttpResponseMessage> GetAsync(Uri uri, IDictionary<string, string> headers)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-
-        if (headers != null)
+        /* Connect TCP and handshake TLS. The finally block with close them. */
+        (var tcpcli, var netstr) = await ConnectHttp(uri);
+        try
         {
-            foreach (var kv in headers)
+            /* Build the HTTP request. */
+            var requestLines = new List<string>
             {
-                // Use TryAddWithoutValidation to allow arbitrary header values like "HashBack ..."
-                request.Headers.TryAddWithoutValidation(kv.Key, kv.Value);
-            }
-        }
+                $"GET {uri.PathAndQuery} HTTP/1.1",
+                $"Host: {uri.Host}",
+                "Connection: close",
+                "Accept-Encoding: plain",
+                "User-Agent: demo.hashback.dev"
+            };
+            requestLines.AddRange(headers.Select(kv => $"{kv.Key}: {kv.Value}"));
+            var request = Encoding.ASCII.GetBytes(string.Join("\r\n", requestLines) + "\r\n\r\n");
 
-        return await _client.SendAsync(request);
+            /* Send the request. */
+            await netstr.WriteAsync(request);
+
+            /* Read the response. */
+            byte[] respBytes = new byte[1000];
+            int bytesIn = await netstr.ReadAsync(respBytes, 0, respBytes.Length);
+            string respAsString = Encoding.ASCII.GetString(respBytes, 0, bytesIn);
+
+            /* Parse the */
+
+            return new HttpResponseMessage();
+        }
+        finally
+        {
+            netstr.Dispose();
+            tcpcli.Dispose();
+        }
+    }
+
+    private async Task<(TcpClient tcpcli, Stream netstr)> ConnectHttp(Uri uri)
+    {
+        /* Validate the URL is acceptable. */
+        bool isDebug = uri.Authority == data.ConfigServiceHost;
+        if (uri.Scheme != "https" && !isDebug)
+            throw new ApplicationException("URL must be HTTPS only.");
+        if (uri.Port != 443 && !isDebug)
+            throw new ApplicationException("URL must be port 443.");
+
+        /* Make all the precautions for public use. */
+        var remoteIp = await ResolveDomain(uri.Host, isDebug);
+
+        /* Connect TCP. */
+        var tcp = new TcpClient();
+        await tcp.ConnectAsync(remoteIp, uri.Port);
+        var netstr = tcp.GetStream();
+
+        /* Handshake TLS. */
+        if (uri.Scheme == "https")
+        {
+            var tls = new SslStream(netstr); // TODO Capture cert.
+            await tls.AuthenticateAsClientAsync(uri.Host);
+            return (tcp, tls);
+        }
+        return (tcp, netstr);
+    }
+
+    private async Task<IPAddress> ResolveDomain(string host, bool isDebug)
+    {
+        /* Shortcut the one acceptable use of localhost. */
+        if (host == "localhost" && isDebug)
+            return IPAddress.Loopback;
+
+        /* Load the various IPs and filter. */
+        var ips =
+            (await Dns.GetHostAddressesAsync(host))
+            .Where(IsAcceptableIP)
+            .ToList();
+
+        /* If none left, throw an error. */
+        if (ips.Count == 0)
+            throw new ApplicationException("No acceptable IPs.");
+        return ips.First();
+    }
+
+    private bool IsAcceptableIP(IPAddress ip)
+    {
+        return ipFilter.IsAcceptable(ip);
     }
 }
