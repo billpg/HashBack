@@ -108,7 +108,7 @@ public class CallController : ControllerBase
         string authHeader = await this.builder.BuildWithHost(session, caller.Authority);
 
         /* Make a GET request to that URL. */
-        HttpResponseMessage resp = await MakeGetRequestToCaller(caller, authHeader);
+        var resp = await MakeGetRequestToCaller(caller, authHeader);
 
         /* Build a report of the response, including status code, headers, and body. */
         var report = new StringBuilder();
@@ -117,7 +117,7 @@ public class CallController : ControllerBase
         foreach (var header in resp.Headers)
             report.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
         report.AppendLine("Body:");
-        var body = await resp.Content.ReadAsStringAsync();
+        var body = resp.Body;
         report.AppendLine(body);
         report.AppendLine();
         var getHashEvents = data.ListGetHashEvents(session.Id);
@@ -134,22 +134,11 @@ public class CallController : ControllerBase
         return Content(reportAsString, "text/plain");
     }
 
-    /// <summary>
-    /// Mock the response from the caller for unit-testing.
-    /// </summary>
-    private HttpResponseMessage? OverrideCallerResponse = null;
-
-    private async Task<HttpResponseMessage> MakeGetRequestToCaller(Uri caller, string authHeader)
+    private async Task<SimpleHttpResponse> MakeGetRequestToCaller(Uri caller, string authHeader)
     {
-        if (OverrideCallerResponse != null)
-            return OverrideCallerResponse;
-
-        var headers = new Dictionary<string, string>
-        {
-            ["Authorization"] = "HashBack " + authHeader
-        };
-
-        var resp = await httpGetter.GetAsync(caller, headers);
+        var req = new SimpleHttpRequest(caller)
+            .WithHeader("Authorization", "HashBack " + authHeader);
+            var resp = await httpGetter.GetAsync(req);
         return resp;
     }
 
@@ -178,7 +167,7 @@ public class CallController : ControllerBase
             return false;
 
         /* If the host is an IP address, reject it. */
-        if (System.Net.IPAddress.TryParse(url.Host, out var ip))
+        if (IPAddress.TryParse(url.Host, out _))
             return false;
 
         /* If the host starts or ends with a dot, reject it. */

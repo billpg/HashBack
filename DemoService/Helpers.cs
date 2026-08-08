@@ -142,4 +142,11 @@ public static class Helpers
     {
         return (int)(Math.Pow(9, net.Weight()+1));
     }
+
+    public static IDictionary<string,string> WithReplaceKeyValue(this IDictionary<string,string> old, string key, string value)
+    {
+        var newDict = new Dictionary<string, string>(old);
+        newDict[key] = value;
+        return newDict.AsReadOnly();
+    }
 }

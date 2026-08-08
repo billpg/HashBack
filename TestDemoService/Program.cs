@@ -1,65 +1,36 @@
-﻿using billpg.HashBackCore;
+﻿using Newtonsoft.Json.Linq;
 using System;
-using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 
 Console.WriteLine("Hello, World!");
 
-if (true)
-{
-    if (false)
-    {
-        using var http = new HttpClient();
-        var resp = await http.GetAsync("http://localhost:9001/hello/");
-        var content = await resp.Content.ReadAsStringAsync();
-    }
+/* Build a JSON claim. */
+var claimAsJson = new JObject();
+claimAsJson["Version"] = "BILLPG_DRAFT_4.2";
+claimAsJson["Host"] = "localhost:9001";
+claimAsJson["Now"] = (long)(DateTime.UtcNow - DateTime.UnixEpoch).TotalSeconds;
+claimAsJson["Unus"] = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+string verifyUrl = $"http://localhost:9001/hash/{Guid.NewGuid()}";
+claimAsJson["Verify"] = verifyUrl;
 
-    string verify = $"http://localhost:9001/hash/{Guid.NewGuid()}";
+/* Hash the claim. */
+byte[] claimAsBytes = Encoding.ASCII.GetBytes(claimAsJson.ToString());
+byte[] salt = Convert.FromBase64String("MGrvPY28enVH8lmkmlksLxQqIvX65oseOPAoqCO4XPw=");
+byte[] hashInput = Enumerable.Concat(salt, claimAsBytes).ToArray();
+byte[] hashAsBytes = SHA256.HashData(hashInput);
+string hashAsText = Convert.ToBase64String(hashAsBytes);
 
-    string verificationHash = "";
-    void RegisterHash(string x, string y)
-    {
-        verificationHash = y;
-    }
+/* Upload the hash. Replace this with uploading to your own website. */
+HttpClient httpPut = new HttpClient();
+var respPut = await httpPut.PutAsync(verifyUrl, new StringContent(hashAsText));
+respPut.EnsureSuccessStatusCode();
 
-    string ah = "";
-    {
-        var hbb = new HashBackBuilder();
-        hbb.Host = "demo.hashback.dev";
-        hbb.SetVerify(verify);
-        hbb.SetSyncHashRegister(RegisterHash);
-        ah = await hbb.Build();
-    }
+/* Call the hello end-point. */
+HttpClient httpHello = new HttpClient();
+httpHello.DefaultRequestHeaders.Add("Authorization", "HashBack " + Convert.ToBase64String(claimAsBytes));
+var respHello = await httpHello.GetAsync("http://localhost:9001/hello/");
+respHello.EnsureSuccessStatusCode();
+var helloBody = await respHello.Content.ReadAsStringAsync();
 
-
-
-    {
-        using var http = new HttpClient();
-
-        // PUT a text/plain request to the hash service with a random GUID in the URL
-        using var content = new StringContent(verificationHash, Encoding.ASCII, "text/plain");
-
-        var response = await http.PutAsync(verify, content);
-
-        Console.WriteLine($"Status: {(int)response.StatusCode} {response.ReasonPhrase}");
-        var responseBody = await response.Content.ReadAsStringAsync();
-        Console.WriteLine($"Response body: {responseBody}");
-    }
-
-    {
-        using var http = new HttpClient();
-        http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("HashBack", ah);
-        var resp = await http.GetAsync("http://localhost:9001/hello/");
-        Console.WriteLine($"Status: {(int)resp.StatusCode} {resp.ReasonPhrase}");
-        var content = await resp.Content.ReadAsStringAsync();
-        Console.WriteLine($"Response body: {content}");
-
-    }
-
-}
-
-if (true)
-{
-
-}
+{ }

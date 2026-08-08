@@ -73,13 +73,9 @@ public sealed class CallControllerTests
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
 
         // Prepare a fake response from the remote caller and set it on the fake getter.
-        var fakeResp = new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent("Hello from remote caller")
-        };
-        fakeResp.Headers.Add("X-Remote", "value");
-
-        fake.Response = fakeResp;
+        fake.Response = new SimpleHttpResponse(200)
+            .WithHeader("X-Remote", "value")
+            .WithBody("Hello from remote caller");
 
         // Act
         var result = await controller.Post().ConfigureAwait(false);

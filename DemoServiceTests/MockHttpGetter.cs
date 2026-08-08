@@ -17,20 +17,21 @@ namespace DemoServiceTests
             _registered = registered ?? new ConcurrentDictionary<string, string>();
         }
         
-        public HttpResponseMessage? Response { get; set; }
+        public SimpleHttpResponse? Response { get; set; }
         public IDictionary<string, string>? LastHeaders { get; private set; }
         public Uri? LastUri { get; private set; }
 
-        public Task<HttpResponseMessage> GetAsync(Uri uri, IDictionary<string, string>? headers = null)
+        public Task<SimpleHttpResponse> GetAsync(SimpleHttpRequest req)
         {
-            if (Response == null && _registered.TryGetValue(uri.ToString(), out string? registeredHash))
-            {
-                Response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(registeredHash) };
-            }
+            if (Response == null && _registered.TryGetValue(req.Url.ToString(), out string? registeredHash))
+                Response = new SimpleHttpResponse(200)
+                    .WithHeader("Content-Type", "text/plain")
+                    .WithHeader("Server", "unit test")
+                    .WithBody(registeredHash);
                    
-            LastUri = uri;
-            LastHeaders = headers;
-            return Task.FromResult(Response ?? new HttpResponseMessage(HttpStatusCode.NotFound));
+            LastUri = req.Url;
+            LastHeaders = req.Headers;
+            return Task.FromResult(Response ?? new SimpleHttpResponse(404));
         }
     }
 }

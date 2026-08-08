@@ -10,6 +10,7 @@ using Swashbuckle.AspNetCore.Annotations;
 using Microsoft.OpenApi;
 using DemoService.Services;
 
+// Web Service core handler.
 var builder = WebApplication.CreateBuilder(args);
 
 // Add controllers and OpenAPI/Swagger generator
@@ -45,6 +46,9 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 var app = builder.Build();
+
+// Global exception handling middleware -- converts exceptions into HTTP responses
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // Add IP rate limiting middleware early so it applies to all requests.
 // The middleware will return 429 Too Many Requests when a single IP exceeds
