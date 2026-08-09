@@ -10,6 +10,10 @@ using Swashbuckle.AspNetCore.Annotations;
 using Microsoft.OpenApi;
 using DemoService.Services;
 
+// Read the command line for a "Allow Get Localhost" flag.
+ServiceData.AllowGetLocalhost
+    = Environment.GetCommandLineArgs().Contains("GetLocalhost");
+
 // Web Service core handler.
 var builder = WebApplication.CreateBuilder(args);
 

@@ -95,7 +95,8 @@ public class HelloController : ControllerBase
         /* Call the supplied verification URL and get the results. */
         var resp = await httpGetter.GetAsync(new SimpleHttpRequest(url));
         if (resp.StatusCode != 200)
-            throw new ApplicationException($"{url} returned status code {resp.StatusCode}");
+            throw new BadRequestException("Bad Verification URL.", 
+                $"{url} returned status code {resp.StatusCode}");
 
         /* Split the response into lines, looking for the first one that might be the hash.
          * This will allow chunked to work, as the length-of-chunk line will be ignored. */
@@ -106,6 +107,7 @@ public class HelloController : ControllerBase
         }
 
         /* No lines fit. */
-        throw new ApplicationException($"{url} did not return a suitable base-64 verification hash.");
+        throw new BadRequestException("Bad Verification Hash",
+            $"{url} did not return a suitable base-64 verification hash.");
     }
 }

@@ -10,6 +10,7 @@ namespace DemoService;
 public class ServiceData
 {
     public string ConfigServiceHost { get; set; } = "localhost:9001";
+    public static bool AllowGetLocalhost { get; internal set; } = false;
 
     private readonly ConcurrentDictionary<Guid, StoredHash> hashes
         = new();

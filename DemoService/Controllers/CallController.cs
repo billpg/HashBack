@@ -98,10 +98,11 @@ public class CallController : ControllerBase
         if (string.IsNullOrWhiteSpace(requestBody))
             return BadRequest("Request body must contain non-empty plain text.");
 
-        /* Trim, then validate the request body is a valid HTTPS URL. */
+        /* Trim, then validate the request body is a valid HTTPS URL.
+         * Note that the HttpGetter service will make additional validations on the URL. */
         bool isValid = Uri.TryCreate(requestBody.Trim(), UriKind.Absolute, out var caller);
-        if (!isValid || caller == null || !IsSecure(caller))
-            return BadRequest("Request body must be a valid HTTPS URL.");
+        if (!isValid || caller == null)
+            return BadRequest("Request body must be a valid URL.");
 
         /* Build the Authorization header for the caller's URL. */
         var session = new CallSession(data.ConfigServiceHost, Guid.NewGuid(), caller!, DateTime.UtcNow, Request.RequestIP());
@@ -142,43 +143,4 @@ public class CallController : ControllerBase
         return resp;
     }
 
-    private bool IsSecure(Uri url)
-    {
-        /* Allow HTTP for localhost only, and only when configured as running as localhost. */
-        if (url.Scheme == Uri.UriSchemeHttp &&
-            url.Host == "localhost" &&
-            url.Authority == data.ConfigServiceHost)
-            return true;
-
-        /* Reject anything other than HTTPS. */
-        if (url.Scheme != Uri.UriSchemeHttps)
-            return false;
-
-        /* If the port is anything other than 443, reject it. */
-        if (url.Port != 443)
-            return false;
-
-        /* If the host is less than five charcters, reject it. */
-        if (url.Host.Length < 5)
-            return false;
-
-        /* If the URL contains any non-ascii characters, reject it. */
-        if (url.Host.Any(c => c > 127) || url.PathAndQuery.Contains('%'))
-            return false;
-
-        /* If the host is an IP address, reject it. */
-        if (IPAddress.TryParse(url.Host, out _))
-            return false;
-
-        /* If the host starts or ends with a dot, reject it. */
-        if (url.Host.StartsWith('.') || url.Host.EndsWith('.'))
-            return false;
-
-        /* If the host is a single undotted string, reject it. */
-        if (!url.Host.Contains('.'))
-            return false;
-
-        /* Anything else is considered secure. */
-        return true;
-    }
 }

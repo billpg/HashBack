@@ -35,5 +35,4 @@
   <ItemGroup>
     <ProjectReference Include="..\billpg.HashBackCore\billpg.HashBackCore.csproj" />
   </ItemGroup>
-
 </Project>

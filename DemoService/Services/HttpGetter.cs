@@ -29,6 +29,9 @@ public class HttpGetter : IHttpGetter
 
     public async Task<SimpleHttpResponse> GetAsync(SimpleHttpRequest req)
     {
+        /* First, validate the URL. */
+        ValidateUrlOrThrow(req.Url);
+
         /* Connect TCP and handshake TLS. The finally block with close them. */
         (var tcpcli, var netstr) = await ConnectHttp(req.Url);
         try
@@ -74,8 +77,10 @@ public class HttpGetter : IHttpGetter
 
     private async Task<(TcpClient tcpcli, Stream netstr)> ConnectHttp(Uri uri)
     {
+        /* Check if this is a localhost allowance */
+        bool isDebug = ServiceData.AllowGetLocalhost && uri.Scheme == "http" && uri.Host == "localhost";
+
         /* Validate the URL is acceptable. */
-        bool isDebug = uri.Authority == data.ConfigServiceHost;
         if (uri.Scheme != "https" && !isDebug)
             throw new ApplicationException("URL must be HTTPS only.");
         if (uri.Port != 443 && !isDebug)
@@ -86,7 +91,16 @@ public class HttpGetter : IHttpGetter
 
         /* Connect TCP. */
         var tcp = new TcpClient();
-        await tcp.ConnectAsync(remoteIp, uri.Port);
+        try
+        {
+            await tcp.ConnectAsync(remoteIp, uri.Port);
+        }
+        catch (SocketException)
+        {
+            throw new BadRequestException(
+                "External URL not available.", 
+                $"Can't connect to {uri} ({remoteIp})");
+        }
         var netstr = tcp.GetStream();
 
         /* Handshake TLS. */
@@ -115,25 +129,47 @@ public class HttpGetter : IHttpGetter
         throw new ApplicationException($"IP address ({ip}) of host ({host}) is not acceptable.");
     }
 
-    private (string httpVersion, int statusCode, string statusDescription) ParseHttpBanner(string? banner)
+    private static void ValidateUrlOrThrow(Uri url)
     {
-        if (string.IsNullOrWhiteSpace(banner))
-            throw new ApplicationException("Empty or missing HTTP response banner.");
+        /* Allow HTTP for localhost only, and only when allowed. */
+        if (ServiceData.AllowGetLocalhost &&
+            url.Scheme == Uri.UriSchemeHttp &&
+            url.Host == "localhost")
+            return;
 
-        // Split into at most 3 parts: version, status code, and the rest as description.
-        var parts = banner.Split(new[] { ' ' }, 3, StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 2)
-            throw new ApplicationException($"Invalid HTTP banner: '{banner}'");
+        BadRequestException Ex(string detail)
+            => new("URL not acceptable.", detail);
 
-        var httpVersion = parts[0];
-        if (!httpVersion.StartsWith("HTTP/", StringComparison.OrdinalIgnoreCase))
-            throw new ApplicationException($"Invalid HTTP version in banner: '{banner}'");
+        /* Reject anything other than HTTPS. */
+        if (url.Scheme != Uri.UriSchemeHttps)
+            throw Ex($"{url.Scheme} URLs are not accepted.");
 
-        if (!int.TryParse(parts[1], out int statusCode))
-            throw new ApplicationException($"Invalid status code in banner: '{banner}'");
+        /* If the port is anything other than 443, reject it. */
+        if (url.Port != 443)
+            throw Ex($"URL must be HTTPS and port 443.");
 
-        var statusDescription = parts.Length >= 3 ? parts[2] : string.Empty;
+        /* If the host is less than five charcters, reject it. */
+        if (url.Host.Length < 5)
+            throw Ex("URL host is too short.");
 
-        return (httpVersion, statusCode, statusDescription);
+        /* If the URL contains any non-ascii characters, reject it. */
+        if (url.Host.Any(c => c > 127) || url.PathAndQuery.Contains('%'))
+            throw Ex("URL contains non-ASCII.");
+
+        /* If the host is an IP address, reject it. */
+        if (IPAddress.TryParse(url.Host, out _))
+            throw Ex("Host must be for a domain.");
+
+        /* If the host starts or ends with a dot, reject it. */
+        if (url.Host.StartsWith('.') || url.Host.EndsWith('.'))
+            throw Ex("Host must not start or end with a dot.");
+
+        /* If the host is a single undotted string, reject it. */
+        if (!url.Host.Contains('.'))
+            throw Ex("URL must be for a domain with dots.");
+
+        /* Anything else is considered secure. */
+        return;
     }
+
 }

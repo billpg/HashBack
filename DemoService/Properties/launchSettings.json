@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DemoService": {
+      "commandName": "Project",
+      "commandLineArgs": "GetLocalhost"
+    }
+  }
+}

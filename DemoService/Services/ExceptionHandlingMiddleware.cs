@@ -36,12 +36,36 @@ public sealed class ExceptionHandlingMiddleware
 
             if (ex is AuthorizationParseException apex)
             {
-                context.Response.StatusCode = 400;
+                await RespondProblemDetails(400, "Invalid Authorization Header", apex.Message);
+                return;
+            }
+            if (ex is BadRequestException brex)
+            {
+                await RespondProblemDetails(400, brex.Title, brex.Message);
                 return;
             }
 
             _logger.LogError(ex, "Unhandled exception caught by ExceptionHandlingMiddleware.");
             await WriteProblemDetailsResponseAsync(context, ex).ConfigureAwait(false);
+        }
+
+        async Task RespondProblemDetails(int statusCode, string title, string detail)
+        {
+            var pd = new ProblemDetails
+            {
+                Status = statusCode,
+                Title = title,
+                Detail = detail,
+                Instance = context.Request.Path
+            };
+
+            context.Response.Clear();
+            context.Response.StatusCode = statusCode;
+            context.Response.ContentType = "application/problem+json";
+
+            var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+            var json = JsonSerializer.Serialize(pd, options);
+            await context.Response.WriteAsync(json).ConfigureAwait(false);
         }
     }
 
@@ -74,6 +98,8 @@ public sealed class ExceptionHandlingMiddleware
         };
     }
 
+
+
     private static async Task WriteProblemDetailsResponseAsync(HttpContext context, Exception ex)
     {
         int status = MapStatusCode(ex);
@@ -93,4 +119,9 @@ public sealed class ExceptionHandlingMiddleware
         var json = JsonSerializer.Serialize(pd, options);
         await context.Response.WriteAsync(json).ConfigureAwait(false);
     }
+}
+
+public class BadRequestException(string title, string message) : Exception(message)
+{
+    public string Title { get; } = title;
 }

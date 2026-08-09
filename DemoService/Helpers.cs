@@ -79,6 +79,8 @@ public static class Helpers
         return IPAddress.Loopback;
     }
 
+
+
     public static bool IsIPv4(this IPAddress ip)
         => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork;
     public static bool IsIPv6(this IPAddress ip)
