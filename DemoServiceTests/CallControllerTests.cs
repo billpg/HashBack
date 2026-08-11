@@ -56,7 +56,8 @@ public sealed class CallControllerTests
         var result = await controller.Post().ConfigureAwait(false);
 
         // Assert
-        Assert.IsInstanceOfType(result, typeof(BadRequestObjectResult), "Expected BadRequest when supplied URL is not a valid HTTPS URL.");
+        Assert.IsInstanceOfType(result, typeof(BadRequestObjectResult), 
+            "Expected BadRequest when supplied URL is not a valid HTTPS URL.");
     }
 
     [TestMethod]

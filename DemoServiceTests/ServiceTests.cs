@@ -50,7 +50,7 @@ public class ServiceTests
         if (serviceProc == null)
             Assert.Fail($"Failed to start service process '{exePath}'.");
 
-        bool isRunning = Task.Run(WaitForNowListening).Wait(5000);        
+        bool isRunning = Task.Run(WaitForNowListening).Wait(5000);
         void WaitForNowListening()
         {
             while (true)
@@ -121,7 +121,7 @@ public class ServiceTests
         var helloBody = await respHello.Content.ReadAsStringAsync().ConfigureAwait(false);
 
         /* Check the response. */
-        Assert.AreEqual("Hello localhost!", helloBody);        
+        Assert.AreEqual("Hello localhost!", helloBody);
     }
 
     private async Task<HttpResponseMessage> CallHelloWithClaim(JObject claimAsJson)
@@ -136,7 +136,7 @@ public class ServiceTests
         using HttpClient httpHello = new HttpClient();
         httpHello.DefaultRequestHeaders.Authorization
             = new AuthenticationHeaderValue("HashBack", claimAsBase64);
-         return await httpHello.GetAsync($"{ServiceBaseUrl}hello/").ConfigureAwait(false);
+        return await httpHello.GetAsync($"{ServiceBaseUrl}hello/").ConfigureAwait(false);
     }
 
     [TestMethod]
@@ -177,7 +177,7 @@ public class ServiceTests
 
     [TestMethod]
     public async Task Hello_BadVersion()
-        => await Shared_Hello_BadJson("Version", "RUTABAGA", 
+        => await Shared_Hello_BadJson("Version", "RUTABAGA",
             "Version must be one of 'BILLPG_DRAFT_4.1'/'BILLPG_DRAFT_4.2'.");
 
     [TestMethod]
@@ -251,10 +251,10 @@ public class ServiceTests
         var claimAsJson = BuildClaim(verify: verifyUrl.ToString());
         (var hash, var auth) = HashClaim(claimAsJson);
 
-        /* Set up the listener to respond with the verification hash. */        
+        /* Set up the listener to respond with the verification hash. */
         osl.RespondBody = hash;
         using var http = new HttpClient();
-        http.DefaultRequestHeaders.Authorization 
+        http.DefaultRequestHeaders.Authorization
             = new AuthenticationHeaderValue("HashBack", auth);
         var resp = await http.GetAsync("http://localhost:9001/hello/");
 
@@ -272,7 +272,7 @@ public class ServiceTests
     [TestMethod]
     public async Task Hello_VerificationOffline()
         => await SharedHello_BadVerificationUrl(
-            "http://localhost:8001/xyz", 
+            "http://localhost:8001/xyz",
             "External URL not available.",
             "Can't connect to http://localhost:8001/xyz (127.0.0.1)");
 
@@ -318,8 +318,78 @@ public class ServiceTests
         var respHello = await CallHelloWithClaim(claimAsJson);
 
         /* Assert the response. */
-        await Assert_ErrorResponse(respHello, 400, "Bad Verification URL.", 
+        await Assert_ErrorResponse(respHello, 400, "Bad Verification URL.",
             $"{verifyUrl} returned status code 404");
+    }
+
+    // --- New black-box tests for /hash endpoints ---
+
+    [TestMethod]
+    public async Task Hash_GetRoot_ReturnsHtml()
+    {
+        using var http = new HttpClient();
+        var resp = await http.GetAsync($"{ServiceBaseUrl}hash/").ConfigureAwait(false);
+        Assert.AreEqual(HttpStatusCode.OK, resp.StatusCode);
+        Assert.IsNotNull(resp.Content.Headers.ContentType);
+        Assert.IsTrue(resp.Content.Headers.ContentType!.MediaType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase));
+        var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+        Assert.IsTrue(body.Contains("<html"), "Expected HTML content from /hash/");
+    }
+
+    [TestMethod]
+    public async Task Hash_PutAndGetById_HappyPath()
+    {
+        var id = Guid.NewGuid();
+        // prepare a deterministic 32-byte payload
+        var bytes = Enumerable.Range(0, 32).Select(i => (byte)i).ToArray();
+        var base64 = Convert.ToBase64String(bytes);
+
+        using (var http = new HttpClient())
+        {
+            var putResp = await http.PutAsync($"{ServiceBaseUrl}hash/{id}", new StringContent(base64)).ConfigureAwait(false);
+            putResp.EnsureSuccessStatusCode();
+            var returned = await putResp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            Assert.AreEqual(base64, returned);
+
+            var getResp = await http.GetAsync($"{ServiceBaseUrl}hash/{id}").ConfigureAwait(false);
+            getResp.EnsureSuccessStatusCode();
+            var got = await getResp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            Assert.AreEqual(base64, got);
+            Assert.AreEqual("text/plain", getResp.Content.Headers.ContentType?.MediaType);
+        }
+    }
+
+    [TestMethod]
+    public async Task Hash_GetById_NotFound()
+    {
+        var id = Guid.NewGuid();
+        using var http = new HttpClient();
+        var resp = await http.GetAsync($"{ServiceBaseUrl}hash/{id}").ConfigureAwait(false);
+        Assert.AreEqual(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task Hash_Put_EmptyBody_Returns400()
+    {
+        var id = Guid.NewGuid();
+        using var http = new HttpClient();
+        var resp = await http.PutAsync($"{ServiceBaseUrl}hash/{id}", new StringContent("")).ConfigureAwait(false);
+        Assert.AreEqual(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task Hash_Put_ConflictOnDuplicate()
+    {
+        var id = Guid.NewGuid();
+        var bytes = Enumerable.Range(0, 32).Select(i => (byte)i).ToArray();
+        var base64 = Convert.ToBase64String(bytes);
+
+        using var http = new HttpClient();
+        var first = await http.PutAsync($"{ServiceBaseUrl}hash/{id}", new StringContent(base64)).ConfigureAwait(false);
+        first.EnsureSuccessStatusCode();
+
+        var second = await http.PutAsync($"{ServiceBaseUrl}hash/{id}", new StringContent(base64)).ConfigureAwait(false);
+        Assert.AreEqual(HttpStatusCode.Conflict, second.StatusCode);
     }
 
 }

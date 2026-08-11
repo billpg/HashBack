@@ -33,7 +33,7 @@ internal class OneShotHttpListen : IDisposable
                 this.ListenPort = tryPort;
                 break;
             }
-            catch (HttpListenerException ex) when (ex.ErrorCode == 32)
+            catch (HttpListenerException ex)
             { /* Ignore any try a new port. */ }
         }
 

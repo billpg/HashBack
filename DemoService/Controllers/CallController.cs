@@ -139,7 +139,7 @@ public class CallController : ControllerBase
     {
         var req = new SimpleHttpRequest(caller)
             .WithHeader("Authorization", "HashBack " + authHeader);
-            var resp = await httpGetter.GetAsync(req);
+        var resp = await httpGetter.GetAsync(req);
         return resp;
     }
 
