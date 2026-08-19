@@ -1,14 +1,16 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
-using DemoService;
-using System.Reflection;
-using System.IO;
-using Swashbuckle.AspNetCore.Annotations;
-using Microsoft.OpenApi;
+﻿using DemoService;
 using DemoService.Services;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.OpenApi;
+using Swashbuckle.AspNetCore.Annotations;
+using System.IO;
+using System.Reflection;
+using System.Text;
 
 // Read the command line for a "Allow Get Localhost" flag.
 ServiceData.AllowGetLocalhost
@@ -76,6 +78,8 @@ app.MapGet("/openapi", (HttpContext ctx) =>
     return Results.StatusCode(StatusCodes.Status302Found);
 });
 
-app.MapGet("/", () => Results.Text("DemoService running on http://localhost:9001"));
+// Return the generated HTML home page
+app.MapGet("/", () => Results.Content(HtmlPages.Home(), "text/html; charset=utf-8"));
 
+// Start the service. This function will continue until the process stops.
 app.Run();

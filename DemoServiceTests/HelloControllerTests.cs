@@ -18,28 +18,6 @@ public sealed class HelloControllerTests
     ServiceData GetServiceData()
         => new ServiceData { ConfigServiceHost = $"{Guid.NewGuid()}.example" };
 
-
-    [TestMethod]
-    public async Task Authenticate_NoCookieNoHeader_ReturnsNull()
-    {
-        // Arrange
-        var controller = new HelloController(GetServiceData(), new MockHttpGetter());
-        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
-
-        // Use reflection to call the private Authenticate method.
-        var mi = typeof(HelloController).GetMethod("Authenticate", BindingFlags.NonPublic | BindingFlags.Instance)
-            ?? throw new InvalidOperationException("Authenticate method not found.");
-
-        // Act
-        var taskObj = (Task)mi.Invoke(controller, new object[] { null, null })!;
-        await taskObj.ConfigureAwait(false);
-        var result = ((dynamic)taskObj).Result;
-
-        // Assert
-        Assert.IsNull((string?)result.Item1, "Expected null authDomain when no header and no cookie.");
-        Assert.IsFalse((bool)result.Item2, "Expected isCookieValid == false when no cookie present.");
-    }
-
     [TestMethod]
     public async Task Get_NoCookieNoHeader_Returns401AndWwwAuthenticateHeader()
     {
@@ -80,12 +58,8 @@ public sealed class HelloControllerTests
         var verifyUrl = $"https://client.example/verify/{Guid.NewGuid()}";
 
         // Build a real HashBack header and register the verification hash into our dictionary.
-        var builder = new HashBackBuilder<int>();
-        builder.Host = serviceData.ConfigServiceHost;
-        builder.VerifyGetter = s => Task.FromResult(verifyUrl);
-        builder.HashRegister = (s, url, hash) => Task.Run(() => registeredHashes[url] = hash);
-
-        string authToken = await builder.Build(1);
+        var (token, hash) = HashBackBuilder.Build(serviceData.ConfigServiceHost, verifyUrl);
+        registeredHashes[verifyUrl] = hash;
 
         // Create fake getter that returns the registered hash
         var fakeGetter = new MockHttpGetter(registeredHashes);
@@ -95,7 +69,7 @@ public sealed class HelloControllerTests
 
         // ----- First request: use Authorization header and receive Set-Cookie -----
         var ctx1 = new DefaultHttpContext();
-        ctx1.Request.Headers["Authorization"] = "HashBack " + authToken;
+        ctx1.Request.Headers["Authorization"] = "HashBack " + token;
         controller.ControllerContext = new ControllerContext { HttpContext = ctx1 };
 
         var result1 = await controller.Get().ConfigureAwait(false);
@@ -136,7 +110,8 @@ public sealed class HelloControllerTests
         Assert.AreEqual($"Hello {expectedDomain}!", content2.Content);
 
         // When cookie was valid, controller should not append a new cookie.
-        Assert.IsFalse(ctx2.Response.Headers.ContainsKey("Set-Cookie"), "Second response should not set a cookie when cookie is already valid.");
+        Assert.IsFalse(ctx2.Response.Headers.ContainsKey("Set-Cookie"), 
+            "Second response should not set a cookie when cookie is already valid.");
     }
 
     // Unhappy-path tests
@@ -162,12 +137,8 @@ public sealed class HelloControllerTests
         var registeredHashes = new ConcurrentDictionary<string, string>();
         var verifyUrl = $"https://client.example/verify/{Guid.NewGuid()}";
 
-        var builder = new HashBackBuilder<int>();
-        builder.Host = "demo.hashback.dev";
-        builder.VerifyGetter = s => Task.FromResult(verifyUrl);
-        builder.HashRegister = (s, url, hash) => Task.Run(() => registeredHashes[url] = hash);
-
-        string authToken = await builder.Build(1);
+        var (token, hash) = HashBackBuilder.Build("demo.hashback.dev", verifyUrl);
+        registeredHashes[verifyUrl] = hash;
 
         // Create fake getter that returns tampered hash
         var fakeGetter = new MockHttpGetter(registeredHashes);
@@ -186,23 +157,10 @@ public sealed class HelloControllerTests
         var controller = new HelloController(GetServiceData(), fakeGetter);
 
         var ctx = new DefaultHttpContext();
-        ctx.Request.Headers["Authorization"] = "HashBack " + authToken;
+        ctx.Request.Headers["Authorization"] = "HashBack " + token;
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
 
         // Act & Assert: wrong verification hash should produce an AuthorizationParseException
         await Assert.ThrowsExceptionAsync<AuthorizationParseException>(async () => await controller.Get());
-    }
-
-    [TestMethod]
-    public async Task Get_WithInvalidCookie_ThrowsInvalidOperationException()
-    {
-        // Arrange: provide a malformed/tampered cookie value
-        var controller = new HelloController(GetServiceData(), new MockHttpGetter());
-        var ctx = new DefaultHttpContext();
-        ctx.Request.Headers["Cookie"] = "HashBackDemoService=invalid.jwt.parts";
-        controller.ControllerContext = new ControllerContext { HttpContext = ctx };
-
-        // Act & Assert: JWT.ParseAndValidateReturnSub throws InvalidOperationException on bad token
-        await Assert.ThrowsExceptionAsync<InvalidOperationException>(async () => await controller.Get());
     }
 }

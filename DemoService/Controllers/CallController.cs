@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using billpg.HashBackCore;
 using System.Net;
 using DemoService.Services;
+using Microsoft.AspNetCore.Builder;
 
 namespace DemoService.Controllers;
 
@@ -24,54 +25,10 @@ public class CallController : ControllerBase
     /// </summary>
     private readonly IHttpGetter httpGetter;
 
-    /// <summary>
-    /// Represents the builder used to construct hash-based data structures.
-    /// </summary>
-    private readonly HashBackBuilder<CallSession> builder;
-
-    private record CallSession(string ServiceHost, Guid Id, Uri CallerUrl, DateTime Now, IPAddress Caller)
-    {
-        public string VerifyUrl => $"http://{ServiceHost}/hash/{Id}";
-    }
-
     public CallController(ServiceData data, IHttpGetter httpGetter)
     {
-        /* Store the data object for later use.
-         * This is the persistent service data that will be shared across requests. */
         this.data = data;
         this.httpGetter = httpGetter;
-
-        /* Initialize the HashBackBuilder with the necessary callbacks for 
-         * generating verification URLs and registering hashes. */
-        this.builder = new()
-        {
-            VerifyGetter = GenerateVerifyUrl,
-            HashRegister = RegisterHash
-        };
-    }
-
-    /// <summary>
-    /// Build a verification URL that will be passed to the remote service in the form of
-    /// an Authorization header. The remote service will call this URL to verify the hash.
-    /// </summary>
-    /// <returns>Verification URL with a unique ID in the place that RegsiterHash will expect it.</returns>
-    private static Task<string> GenerateVerifyUrl(CallSession session)
-        => Task.FromResult(session.VerifyUrl);
-
-    /// <summary>
-    /// Called by the HashBackBuilder class when it has a verification
-    ///  URL and a corresponding verification hash to serve.
-    /// </summary>
-    /// <param name="session">Caller's session data.</param>
-    /// <param name="_">Ignored verification URL. (Uses ID in session.)</param>
-    /// <param name="hash">The veirifcation hash to return.</param>
-    /// <returns>Async task.</returns>
-    private Task RegisterHash(CallSession session, string _, string hash)
-    {
-        var storedHash = new StoredHash(
-            Convert.FromBase64String(hash), session.Now, session.Caller);
-        data.TryAddHash(session.Id, storedHash);
-        return Task.CompletedTask;
     }
 
     // GET /call/
@@ -105,42 +62,42 @@ public class CallController : ControllerBase
             return BadRequest("Request body must be a valid URL.");
 
         /* Build the Authorization header for the caller's URL. */
-        var session = new CallSession(data.ConfigServiceHost, Guid.NewGuid(), caller!, DateTime.UtcNow, Request.RequestIP());
-        string authHeader = await this.builder.BuildWithHost(session, caller.Authority);
+        Guid id = Guid.NewGuid();
+        string verifyUrl = $"https://{data.ConfigServiceHost}/hash/{id}";
+        DateTime now = DateTime.UtcNow;
+        (string authHeader, string hash) = HashBackBuilder.Build(caller.Authority, now, verifyUrl);
+        var storedHash = new StoredHash(Convert.FromBase64String(hash), now, Request.RequestIP());
+        data.TryAddHash(id, storedHash);
 
         /* Make a GET request to that URL. */
-        var resp = await MakeGetRequestToCaller(caller, authHeader);
+        var req = new SimpleHttpRequest(caller)
+            .WithHeader("Authorization", "HashBack " + authHeader);
+        var resp = await httpGetter.GetAsync(req);
 
+        /* Report to caller. */
+        return Content(BuildReport(caller, id, resp), "text/plain");
+    }
+
+    private string BuildReport(Uri caller, Guid id, SimpleHttpResponse resp)
+    {
         /* Build a report of the response, including status code, headers, and body. */
         var report = new StringBuilder();
         report.AppendLine($"GET {caller}:");
-        report.AppendLine($"Status: {(int)resp.StatusCode}");
+        report.AppendLine($"Status: {resp.StatusCode}");
         foreach (var header in resp.Headers)
             report.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
         report.AppendLine("Body:");
         var body = resp.Body;
         report.AppendLine(body);
         report.AppendLine();
-        var getHashEvents = data.ListGetHashEvents(session.Id);
-        report.AppendLine($"Logged GET /hash/{session.Id} events: ({getHashEvents.Count})");
+        var getHashEvents = data.ListGetHashEvents(id);
+        report.AppendLine($"Logged GET /hash/{id} events: ({getHashEvents.Count})");
         for (int eventIndex = 0; eventIndex < getHashEvents.Count; eventIndex++)
         {
             var e = getHashEvents[eventIndex];
             report.AppendLine($"[{eventIndex + 1}/{getHashEvents.Count}] {e.GotAt} from {e.GotBy}");
             report.AppendLine(e.RequestHeaders);
         }
-
-        /* Return report to caller as plain text. */
-        var reportAsString = report.ToString();
-        return Content(reportAsString, "text/plain");
+        return report.ToString();
     }
-
-    private async Task<SimpleHttpResponse> MakeGetRequestToCaller(Uri caller, string authHeader)
-    {
-        var req = new SimpleHttpRequest(caller)
-            .WithHeader("Authorization", "HashBack " + authHeader);
-        var resp = await httpGetter.GetAsync(req);
-        return resp;
-    }
-
 }

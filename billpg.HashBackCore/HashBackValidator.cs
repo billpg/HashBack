@@ -1,8 +1,7 @@
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 
 namespace billpg.HashBackCore
@@ -68,7 +67,7 @@ namespace billpg.HashBackCore
             }
 
             /* Attempt to parse JSON, complaining if it rejects the string. */
-            JObject? obj = Helpers.TryJsonParse(json);
+            JsonObject? obj = Helpers.TryJsonParse(json);
             if (obj == null)
             {
                 /* If we got here, it means the input was not valid JSON. */
@@ -78,7 +77,7 @@ namespace billpg.HashBackCore
             }
 
             /* Validate Version. */
-            string? version = obj["Version"]?.Value<string>();
+            string? version = obj["Version"]?.GetValue<string>();
             if (version == null)
                 throw new AuthorizationParseException(
                     "Version property is missing.",
@@ -89,7 +88,7 @@ namespace billpg.HashBackCore
                     ValidateRejectionReason.BadHeader);
 
             /* Validate Host. */
-            string? host = obj["Host"]?.Value<string>();
+            string? host = obj["Host"]?.GetValue<string>();
             if (host == null)
                 throw new AuthorizationParseException(
                     "Host property is missing.", 
@@ -101,7 +100,7 @@ namespace billpg.HashBackCore
                     ValidateRejectionReason.WrongHost);
 
             /* Validate Now. */
-            long? now = obj["Now"]?.Value<long>();
+            long? now = obj["Now"]?.GetValue<long?>();
             if (now == null)
                 throw new AuthorizationParseException(
                     "Now property is missing.", 
@@ -113,7 +112,7 @@ namespace billpg.HashBackCore
                     ValidateRejectionReason.WrongNow);
 
             /* Validate Unus. */
-            string? unus = obj["Unus"]?.Value<string>();
+            string? unus = obj["Unus"]?.GetValue<string>();
             if (unus == null)
                 throw new AuthorizationParseException(
                     "Unus property is missing.", 
@@ -129,7 +128,7 @@ namespace billpg.HashBackCore
                     ValidateRejectionReason.BadHeader);
 
             /* Validate Verify (must be a valid https URL) */
-            string? verifyUrl = obj["Verify"]?.Value<string>();
+            string? verifyUrl = obj["Verify"]?.GetValue<string>();
             if (verifyUrl == null)
                 throw new AuthorizationParseException(
                     "Verify property is missing.",
@@ -154,7 +153,7 @@ namespace billpg.HashBackCore
 
             /* If all checks pass, compute the expected 
              * hash from the bytes collected earlier. */
-            string expectedHash = Helpers.ComputeVerificationHash(version, jsonBytes);
+            string expectedHash = Helpers.ComputeVerificationHash(version, jsonBytes!);
             OnLogWrite($"Expected Hash: \"{expectedHash}\"");
 
             /* Call the corresponding verification hash getter function.

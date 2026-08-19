@@ -12,6 +12,9 @@ namespace DemoService;
 
 internal class HtmlPages
 {
+    internal static string Home()
+        => GetHtmlByResource("DemoService.Docs.Home.md");
+
     internal static string HashRoot()
         => GetHtmlByResource("DemoService.Docs.GetHashRoot.md");
 
@@ -73,7 +76,7 @@ internal class HtmlPages
                 currSection = new XElement("section");
                 currSection.SetAttributeValue("class", "panel");
                 currSection.Add(elem);
-                
+
                 /* Find the footer and add the new section immediately before it. */
                 htmlOut.Descendants().WhereElement("p").WhereClass("footer").Single().AddBeforeSelf(currSection);
             }

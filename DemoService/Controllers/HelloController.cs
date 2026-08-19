@@ -59,17 +59,19 @@ public class HelloController : ControllerBase
 
         /* Failed authentication, return a 401 with some text. */
         Response.Headers["WWW-Authenticate"]
-            = $"HashBack realm=\"demo.hashback.dev\" set-cookie=\"{HashBackCookieName}\" version=\"BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1\"";
+            = $"HashBack realm=\"demo.hashback.dev\"" +
+            $" set-cookie=\"{HashBackCookieName}\"" +
+            $" version=\"BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1\"";
         Response.StatusCode = 401;
         return Content(HtmlPages.HelloRoot(), "text/html", Encoding.UTF8);
     }
 
     private async Task<(string? authDomain, bool isCookieValid)> Authenticate(string? authHeader, string? cookieValue)
     {
-        /* Check the cookie first. */
+        /* Check the cookie first. If its valid, return the domain inside it. */
         if (!string.IsNullOrEmpty(cookieValue))
         {
-            string domainInCookie = JWT.ParseAndValidateReturnSub(cookieValue);
+            string? domainInCookie = JWT.ParseAndValidateReturnSub(cookieValue);
             if (domainInCookie != null)
                 return (domainInCookie, true);
         }
@@ -87,6 +89,7 @@ public class HelloController : ControllerBase
                 return (authDomain, false);
         }
 
+        /* Not authenticated. */
         return (null, false);
     }
 

@@ -1,10 +1,11 @@
-﻿using Microsoft.AspNetCore.Http.Features;
-using Newtonsoft.Json.Linq;
+﻿using DemoService.Services;
+using Microsoft.AspNetCore.Http.Features;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 
 namespace DemoService;
@@ -30,13 +31,13 @@ internal static class JWT
     {
         long nowUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
-        var jwtHead = new JObject
+        var jwtHead = new JsonObject
         {
             ["typ"] = "JWT",
             ["alg"] = "HS256"
         };
 
-        var jwtBody = new JObject
+        var jwtBody = new JsonObject
         {
             ["sub"] = sub,
             ["iat"] = nowUnix,
@@ -51,36 +52,43 @@ internal static class JWT
         return headAndBody + "." + Helpers.JWTEncode(sigAsBytes);
     }
 
-    internal static string ParseAndValidateReturnSub(string cookieValue)
+    internal static string? ParseAndValidateReturnSub(string cookieValue)
     {
+        /* Parse JWT. If the structure is wrong then return null as an 
+         * invalid cookie but unworthy of note. */
         var parts = cookieValue.Split('.');
         if (parts.Length != 3)
-            throw new InvalidOperationException("Invalid JWT format.");
+            return null;
         string headAndBody = parts[0] + "." + parts[1];
+
+        /* Find the expected signature from this payload and see if it
+         * matches the one provided. If not, reject it. */
         var sigAsBytes = HMACSHA256.HashData(HMACSHA256Key, Encoding.ASCII.GetBytes(headAndBody));
         string expectedSig = Helpers.JWTEncode(sigAsBytes);
-        if (!string.Equals(expectedSig, parts[2], StringComparison.Ordinal))
-            throw new InvalidOperationException("Invalid JWT signature.");
+        if (expectedSig != parts[2])
+            return null;
+
+        /* From this point, any issues with signed cookies are problems worthy of an exception. */
         var bodyJson = JWTDecode(parts[1]);
-        long expUnix = bodyJson.Value<long>("exp");
+        long expUnix = bodyJson["exp"]!.GetValue<long>();
         long nowUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         if (nowUnix > expUnix)
-            throw new InvalidOperationException("JWT has expired.");
-        return bodyJson.Value<string>("sub") ?? throw new InvalidOperationException("JWT missing 'sub' claim.");
+            return null;
+        return bodyJson["sub"]!.GetValue<string>() ?? throw new InvalidOperationException("JWT missing 'sub' claim.");
     }
 
-    private static string JWTEncode(JObject json)
+    private static string JWTEncode(JsonObject json)
     {
-        var jsonAsString = json.ToString(Newtonsoft.Json.Formatting.None);
+        var jsonAsString = json.ToString();
         var jsonAsBytes = Encoding.UTF8.GetBytes(jsonAsString);
         return Helpers.JWTEncode(jsonAsBytes);
     }
 
-    private static JObject JWTDecode(string base64Url)
+    private static JsonObject JWTDecode(string base64Url)
     {
         var bytes = Helpers.TryParseBase64(base64Url) 
             ?? throw new InvalidOperationException("Invalid base64url encoding.");
         var jsonAsString = Encoding.UTF8.GetString(bytes);
-        return JObject.Parse(jsonAsString);
+        return (JsonObject)JsonNode.Parse(jsonAsString)!;
     }
 }

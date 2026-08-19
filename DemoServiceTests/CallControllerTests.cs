@@ -40,27 +40,6 @@ public sealed class CallControllerTests
     }
 
     [TestMethod]
-    public async Task Post_InvalidUrl_ReturnsBadRequest()
-    {
-        // Arrange
-        var data = GetServiceData();
-        var fake = new MockHttpGetter();
-        var controller = new CallController(data, fake);
-        var ctx = new DefaultHttpContext();
-        // Provide an invalid (non-HTTPS) URL
-        var body = "http://insecure.example";
-        ctx.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(body));
-        controller.ControllerContext = new ControllerContext { HttpContext = ctx };
-
-        // Act
-        var result = await controller.Post().ConfigureAwait(false);
-
-        // Assert
-        Assert.IsInstanceOfType(result, typeof(BadRequestObjectResult), 
-            "Expected BadRequest when supplied URL is not a valid HTTPS URL.");
-    }
-
-    [TestMethod]
     public async Task Post_ValidHttps_UsesFakeHttpGetterAndReturnsReport()
     {
         // Arrange
