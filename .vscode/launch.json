@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug DemoService",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/DemoService/bin/Debug/net10.0/DemoService.dll",
+            "cwd": "${workspaceFolder}/DemoService",
+            "args": ["GetLocalhost"],
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+            },
+            "preLaunchTask": "build DemoService",
+            "stopAtEntry": false,
+            "justMyCode": true
+        }
+    ]
+}

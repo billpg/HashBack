@@ -13,7 +13,7 @@ namespace DemoService;
 internal class HtmlPages
 {
     internal static string Home()
-        => GetHtmlByResource("DemoService.Docs.Home.md");
+        => GetHtmlByResource("DemoService.Docs.GetHome.md");
 
     internal static string HashRoot()
         => GetHtmlByResource("DemoService.Docs.GetHashRoot.md");
