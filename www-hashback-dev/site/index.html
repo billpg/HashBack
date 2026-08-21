@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>HashBack | Trusted authentication without secret storage</title>
+    <title>HashBack | Server-to-Server authentication without secret storage</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
@@ -32,7 +32,7 @@
           <p>One call out, one call back.</p>
         </article>
         <article class="card">
-          <h3>Built for Servers</h3>
+          <h3>Server-to-Server</h3>
           <p>Use it for general-purpose authentication between internet-facing services.</p>
         </article>
       </section>
@@ -46,7 +46,7 @@
           <img src="PhoneCall-Frame-3.png" alt="You know my number. Call me back." />
           <img src="PhoneCall-Frame-4.png" alt="Hi Alice. Did you call me just now?" />
         </div>
-        <p>Did you see what <b>didn't</b> happen? No-one needed a cryptographic key or secret token.</p>
+        <p>Did you see what <b>didn't</b> happen? <b>No-one</b> needed a cryptographic key or secret token.</p>
         <p>Now apply that idea to web authentication. The client knows, thanks to TLS, who they are  connecting to, but the server doesn't know who that incoming connection is from. If the server can call the client back, this time the server knows, thanks again to TLS, that the client is who they say they are. The two connections in opposite directions complete the loop.</p>
       </section>
       <section class="panel">

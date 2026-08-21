@@ -17,7 +17,7 @@ internal static class XmlHelpers
     public static XElement Introduction(this XDocument doc)
         => doc.FindElementName("div").WhereClass("introduction").Single();
 
-    public static XElement Main(this XDocument doc)
+    public static XElement MainSection(this XDocument doc)
         => doc.FindElementName("main").Single();
 
     public static XElement AddSection(this XDocument doc, string className)
@@ -25,7 +25,7 @@ internal static class XmlHelpers
 
     public static XElement AddElementToMain(this XDocument doc, string elementName, string className)
     {
-        var main = doc.Main();
+        var main = doc.MainSection();
         var footer = main.Elements().WhereName("p").WhereClass("footer").Single();
 
         var section = new XElement("section");
@@ -37,7 +37,7 @@ internal static class XmlHelpers
 
     public static XElement AddStepSection(this XDocument doc, string title)
     {
-        int lastStep = doc.Main()
+        int lastStep = doc.MainSection()
             .Descendants()
             .WhereName("span")
             .WhereClass("number")

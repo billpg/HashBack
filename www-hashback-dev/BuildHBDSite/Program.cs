@@ -3,7 +3,7 @@ using System.Xml.Linq;
 using System.Reflection;
 
 var htmlTemplate = LoadTemplate("BuildHBDSite.SiteTemplate.xml");
-var siteFolder = "C:\\Users\\hacke\\source\\repos\\billpg\\HashBack\\www-hashback-dev\\site";
+var siteFolder = "/home/billdev/Develop/HashBack/www-hashback-dev/site";
 
 var buttons = new Dictionary<string, string>
 {
@@ -19,7 +19,7 @@ var buttons = new Dictionary<string, string>
 {
     var html = new XDocument(htmlTemplate);
 
-    html.Title().SetValue("HashBack | Trusted authentication without secret storage");
+    html.Title().SetValue("HashBack | Server-to-Server authentication without secret storage");
     html.H1().SetValue("HashBack");
     html.Introduction().AddHtml(
         "Cloud servers shouldn’t need to hold onto long‑lived secrets like passwords, API tokens or private keys." +
@@ -43,7 +43,7 @@ var buttons = new Dictionary<string, string>
         "<p>One call out, one call back.</p>");
 
     var card3 = cards.AddElement("article", "card");
-    card3.AddHtml("<h3>Built for Servers</h3>");
+    card3.AddHtml("<h3>Server-to-Server</h3>");
     card3.AddHtml("<p>Use it for general-purpose authentication between internet-facing services.</p>");
 
     var analogy = html.AddSection("panel");
@@ -62,7 +62,7 @@ var buttons = new Dictionary<string, string>
         "</div>");
     analogy.AddHtml(
         "<p>Did you see what <b>didn't</b> happen? " +
-        "No-one needed a cryptographic key or secret token.</p>");
+        "<b>No-one</b> needed a cryptographic key or secret token.</p>");
     analogy.AddHtml(
         "<p>Now apply that idea to web authentication. The client knows, thanks to TLS, who they are " +
         " connecting to, but the server doesn't know who that incoming connection is from." +
@@ -133,7 +133,7 @@ void SaveHtml(XDocument doc, string filename)
     step3.AddHtml("<p>Run a <b>salted SHA-256 hash over your JSON</b> and base-64 the result. Publish that string" +
         " as a one-line text file at the URL you listed in your JSON earlier.</p>");
     step3.AddCode(
-        "$ cat auth.json hashback-salt.bin \\",
+        "$ cat hashback-salt.bin auth.json \\",
         "    | sha256sum \\",
         "    | cut -d ' ' -f1 \\",
         "    | xxd -r -p \\",
@@ -261,7 +261,7 @@ void SaveHtml(XDocument doc, string filename)
     hello.AddHashbert("Is it me you're looking for?");
 
     var call = html.AddSection("panel");
-    call.AddHtml("<h2>Test Your Client Code</h2>");
+    call.AddHtml("<h2>Test Your Service Code</h2>");
     call.AddHtml(
         "<div class=\"feature-item\">" +
         "<strong><code>https://demo.hashback.dev/call/</code></strong>" +
@@ -357,7 +357,8 @@ void SaveHtml(XDocument doc, string filename)
         "<p>The exact mechanism is still to be discussed — but if you're interested, please let me know.</p>");
     money.AddHashbert("If you help HashBack, you help me. And I am adorable.");
 
-    html.AddSection("panel").AddButtons(buttons, "help.html", "https://github.com/billpg/HashBack/", "Next: More technical docs at the Github!");
+    html.AddSection("panel").AddButtons(buttons, "help.html", "https://github.com/billpg/HashBack/", 
+        "Next: More technical docs at the Github!");
     SaveHtml(html, "help.html");
 
 }
