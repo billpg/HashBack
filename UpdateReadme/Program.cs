@@ -127,17 +127,11 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     string xnHostDomain = new System.Globalization.IdnMapping().GetAscii(hostDomainName);
 
     /* Use HashBackCore to build the Authorization header JSON. */
-    var builder = new billpg.HashBackCore.HashBackBuilder();
-    builder.Host = hostDomainName;
-    builder.NowGetter = () => billpg.HashBackCore.Helpers.ToUnixTimeSeconds(now);
-    builder.UnusGetter = () => GenerateUnus(128, keyBase);
-    builder.SetVerify(verifyUrl);
-    string verificationHash = "";
-    builder.SetSyncHashRegister((url, hash) => verificationHash = hash);
-    var authHeader = builder.Build().Result;
+    var (token, hash) = billpg.HashBackCore.HashBackBuilder.Build(
+        hostDomainName, now, GenerateUnus(128, keyBase), verifyUrl);
 
     /* Bring the base64 block back into bytes and parse as JSON. */
-    byte[] jsonAsBytes = Convert.FromBase64String(authHeader);
+    byte[] jsonAsBytes = Convert.FromBase64String(token);
     string jsonAsString = Encoding.UTF8.GetString(jsonAsBytes);
     var requestJson = JObject.Parse(jsonAsString);
 
@@ -170,7 +164,7 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     if (hash1066Index > 0)
     {
         var lineByQuotes = readmeLines[hash1066Index].Split('`');
-        readmeLines[hash1066Index] = lineByQuotes[0] + "`" + verificationHash + "`" + lineByQuotes[2];
+        readmeLines[hash1066Index] = lineByQuotes[0] + "`" + hash + "`" + lineByQuotes[2];
     }
 
     /* Build Set-Cookie header. */

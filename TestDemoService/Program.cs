@@ -1,12 +1,12 @@
-﻿using Newtonsoft.Json.Linq;
-using System;
+﻿using System;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Nodes;
 
 Console.WriteLine("Hello, World!");
 
 /* Build a JSON claim. */
-var claimAsJson = new JObject();
+var claimAsJson = new JsonObject();
 claimAsJson["Version"] = "BILLPG_DRAFT_4.2";
 claimAsJson["Host"] = "localhost:9001";
 claimAsJson["Now"] = (long)(DateTime.UtcNow - DateTime.UnixEpoch).TotalSeconds;

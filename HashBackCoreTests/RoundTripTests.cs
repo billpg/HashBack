@@ -38,20 +38,18 @@ namespace HashBackCoreTests
             }
 
             /* Build the authorization header and register the hash along the way. */
-            var builder = new HashBackBuilder();
-            builder.Host = "roundtripissuer.example";
+            string host = $"{Guid.NewGuid():N}.roundtripissuer.example";
             string verifyUrl = $"https://roundtripclient.example/{Guid.NewGuid()}.txt";
-            builder.SetVerify(verifyUrl);
-            builder.SetSyncHashRegister(RegisterHash);
-            string authHeader = await builder.Build();
+            (var token, var hash) = HashBackBuilder.Build(host, verifyUrl);
+            RegisterHash(verifyUrl, hash);
 
             /* Pass the authorization header to the validator and confirm user ID. */
             var validator = new HashBackValidator();
-            validator.RequireHost(builder.Host);
+            validator.RequireHost(host);
             validator.RequireNowWindow(10);
             validator.SetSyncIdentifyUser(IdentifyUser);
             validator.SetSyncGetHash(GetHash);
-            string identifiedUser = await validator.Validate(authHeader);
+            string identifiedUser = await validator.Validate(token);
             Assert.AreEqual("roundtripclient.example", identifiedUser);
         }
     }

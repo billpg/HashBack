@@ -25,14 +25,7 @@ namespace HashBackCoreTests
             long? now = null,
             string verify = "https://client.example/api/hashback?id=502542886")
         {
-            now ??= (long)1E9;
-            var builder = new HashBackBuilder();
-            builder.Host = host;
-            builder.NowGetter = () => now.Value;
-            builder.UnusGetter = () => "RutabagaRutabagaCarrot==";
-            builder.VerifyGetter = () => Task.FromResult(verify);
-            builder.SetSyncHashRegister((u, h) => { });
-            return await builder.Build();
+            return HashBackBuilder.Build(host, now ?? (long)1E9, "RutabagaRutabagaCarrot==", verify).token;
         }
 
         [TestMethod]

@@ -36,7 +36,7 @@ public class ServiceTests
 
         /* Find the DemoService EXE and launch it. */
         var dllPath = typeof(DemoService.Helpers).Assembly.Location;
-        var exePath = Path.ChangeExtension(dllPath, ".exe");
+        var exePath = Path.ChangeExtension(dllPath, "").TrimEnd('.');
         var psi = new ProcessStartInfo(exePath)
         {
             Arguments = "GetLocalhost",
