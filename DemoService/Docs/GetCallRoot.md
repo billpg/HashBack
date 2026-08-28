@@ -15,7 +15,8 @@ The service will make a POST request to that URL with a `HashBack` header contai
 - A `VerifyUrl` string that is a URL to this service where you can retrieve the hash.
 
 The response (if a 200) will be a text/plain log of the call, including any attempts to retrieve the hash from the `VerifyUrl`.
-The log will include the `VerifyUrl` and the base64-encoded hash.
+The log will include the `VerifyUrl`, the base64-encoded hash, and the SHA-256 (base64-encoded) hash of the TLS certificate
+your server presented, so you can confirm which certificate was actually seen.
 
 If the service can't or won't perform the request, an applicable HTTP error code will be returned.
 

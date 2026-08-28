@@ -28,6 +28,9 @@ public record HeaderBase(IDictionary<string, string> Headers)
 
 public record SimpleHttpResponse(int StatusCode, string Body, string? State) : HeaderBase
 {
+    /// <summary>The remote's TLS certificate, as a Base64-encoded SHA-256 hash. Null for a plain HTTP connection.</summary>
+    public string? RemoteCertificateHash { get; init; }
+
     public SimpleHttpResponse()
         : this(200, "", null) { }
 
@@ -42,6 +45,9 @@ public record SimpleHttpResponse(int StatusCode, string Body, string? State) : H
 
     public SimpleHttpResponse WithBody(string body)
         => this with { Body = body };
+
+    public SimpleHttpResponse WithRemoteCertificateHash(string? hash)
+        => this with { RemoteCertificateHash = hash };
 }
 
 public record SimpleHttpRequest(Uri Url) : HeaderBase

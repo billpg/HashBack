@@ -84,6 +84,7 @@ public class CallController : ControllerBase
         var report = new StringBuilder();
         report.AppendLine($"GET {caller}:");
         report.AppendLine($"Status: {resp.StatusCode}");
+        report.AppendLine($"Remote TLS Certificate (SHA-256, Base64): {resp.RemoteCertificateHash ?? "(none - not an HTTPS connection)"}");
         foreach (var header in resp.Headers)
             report.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
         report.AppendLine("Body:");

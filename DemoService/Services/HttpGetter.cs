@@ -6,6 +6,8 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -16,26 +18,70 @@ public interface IHttpGetter
     Task<SimpleHttpResponse> GetAsync(SimpleHttpRequest req);
 }
 
+/// <summary>
+/// Decides whether a remote TLS certificate is acceptable. Given the certificate, its
+/// chain, and the policy errors SslStream's own default validation would have raised.
+/// The default handler simply returns true only when sslPolicyErrors is None - i.e.
+/// exactly what SslStream would have accepted with no custom callback at all - so
+/// overriding this is opt-in, for cases such as certificate pinning.
+/// </summary>
+public delegate bool IsCertificateAcceptableDelegate(
+    Uri url, X509Certificate2 certificate, X509Chain? chain, SslPolicyErrors sslPolicyErrors);
+
 public class HttpGetter : IHttpGetter
 {
     private readonly ServiceData data;
     private readonly IIpFilter ipFilter;
+    private readonly TimeSpan timeout;
+    private readonly Func<string, CancellationToken, Task<IPAddress[]>> dnsLookup;
+    private readonly IsCertificateAcceptableDelegate isCertificateAcceptable;
 
-    public HttpGetter(ServiceData data, IIpFilter ipFilter)
+    /// <summary>
+    /// Constructs a new HttpGetter. The optional timeout bounds the entire fetch - DNS
+    /// resolution, TCP connect, TLS handshake, and the request/response exchange - so a
+    /// slow or unresponsive remote server (accidental or malicious) can't tie up this
+    /// connection indefinitely. Defaults to ten seconds; pass a shorter value in tests
+    /// that need to exercise the timeout without waiting for the real default.
+    /// The optional dnsLookup replaces the real DNS resolver, for tests that need to
+    /// supply a specific, synthetic set of addresses for a host.
+    /// The optional isCertificateAcceptable replaces the default TLS certificate check
+    /// (see <see cref="IsCertificateAcceptableDelegate"/>).
+    /// </summary>
+    public HttpGetter(
+        ServiceData data,
+        IIpFilter ipFilter,
+        TimeSpan? timeout = null,
+        Func<string, CancellationToken, Task<IPAddress[]>>? dnsLookup = null,
+        IsCertificateAcceptableDelegate? isCertificateAcceptable = null)
     {
         this.data = data;
         this.ipFilter = ipFilter;
+        this.dnsLookup = dnsLookup ?? Dns.GetHostAddressesAsync;
+        this.timeout = timeout ?? TimeSpan.FromSeconds(10);
+        this.isCertificateAcceptable = isCertificateAcceptable ?? DefaultIsCertificateAcceptable;
     }
+
+    private static bool DefaultIsCertificateAcceptable(
+        Uri url, X509Certificate2 certificate, X509Chain? chain, SslPolicyErrors sslPolicyErrors)
+        => sslPolicyErrors == SslPolicyErrors.None;
 
     public async Task<SimpleHttpResponse> GetAsync(SimpleHttpRequest req)
     {
         /* First, validate the URL. */
         ValidateUrlOrThrow(req.Url);
 
-        /* Connect TCP and handshake TLS. The finally block with close them. */
-        (var tcpcli, var netstr) = await ConnectHttp(req.Url);
+        /* A single deadline covers every network step below. */
+        using var cts = new CancellationTokenSource(timeout);
+        var cancellationToken = cts.Token;
+
+        TcpClient? tcpcli = null;
+        Stream? netstr = null;
+        string? certificateHash = null;
         try
         {
+            /* Connect TCP and handshake TLS. */
+            (tcpcli, netstr, certificateHash) = await ConnectHttp(req.Url, cancellationToken);
+
             /* Build the HTTP request. */
             var requestLines = new List<string>
             {
@@ -49,11 +95,11 @@ public class HttpGetter : IHttpGetter
             var request = Encoding.ASCII.GetBytes(string.Join("\r\n", requestLines) + "\r\n\r\n");
 
             /* Send the request. */
-            await netstr.WriteAsync(request);
+            await netstr.WriteAsync(request, cancellationToken);
 
             /* Read the response. */
             byte[] respBytes = new byte[1000];
-            int bytesIn = await netstr.ReadAsync(respBytes, 0, respBytes.Length);
+            int bytesIn = await netstr.ReadAsync(respBytes.AsMemory(), cancellationToken);
             string respAsString = Encoding.ASCII.GetString(respBytes, 0, bytesIn);
             var respStream = new StringReader(respAsString);
 
@@ -66,19 +112,31 @@ public class HttpGetter : IHttpGetter
                     break;
                 resp = resp.WithResponseLine(line);
             }
-            return resp;
+            return resp.WithRemoteCertificateHash(certificateHash);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw new BadRequestException(
+                "External URL not available.",
+                $"Timed out communicating with {req.Url} after {timeout.TotalSeconds:0.#} seconds.");
         }
         finally
         {
-            netstr.Dispose();
-            tcpcli.Dispose();
+            netstr?.Dispose();
+            tcpcli?.Dispose();
         }
     }
 
-    private async Task<(TcpClient tcpcli, Stream netstr)> ConnectHttp(Uri uri)
+    internal async Task<(TcpClient tcpcli, Stream netstr, string? certificateHash)> ConnectHttp(Uri uri, CancellationToken cancellationToken)
     {
-        /* Check if this is a localhost allowance */
-        bool isDebug = ServiceData.AllowGetLocalhost && uri.Scheme == "http" && uri.Host == "localhost";
+        /* Check if this is a localhost allowance. (Note: ValidateUrlOrThrow, the gate in
+         * front of the public GetAsync entry point, never lets an https://localhost URL
+         * through regardless of this flag - "localhost" has no dot and non-443 ports are
+         * rejected there unconditionally - so allowing https here only matters for tests
+         * that call ConnectHttp directly.) */
+        bool isDebug = ServiceData.AllowGetLocalhost
+            && (uri.Scheme == "http" || uri.Scheme == "https")
+            && uri.Host == "localhost";
 
         /* Validate the URL is acceptable. */
         if (uri.Scheme != "https" && !isDebug)
@@ -87,46 +145,93 @@ public class HttpGetter : IHttpGetter
             throw new ApplicationException("URL must be port 443.");
 
         /* Make all the precautions for public use. */
-        var remoteIp = await ResolveDomain(uri.Host, isDebug);
+        var remoteIp = await ResolveDomain(uri.Host, isDebug, cancellationToken);
 
         /* Connect TCP. */
         var tcp = new TcpClient();
         try
         {
-            await tcp.ConnectAsync(remoteIp, uri.Port);
+            await tcp.ConnectAsync(remoteIp, uri.Port).WaitAsync(cancellationToken);
         }
         catch (SocketException)
         {
+            tcp.Dispose();
             throw new BadRequestException(
-                "External URL not available.", 
+                "External URL not available.",
                 $"Can't connect to {uri} ({remoteIp})");
+        }
+        catch
+        {
+            /* Covers a timeout (OperationCanceledException) and anything else - dispose
+             * what we've opened so far and let the caller decide how to report it. */
+            tcp.Dispose();
+            throw;
         }
         var netstr = tcp.GetStream();
 
         /* Handshake TLS. */
         if (uri.Scheme == "https")
         {
-            var tls = new SslStream(netstr); // TODO Capture cert.
-            await tls.AuthenticateAsClientAsync(uri.Host);
-            return (tcp, tls);
+            string? certificateHash = null;
+            var tls = new SslStream(netstr, leaveInnerStreamOpen: false,
+                userCertificateValidationCallback: (sender, certificate, chain, sslPolicyErrors) =>
+                {
+                    /* No certificate at all is never acceptable. */
+                    if (certificate == null)
+                        return false;
+
+                    /* Record the certificate's hash regardless of the outcome, so callers
+                     * can see what was actually presented even if it gets rejected. Only
+                     * dispose the X509Certificate2 if we had to construct it ourselves -
+                     * one handed to us already as X509Certificate2 belongs to SslStream. */
+                    X509Certificate2? owned = null;
+                    try
+                    {
+                        var cert2 = certificate as X509Certificate2 ?? (owned = new X509Certificate2(certificate));
+                        certificateHash = Convert.ToBase64String(cert2.GetCertHash(HashAlgorithmName.SHA256));
+                        return isCertificateAcceptable(uri, cert2, chain, sslPolicyErrors);
+                    }
+                    finally
+                    {
+                        owned?.Dispose();
+                    }
+                });
+            try
+            {
+                await tls.AuthenticateAsClientAsync(uri.Host).WaitAsync(cancellationToken);
+            }
+            catch
+            {
+                tls.Dispose();
+                tcp.Dispose();
+                throw;
+            }
+            return (tcp, tls, certificateHash);
         }
-        return (tcp, netstr);
+        return (tcp, netstr, null);
     }
 
-    private async Task<IPAddress> ResolveDomain(string host, bool isDebug)
+    internal async Task<IPAddress> ResolveDomain(string host, bool isDebug, CancellationToken cancellationToken)
     {
         /* Shortcut the one acceptable use of localhost. */
         if (host == "localhost" && isDebug)
             return IPAddress.Loopback;
 
-        /* Load the various IPs and filter. (IsAcceptable will internally
-         * update that remote IP's quota.) */
-        var ip = (await Dns.GetHostAddressesAsync(host)).First();
-        if (ipFilter.IsAcceptable(ip))
-            return ip;
+        /* Load the various IPs for this host and use the first one that passes the IP
+         * filter, rather than assuming the resolver's first answer is usable - a
+         * legitimate dual-stack or multi-homed host can have some addresses this filter
+         * would reject (for example, a link-local IPv6 entry) alongside a usable one.
+         * (IsAcceptable will internally update that address's quota.) */
+        var candidates = await dnsLookup(host, cancellationToken);
+        foreach (var ip in candidates)
+        {
+            if (ipFilter.IsAcceptable(ip))
+                return ip;
+        }
 
-        /* 400 if the IP is not acceptable. */
-        throw new ApplicationException($"IP address ({ip}) of host ({host}) is not acceptable.");
+        /* None of the resolved addresses were acceptable. */
+        throw new ApplicationException(
+            $"None of the {candidates.Length} IP address(es) for host ({host}) are acceptable.");
     }
 
     private static void ValidateUrlOrThrow(Uri url)

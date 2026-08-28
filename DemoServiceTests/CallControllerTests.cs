@@ -55,7 +55,8 @@ public sealed class CallControllerTests
         // Prepare a fake response from the remote caller and set it on the fake getter.
         fake.Response = new SimpleHttpResponse(200)
             .WithHeader("X-Remote", "value")
-            .WithBody("Hello from remote caller");
+            .WithBody("Hello from remote caller")
+            .WithRemoteCertificateHash("RutabagaCertificateHashInBase64==");
 
         // Act
         var result = await controller.Post().ConfigureAwait(false);
@@ -71,5 +72,7 @@ public sealed class CallControllerTests
         StringAssert.Contains(report, "Status: 200", "Report should include the status code from the fake response.");
         StringAssert.Contains(report, "X-Remote: value", "Report should include headers from the fake response.");
         StringAssert.Contains(report, "Hello from remote caller", "Report should include the body from the fake response.");
+        StringAssert.Contains(report, "RutabagaCertificateHashInBase64==",
+            "Report should include the remote TLS certificate hash from the fake response.");
     }
 }
