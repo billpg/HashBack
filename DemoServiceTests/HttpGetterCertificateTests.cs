@@ -2,7 +2,6 @@ using System;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
-using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
@@ -62,6 +61,7 @@ public class HttpGetterCertificateTests
     public async Task ConnectHttp_DefaultPolicy_RejectsSelfSignedCertificate()
     {
         using var cert = CreateSelfSignedCertificate("localhost");
+        string expectedHash = Convert.ToBase64String(cert.GetCertHash(HashAlgorithmName.SHA256));
         var (listener, port, serverTask) = StartTlsServer(cert);
         ServiceData.AllowGetLocalhost = true;
         try
@@ -70,9 +70,13 @@ public class HttpGetterCertificateTests
                 new ServiceData(), new IpFilter(),
                 dnsLookup: (host, ct) => Task.FromResult(new[] { IPAddress.Loopback }));
 
-            await Assert.ThrowsExceptionAsync<AuthenticationException>(async () =>
+            var ex = await Assert.ThrowsExceptionAsync<BadRequestException>(async () =>
                 await getter.ConnectHttp(
                     new Uri($"https://localhost:{port}/"), CancellationToken.None));
+
+            Assert.AreEqual("External URL not available.", ex.Title);
+            StringAssert.Contains(ex.Message, expectedHash,
+                "Rejection detail should still report the certificate that was actually presented.");
         }
         finally
         {

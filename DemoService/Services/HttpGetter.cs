@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -82,25 +83,21 @@ public class HttpGetter : IHttpGetter
             /* Connect TCP and handshake TLS. */
             (tcpcli, netstr, certificateHash) = await ConnectHttp(req.Url, cancellationToken);
 
-            /* Build the HTTP request. */
+            /* Build and send the HTTP request. */
             var requestLines = new List<string>
             {
                 $"GET {req.Url.PathAndQuery} HTTP/1.1",
                 $"Host: {req.Url.Host}",
                 "Connection: close",
-                "Accept-Encoding: plain",
+                "Accept-Encoding: identity",
                 "User-Agent: demo.hashback.dev"
             };
             requestLines.AddRange(req.Headers.Select(kv => $"{kv.Key}: {kv.Value}"));
             var request = Encoding.ASCII.GetBytes(string.Join("\r\n", requestLines) + "\r\n\r\n");
-
-            /* Send the request. */
             await netstr.WriteAsync(request, cancellationToken);
 
-            /* Read the response. */
-            byte[] respBytes = new byte[1000];
-            int bytesIn = await netstr.ReadAsync(respBytes.AsMemory(), cancellationToken);
-            string respAsString = Encoding.ASCII.GetString(respBytes, 0, bytesIn);
+            /* Read the response. Cut everything after the first 1k. */
+            string respAsString = await LoadBytesFromStream(netstr, cancellationToken, 1000); 
             var respStream = new StringReader(respAsString);
 
             /* Churn the lines through the response builder state machine. */
@@ -125,6 +122,20 @@ public class HttpGetter : IHttpGetter
             netstr?.Dispose();
             tcpcli?.Dispose();
         }
+    }
+
+    private async Task<string> LoadBytesFromStream(Stream netstr, CancellationToken cancellationToken, int maxByteCount)
+    {
+        byte[] respBytes =  new byte[maxByteCount];
+        int freeIndex = 0;
+        while (freeIndex < maxByteCount)
+        {
+            int bytesIn = await netstr.ReadAsync(respBytes.AsMemory(freeIndex), cancellationToken);
+            if (bytesIn <= 0)
+                break;
+            freeIndex += bytesIn;
+        }
+        return Encoding.ASCII.GetString(respBytes, 0, freeIndex);
     }
 
     internal async Task<(TcpClient tcpcli, Stream netstr, string? certificateHash)> ConnectHttp(Uri uri, CancellationToken cancellationToken)
@@ -200,8 +211,21 @@ public class HttpGetter : IHttpGetter
             {
                 await tls.AuthenticateAsClientAsync(uri.Host).WaitAsync(cancellationToken);
             }
+            catch (AuthenticationException ex)
+            {
+                tls.Dispose();
+                tcp.Dispose();
+                string certDetail = certificateHash != null
+                    ? $" Presented certificate SHA-256 (Base64): {certificateHash}."
+                    : "";
+                throw new BadRequestException(
+                    "External URL not available.",
+                    $"TLS handshake with {uri} was rejected: {ex.Message}{certDetail}");
+            }
             catch
             {
+                /* Covers a timeout (OperationCanceledException) and anything else - dispose
+                 * what we've opened so far and let the caller decide how to report it. */
                 tls.Dispose();
                 tcp.Dispose();
                 throw;
