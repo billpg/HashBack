@@ -58,7 +58,8 @@ public sealed class HelloControllerTests
         var verifyUrl = $"https://client.example/verify/{Guid.NewGuid()}";
 
         // Build a real HashBack header and register the verification hash into our dictionary.
-        var (token, hash) = HashBackBuilder.Build(serviceData.ConfigServiceHost, verifyUrl);
+        var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, new Uri(verifyUrl));
+        var (token, hash) = (hashBackRequest.AuthToken, hashBackRequest.VerificationHash);
         registeredHashes[verifyUrl] = hash;
 
         // Create fake getter that returns the registered hash
@@ -137,7 +138,8 @@ public sealed class HelloControllerTests
         var registeredHashes = new ConcurrentDictionary<string, string>();
         var verifyUrl = $"https://client.example/verify/{Guid.NewGuid()}";
 
-        var (token, hash) = HashBackBuilder.Build("demo.hashback.dev", verifyUrl);
+        var hashBackRequest = HashBackRequest.Create("demo.hashback.dev", new Uri(verifyUrl));
+        var (token, hash) = (hashBackRequest.AuthToken, hashBackRequest.VerificationHash);
         registeredHashes[verifyUrl] = hash;
 
         // Create fake getter that returns tampered hash

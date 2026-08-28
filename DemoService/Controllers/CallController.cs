@@ -63,15 +63,15 @@ public class CallController : ControllerBase
 
         /* Build the Authorization header for the caller's URL. */
         Guid id = Guid.NewGuid();
-        string verifyUrl = $"https://{data.ConfigServiceHost}/hash/{id}";
+        var verifyUrl = new Uri($"https://{data.ConfigServiceHost}/hash/{id}");
         DateTime now = DateTime.UtcNow;
-        (string authHeader, string hash) = HashBackBuilder.Build(caller.Authority, now, verifyUrl);
-        var storedHash = new StoredHash(Convert.FromBase64String(hash), now, Request.RequestIP());
+        var hashBackRequest = HashBackRequest.Create(caller.Authority, now, verifyUrl);
+        var storedHash = new StoredHash(Convert.FromBase64String(hashBackRequest.VerificationHash), now, Request.RequestIP());
         data.TryAddHash(id, storedHash);
 
         /* Make a GET request to that URL. */
         var req = new SimpleHttpRequest(caller)
-            .WithHeader("Authorization", "HashBack " + authHeader);
+            .WithHeader("Authorization", "HashBack " + hashBackRequest.AuthToken);
         var resp = await httpGetter.GetAsync(req);
 
         /* Report to caller. */

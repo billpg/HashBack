@@ -79,12 +79,12 @@ public class HelloController : ControllerBase
         /* If no valid cookie, check the Authorization header. */
         if (!string.IsNullOrEmpty(authHeader))
         {
-            HashBackValidator val = new();
-            val.RequireHost(data.ConfigServiceHost);
-            val.RequireNowWindow(500);
-            val.SetSyncIdentifyUser(url => new Uri(url).Host);
-            val.OnGetHash = GetHash;
-            var authDomain = await val.Validate(authHeader);
+            HashBackPolicy policy = new();
+            policy.RequireHost(data.ConfigServiceHost);
+            policy.RequireNowWindow(500);
+            policy.SetSyncIdentifyUser(verify => verify.Host);
+            policy.OnGetVerificationHash = verify => GetHash(verify.ToString());
+            var authDomain = await HashBackRequest.Authenticate(authHeader, policy);
             if (authDomain != null)
                 return (authDomain, false);
         }
