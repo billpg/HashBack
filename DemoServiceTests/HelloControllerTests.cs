@@ -115,6 +115,144 @@ public sealed class HelloControllerTests
             "Second response should not set a cookie when cookie is already valid.");
     }
 
+    [TestMethod]
+    public async Task Get_ReplayedAuthorizationHeader_SecondUseIsRejected()
+    {
+        // Arrange: a single valid header, and a controller that will see it twice.
+        var registeredHashes = new ConcurrentDictionary<string, string>();
+        var serviceData = GetServiceData();
+        var verifyUrl = $"https://rutabaga.example/verify/{Guid.NewGuid()}";
+
+        var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, new Uri(verifyUrl));
+        registeredHashes[verifyUrl] = hashBackRequest.VerificationHash;
+
+        var fakeGetter = new MockHttpGetter(registeredHashes);
+        var controller = new HelloController(serviceData, fakeGetter);
+
+        // First use: should succeed.
+        var ctx1 = new DefaultHttpContext();
+        ctx1.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
+        controller.ControllerContext = new ControllerContext { HttpContext = ctx1 };
+        var result1 = await controller.Get().ConfigureAwait(false);
+        Assert.IsInstanceOfType(result1, typeof(ContentResult), "First use of a fresh header should succeed.");
+
+        // Second use of the exact same header, with no cookie this time: should be rejected
+        // as a replay, even though it's well within the Now tolerance window.
+        var ctx2 = new DefaultHttpContext();
+        ctx2.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
+        controller.ControllerContext = new ControllerContext { HttpContext = ctx2 };
+
+        var ex = await Assert.ThrowsExceptionAsync<AuthorizationParseException>(
+            async () => await controller.Get());
+        Assert.AreEqual(ValidateRejectionReason.ReplayedUnus, ex.Reason);
+    }
+
+    [TestMethod]
+    public async Task Get_SetsCookie_ExpiresMatchesThirtyMinuteJwtLifetime()
+    {
+        // Arrange
+        var registeredHashes = new ConcurrentDictionary<string, string>();
+        var serviceData = GetServiceData();
+        var verifyUrl = $"https://rutabaga.example/verify/{Guid.NewGuid()}";
+
+        var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, new Uri(verifyUrl));
+        registeredHashes[verifyUrl] = hashBackRequest.VerificationHash;
+
+        var fakeGetter = new MockHttpGetter(registeredHashes);
+        var controller = new HelloController(serviceData, fakeGetter);
+
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
+        controller.ControllerContext = new ControllerContext { HttpContext = ctx };
+
+        var before = DateTimeOffset.UtcNow;
+        await controller.Get().ConfigureAwait(false);
+        var after = DateTimeOffset.UtcNow;
+
+        // Parse the "expires=" attribute out of the raw Set-Cookie header.
+        var setCookieHeader = ctx.Response.Headers["Set-Cookie"].ToString();
+        var expiresMatch = System.Text.RegularExpressions.Regex.Match(
+            setCookieHeader, @"expires=([^;]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        Assert.IsTrue(expiresMatch.Success, "Set-Cookie header should include an expires attribute.");
+        var expires = DateTimeOffset.Parse(expiresMatch.Groups[1].Value);
+
+        // Should land at roughly "now + 30 minutes" - allow a little slack for test execution
+        // time, but the bug this guards against (a week-long cookie backing a 30-minute
+        // token) would be off by days, not seconds.
+        Assert.IsTrue(expires >= before.Add(JWT.Lifetime).AddSeconds(-5) && expires <= after.Add(JWT.Lifetime).AddSeconds(5),
+            $"Cookie should expire around {before.Add(JWT.Lifetime)}, but was {expires}.");
+    }
+
+    [TestMethod]
+    public async Task Get_VerificationHashPublishedInBase64UrlForm_IsAccepted()
+    {
+        // Arrange: publish the verification hash using the alternate hyphen/underscore
+        // (base64url) form rather than standard base64, wherever it happens to differ.
+        var registeredHashes = new ConcurrentDictionary<string, string>();
+        var serviceData = GetServiceData();
+        var verifyUrl = $"https://rutabaga.example/verify/{Guid.NewGuid()}";
+
+        var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, new Uri(verifyUrl));
+        string standardHash = hashBackRequest.VerificationHash;
+        string base64UrlHash = standardHash.Replace('+', '-').Replace('/', '_').TrimEnd('=');
+        registeredHashes[verifyUrl] = base64UrlHash;
+
+        var fakeGetter = new MockHttpGetter(registeredHashes);
+        var controller = new HelloController(serviceData, fakeGetter);
+
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
+        controller.ControllerContext = new ControllerContext { HttpContext = ctx };
+
+        var result = await controller.Get().ConfigureAwait(false);
+
+        var content = result as ContentResult;
+        Assert.IsNotNull(content, "A verification hash published in base64url form should still authenticate.");
+        Assert.AreEqual($"Hello {new Uri(verifyUrl).Host}!", content.Content);
+    }
+
+    [TestMethod]
+    public async Task Get_TamperedCookieSignature_IsRejected()
+    {
+        // Arrange: obtain a genuine cookie, then flip a character in its signature.
+        var registeredHashes = new ConcurrentDictionary<string, string>();
+        var serviceData = GetServiceData();
+        var verifyUrl = $"https://rutabaga.example/verify/{Guid.NewGuid()}";
+
+        var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, new Uri(verifyUrl));
+        registeredHashes[verifyUrl] = hashBackRequest.VerificationHash;
+
+        var fakeGetter = new MockHttpGetter(registeredHashes);
+        var controller = new HelloController(serviceData, fakeGetter);
+
+        var ctx1 = new DefaultHttpContext();
+        ctx1.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
+        controller.ControllerContext = new ControllerContext { HttpContext = ctx1 };
+        await controller.Get().ConfigureAwait(false);
+
+        const string cookieName = "HashBackDemoService";
+        var setCookieHeader = ctx1.Response.Headers["Set-Cookie"].ToString();
+        var cookiePrefix = cookieName + "=";
+        var start = setCookieHeader.IndexOf(cookiePrefix, StringComparison.Ordinal) + cookiePrefix.Length;
+        var end = setCookieHeader.IndexOf(';', start);
+        var cookieValue = end >= 0 ? setCookieHeader.Substring(start, end - start) : setCookieHeader.Substring(start);
+
+        // Flip the cookie's last character - part of its signature - to invalidate it.
+        char lastChar = cookieValue[^1];
+        char replacement = lastChar == 'A' ? 'B' : 'A';
+        var tamperedCookie = cookieValue[..^1] + replacement;
+
+        var ctx2 = new DefaultHttpContext();
+        ctx2.Request.Headers["Cookie"] = $"{cookieName}={tamperedCookie}";
+        controller.ControllerContext = new ControllerContext { HttpContext = ctx2 };
+
+        var result = await controller.Get().ConfigureAwait(false);
+
+        // A tampered cookie and no Authorization header should fall through to 401,
+        // not be silently trusted.
+        Assert.AreEqual(401, ctx2.Response.StatusCode);
+    }
+
     // Unhappy-path tests
 
     [TestMethod]

@@ -27,6 +27,13 @@ public class HelloController : ControllerBase
 
     private const string HashBackCookieName = "HashBackDemoService";
 
+    /// <summary>
+    /// Clock-drift tolerance for the Now property, and (since it must be at least as wide
+    /// as that tolerance to be effective) the window Unus values are remembered for replay
+    /// protection.
+    /// </summary>
+    private const int NowToleranceSeconds = 500;
+
     // GET /hello/
     [HttpGet]
     [Produces("text/plain", "text/html")]
@@ -49,7 +56,7 @@ public class HelloController : ControllerBase
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.Strict,
-                Expires = DateTimeOffset.UtcNow.AddDays(7)
+                Expires = DateTimeOffset.UtcNow.Add(JWT.Lifetime)
             });
         }
 
@@ -81,7 +88,8 @@ public class HelloController : ControllerBase
         {
             HashBackPolicy policy = new();
             policy.RequireHost(data.ConfigServiceHost);
-            policy.RequireNowWindow(500);
+            policy.RequireNowWindow(NowToleranceSeconds);
+            policy.SetSyncUnusValidate(unus => data.TryRecordUnus(unus, TimeSpan.FromSeconds(NowToleranceSeconds)));
             policy.SetSyncIdentifyUser(verify => verify.Host);
             policy.OnGetVerificationHash = verify => GetHash(verify.ToString());
             var authDomain = await HashBackRequest.Authenticate(authHeader, policy);
@@ -101,12 +109,17 @@ public class HelloController : ControllerBase
             throw new BadRequestException("Bad Verification URL.", 
                 $"{url} returned status code {resp.StatusCode}");
 
-        /* Split the response into lines, looking for the first one that might be the hash.
-         * This will allow chunked to work, as the length-of-chunk line will be ignored. */
-        foreach (string line in resp.Body.Split(" \r\n\t".ToCharArray()))
+        /* Split the response into tokens, looking for the first one that decodes to 256
+         * bits. This will allow chunked to work, as the length-of-chunk line will be
+         * ignored. The comparison against the expected hash happens on the decoded bytes -
+         * by re-encoding here to standard base64 - rather than on this raw text, so a hash
+         * published using the alternate hyphen/underscore (base64url) form is still
+         * accepted. */
+        foreach (string token in resp.Body.Split(" \r\n\t".ToCharArray()))
         {
-            if (Helpers.TryParseBase64(line, 256 / 8) != null)
-                return line;
+            byte[]? hashBytes = Helpers.TryParseBase64(token, 256 / 8);
+            if (hashBytes != null)
+                return Convert.ToBase64String(hashBytes);
         }
 
         /* No lines fit. */

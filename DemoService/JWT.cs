@@ -17,6 +17,13 @@ internal static class JWT
     /// </summary>
     private static readonly byte[] HMACSHA256Key = RandomBytes(256/8);
 
+    /// <summary>
+    /// How long a token remains valid after being issued. The Set-Cookie header's own
+    /// Expires attribute should always match this exactly, so the cookie's browser-side
+    /// lifetime and its actual enforced validity never disagree.
+    /// </summary>
+    internal static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(30);
+
     private static byte[] RandomBytes(int length)
     {
         var bytes = new byte[length];
@@ -41,7 +48,7 @@ internal static class JWT
         {
             ["sub"] = sub,
             ["iat"] = nowUnix,
-            ["exp"] = nowUnix + 60 * 30,
+            ["exp"] = nowUnix + (long)Lifetime.TotalSeconds,
             ["bonus"] = "https://youtu.be/XfELJU1mRMg"
         };
 
@@ -61,11 +68,13 @@ internal static class JWT
             return null;
         string headAndBody = parts[0] + "." + parts[1];
 
-        /* Find the expected signature from this payload and see if it
-         * matches the one provided. If not, reject it. */
+        /* Find the expected signature from this payload and see if it matches the one
+         * provided, comparing the raw bytes in constant time rather than the encoded
+         * strings - an ordinary string comparison short-circuits on the first mismatched
+         * character, which is a textbook timing side-channel for a MAC check. */
         var sigAsBytes = HMACSHA256.HashData(HMACSHA256Key, Encoding.ASCII.GetBytes(headAndBody));
-        string expectedSig = Helpers.JWTEncode(sigAsBytes);
-        if (expectedSig != parts[2])
+        var providedSigAsBytes = Helpers.TryParseBase64(parts[2]);
+        if (providedSigAsBytes == null || !CryptographicOperations.FixedTimeEquals(sigAsBytes, providedSigAsBytes))
             return null;
 
         /* From this point, any issues with signed cookies are problems worthy of an exception. */
