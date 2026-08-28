@@ -29,40 +29,36 @@ Then, add a reference to HashBackCore in your project file (.csproj):
 ## 📚 Quick Start
 ### Client-Side Example
 ```csharp
-/* Construct a builder object. */
-var hashbackBuilder = new billpg.HashBackCore.AuthHeaderBuilder();
+/* Build a fresh request for a named remote host, saying where
+ * that server can fetch our verification hash from. */
+var request = billpg.HashBackCore.HashBackRequest.Create(
+    "server.example",
+    new Uri("https://client.example/api/hashback?id=502542886"));
 
-/* Build an authorization header for a named remote 
- * host and where it can fetch our verification hash. */
-var auth = hashbackBuilder
-    .WithHost("server.example")
-    .WithVerify("https://client.example/api/hashback?id=502542886")
-    .Build();
+/* Log the result. */
+Console.WriteLine("Auth Header: " + request.AuthToken);
+Console.WriteLine("Verification Hash: " + request.VerificationHash);
 
-/* Log the result of the builder. */
-Console.WriteLine("Auth Header: " + auth.AuthHeader);
-Console.WriteLine("Verification Hash: " + auth.VerificationHash);
-
-/* Now send the auth.AuthHeader value in an HTTP Authorization
+/* Now send "HashBack " + request.AuthToken in an HTTP Authorization
  * header. When (if) that server fetches the above verification
- * URL, have that respond with the verification hash. */
+ * URL, have that respond with request.VerificationHash. */
 ```
 
 ### Server-Side Example
 ```csharp
-/* Construct an parser object that expects the supplied host name
+/* Construct a policy object that expects the supplied host name
  * and allows up to ten seconds drift in the time-stamp. */
-var hashbackParser = new billpg.HashBackCore.AuthHeaderParser()
-    .WithRequiredHost("server.example")
-    .WithTimeTolerance(10);
+var policy = new billpg.HashBackCore.HashBackPolicy();
+policy.RequireHost("server.example");
+policy.RequireNowWindow(10);
+policy.SetSyncIdentifyUser(verify => LookUpUserForVerifyUrl(verify));
+policy.SetSyncGetVerificationHash(verify => DownloadVerificationHash(verify));
 
-/* Parse the header received in an Authorization header. */
-var parseResult = hashbackParser.Parse("eyHeaderTokenGoesHere==");
-Console.WriteLine("Verify URL: " + parseResult.VerifyUrl);
-Console.WriteLine("Expected Hash: " + parseResult.ExpectedHash);
-
-/* Now fetch the Verify URL, where we expect 
- * to find the same string as the expected hash. */
+/* Parse the header received in an Authorization header and
+ * authenticate it against the policy in one call. */
+string user = await billpg.HashBackCore.HashBackRequest.Authenticate(
+    "eyHeaderTokenGoesHere==", policy);
+Console.WriteLine("Authenticated as: " + user);
 ```
 
 > 🦔 "Remember, every copy/pasted line is a promise you'll try to understand it later."
@@ -76,75 +72,62 @@ The implementation adheres closely to the HashBack specification, ensuring that 
 
 ## 🛠️ Usage
 
-See the demo console app HashBackCore for runnable sample code in a copy-paste-friendly form.
+### `HashBackRequest`
+`HashBackRequest` represents a single HashBack request, whether you're building one to send or parsing one you've received. It's used on both the client and server side.
 
-### `HashBackBuilder`
-On the client side, the `HashBackBuilder` class is used to create HashBack authorization headers. You set up the builder object (keep it long term or throw it away when you're done) and call the `Build` function to generate the final header and verification hash. 
+On the client side, call the static `Create` method to build a fresh request:
+- `HashBackRequest.Create(host, verify)`
+  - Builds a request for right now, with a fresh cryptographic-quality random `Unus` value.
+- `HashBackRequest.Create(host, now, verify)` / `HashBackRequest.Create(host, now, unus, verify)`
+  - Overloads that let you supply your own `Now` and/or `Unus` values, useful for testing.
 
-The builder class has a number of properties that will control the content of the authentication header and how to capture the verification hash string.
+Once built, read these properties to send the request and publish its hash:
+- `AuthToken` - the BASE-64 encoded JSON block, ready to append to an `Authorization: HashBack ` header.
+- `VerificationHash` - the hash to publish at the `Verify` URL.
 
-The following properties should all be set before calling `Build`:
-- `Host`
-  - A simple string value that will be used as the `Host` property.
-  - The service you are attempting to authenticate to should publish exactly what string it expects here.
-- `VerifyGetter`
-  - An async function that will return a URL string for the `Verify` header. 
-  - Set this to a function that will generate that URL, including allocating an ID if needed.
-  - Helper functions allow you to set simple strings or sync functions.
-- `HashRegister`
-  - An aync function that will be called to register an expected hash with the verify URL generated earlier.
-  - Set this to a function that will store the verification hash for retrieval later, perhaps in a database or a file on a web service.
-  - The default handler saves hashes to the builder object where they can be retrieved later.
+On the server side, call the static `Parse` method with the incoming header value:
+- `HashBackRequest.Parse(authHeader)`
+  - Checks the header is well-formed - including that the `Verify` URL is secure - and returns a `HashBackRequest` with the `Host`, `Now`, `Unus` and `Verify` properties extracted. It does not yet apply any of your own server policy; call `Authenticate` for that (see below).
+  - Throws `AuthorizationParseException` if the header is malformed.
 
-These optional helpers provide pre-packaged handlers for these properties:
-- `SetSyncVerifyGetter(fn)`
-    - Sets the `VerifyGetter` with a simpler non-async handler.
-- `SetVerify(url)`
-    - If you don't want to supply a getter function, this function allows you to set a simple string.
-    - Useful if your builder object is intended for a single use and you already have the URL you want to use.
-- `SetSyncHashRegister(fn)`
-    - Sets a simple non-async handler to be called when a verification hash is ready.
-    - Useful if your verification hash storage is a simple in-memory collection.
+### `HashBackPolicy`
+On the server side, the `HashBackPolicy` class holds the pluggable rules your server applies once a header has been parsed - is the `Host` one of ours, is `Now` recent enough, has this `Unus` been used before, who does the `Verify` URL belong to, and what's published there. Configure the delegate properties directly, or use the extension methods below for the common cases.
 
-These properties are for advanced uses only. Normal uses should leave the defaults in place..
-- `NowGetter`
-  - A function that will get the value to use as the `Now` property.
-  - The default handler uses `DateTime.UtcNow`.
-- `UnusGetter`
-  - A function that will get the value to use as the `Usus` proprty.
-  - The default handler uses a cryptographic quality ransom byte source.
-
-The `Build` function calls these various handlers to build the JSON request. On the way, it calls the `HashRegister` handler with the retrieved verification URL and the calculated verification hash. The function returns the encoded header value suitable for embedding into the HTTP `Authorization` header.
-
-### `HashBackValidator`
-On the server side, the `HashBackValidator` class is used to parse and validate HashBack authorization headers. Similar to the builder object, you can set up a parser object the way you want and call the `Validate` function when you have a header.
-
-To configure a validator object, use the following:
 - `.RequireHost(host)` or `.RequireAnyHost(host1, host2)`
-  - Configures the validator to only accept a supplied string as a `Host` value.
+  - Configures the policy to only accept a supplied string as a `Host` value.
   - Use your website's full domain name.
-  - Validation of the Host property is critical to prevent "passing-along" attacks. You service should document one string value that your service will support in client's requests (usually the full domain name of your web server) and call this function with that value.
-  - If you have many acceptable `Host` strings, the "Any" varient will accept a collection of strings.
+  - Validation of the `Host` property is critical to prevent "passing-along" attacks. Your service should document one string value that your service will support in clients' requests (usually the full domain name of your web server) and call this function with that value.
+  - If you have many acceptable `Host` strings, the "Any" variant will accept a collection of strings.
 - `.RequireNowWindow(seconds)`
-  - Configures the validator to only allow up to this many seconds variace from the system clock in the client's `Now` value.
-  - Variants allow for a different number of seconds in the past or future, or to use a different clock to the the system one.
+  - Configures the policy to only allow up to this many seconds variance from the system clock in the client's `Now` value.
+  - Variants allow for a different number of seconds in the past or future, or to use a different clock to the system one.
+- `.RequireUnusNotReused(window)`
+  - Configures the policy to reject any `Unus` value already seen within the supplied `TimeSpan`, keeping an in-memory record of previously seen values.
+  - Pick a window at least as wide as your `Now` tolerance, since an older request could never pass the `Now` check anyway.
+  - Without this, the default accepts any well-formed `Unus` value - the format itself is already checked while parsing the header.
 - `OnIdentifyUser`
-  - Set this property to an async function that will convert a verification URL into the user that owns that URL, or null if the URL doesn't belong to any user your system knows about. This check ensures that verification only proceeds if the URL belongs to an identifiable user.
-  - The string returned by your handler will be the same string returned by the `Validate` functon if all tests pass.
+  - Set this property to an async function that will convert a `Verify` URL into the user that owns that URL, or null if the URL doesn't belong to any user your system knows about. This check ensures that authentication only proceeds if the URL belongs to an identifiable user.
+  - The string returned by your handler will be the same string returned by `Authenticate` if all tests pass.
   - Other than null/not-null, HashBackCore doesn't apply any meaning to the string's value and will blindly pass it along.
-- `OnGetHash`
+  - `SetSyncIdentifyUser(fn)` sets this from a simpler non-async handler.
+- `OnGetVerificationHash`
   - Set this property to an async handler that will download the verification hash from the supplied URL.
   - Any exceptions thrown, such as because of network failures, will fall to the caller.
-  - The return value should be text returned from that URL. 
+  - The return value should be the text returned from that URL.
+  - `SetSyncGetVerificationHash(fn)` sets this from a simpler non-async handler.
+  - HashBackCore deliberately has no default implementation of this - it doesn't interface with HTTP itself, leaving that to your own code (or the ASP.NET Core authenticator package, which does provide one).
 
-If validation is rejected for whatever reason, the function with throw a `AuthorizationParseException` error, with these properties:
+Once configured, call `request.Authenticate(policy)` (or the static shortcut `HashBackRequest.Authenticate(authHeader, policy)` to parse and authenticate in one step). This checks `Host`, `Now` and `Unus`, identifies the user from `Verify`, downloads the verification hash, and confirms it matches. It returns the identified user string on success.
+
+If authentication is rejected for whatever reason, the function will throw an `AuthorizationParseException` error, with these properties:
 - `Message` (inherited from the `Exception` base class.)
-    - Describes (in English) the reason for rejecting the rquest.
+    - Describes (in English) the reason for rejecting the request.
 - `Reason`
     - An enum value that identifies the specific problem. Allowed values are:
       - `BadHeader` - The header itself is malformed.
       - `WrongHost` - The `Host` value is not on the allowed list.
-      - `WrongNow` - The `Now` value is outsode the allowed window.
+      - `WrongNow` - The `Now` value is outside the allowed window.
+      - `ReplayedUnus` - The `Unus` value has already been used, per `RequireUnusNotReused`.
       - `UnknownUser` - The `Verify` value doesn't correspond to a known user.
       - `WrongHash` - The downloaded verification hash did not match the expected hash.
 

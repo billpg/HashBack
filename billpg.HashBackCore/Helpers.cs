@@ -10,8 +10,8 @@ namespace billpg.HashBackCore
     internal static class Helpers
     {
         // HashBack version strings.
-        private const string VersionString41 = "BILLPG_DRAFT_4.1";
-        private const string VersionString42 = "BILLPG_DRAFT_4.2";
+        internal const string VersionString41 = "BILLPG_DRAFT_4.1";
+        internal const string VersionString42 = "BILLPG_DRAFT_4.2";
 
         /// <summary>
         /// Returns an immutable list of supported HashBack version strings.
@@ -168,6 +168,9 @@ namespace billpg.HashBackCore
 
         public static string ToShortJson(this JsonObject j)
             => j.ToJsonString(shortJsonOptions);
+        
+        internal static byte[] ToUtf8(this string s)
+            => Encoding.UTF8.GetBytes(s);
 
         /// <summary>
         /// DateTime.UtcNow wrapped in a function, 
@@ -209,6 +212,7 @@ namespace billpg.HashBackCore
         BadHeader,
         WrongHost,
         WrongNow,
+        ReplayedUnus,
         UnknownUser,
         WrongHash
     }
