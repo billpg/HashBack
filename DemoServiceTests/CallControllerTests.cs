@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using DemoService;
 using DemoService.Controllers;
+using DemoService.Data;
 using DemoService.Services;
 
 namespace DemoServiceTests;
@@ -25,8 +26,9 @@ public sealed class CallControllerTests
     {
         // Arrange
         var data = GetServiceData();
+        using var testDb = new TestHashDb();
         var fake = new MockHttpGetter();
-        var controller = new CallController(data, fake);
+        var controller = new CallController(data, new HashStore(testDb.Db), fake);
         var ctx = new DefaultHttpContext();
         // Empty body
         ctx.Request.Body = new MemoryStream(Array.Empty<byte>());
@@ -44,8 +46,9 @@ public sealed class CallControllerTests
     {
         // Arrange
         var data = GetServiceData();
+        using var testDb = new TestHashDb();
         var fake = new MockHttpGetter();
-        var controller = new CallController(data, fake);
+        var controller = new CallController(data, new HashStore(testDb.Db), fake);
 
         var callerUrl = "https://client.example/";
         var ctx = new DefaultHttpContext();

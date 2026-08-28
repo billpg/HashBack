@@ -253,6 +253,153 @@ public sealed class HelloControllerTests
         Assert.AreEqual(401, ctx2.Response.StatusCode);
     }
 
+    [TestMethod]
+    public async Task Get_WrongHost_ThrowsWithWrongHostReason()
+    {
+        // Proves HelloController's actual RequireHost(data.ConfigServiceHost) wiring,
+        // as opposed to HashBackCoreTests' coverage of host-checking in the abstract.
+        var serviceData = GetServiceData();
+        var hashBackRequest = HashBackRequest.Create(
+            "not-" + serviceData.ConfigServiceHost, new Uri("https://client.example/verify"));
+        var controller = new HelloController(serviceData, new MockHttpGetter());
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
+        controller.ControllerContext = new ControllerContext { HttpContext = ctx };
+
+        var ex = await Assert.ThrowsExceptionAsync<AuthorizationParseException>(async () => await controller.Get());
+        Assert.AreEqual(ValidateRejectionReason.WrongHost, ex.Reason);
+    }
+
+    [TestMethod]
+    public async Task Get_FarPastNow_ThrowsWithWrongNowReason()
+    {
+        // Proves HelloController's actual RequireNowWindow(500) wiring.
+        var serviceData = GetServiceData();
+        var hashBackRequest = HashBackRequest.Create(
+            serviceData.ConfigServiceHost, (long)1_000_000_000, "Rpgt4Fc5nMDq14LOps/hYQ==",
+            new Uri("https://client.example/verify"));
+        var controller = new HelloController(serviceData, new MockHttpGetter());
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
+        controller.ControllerContext = new ControllerContext { HttpContext = ctx };
+
+        var ex = await Assert.ThrowsExceptionAsync<AuthorizationParseException>(async () => await controller.Get());
+        Assert.AreEqual(ValidateRejectionReason.WrongNow, ex.Reason);
+    }
+
+    // The following tests use the real HttpGetter class (not MockHttpGetter), combined
+    // with a real local listener, rather than a fake - proving HelloController's wiring to
+    // the actual outbound-fetch machinery (headers sent, failure handling), which a
+    // fake-backed test can't exercise. Formerly covered as black-box, whole-process tests
+    // in ServiceTests.cs; ported here since they don't actually need a separate process or
+    // a real port 9001 - just a real HttpGetter instance and a local listener.
+
+    [TestMethod]
+    public async Task Get_RealHttpGetter_FetchesVerificationHashAndAuthenticates()
+    {
+        using var osl = new OneShotHttpListen();
+        osl.Start();
+
+        ServiceData.AllowGetLocalhost = true;
+        try
+        {
+            var verifyUrl = new Uri($"http://localhost:{osl.ListenPort}/{Guid.NewGuid()}");
+            var serviceData = GetServiceData();
+            var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
+            osl.RespondBody = hashBackRequest.VerificationHash;
+
+            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter()));
+            var ctx = new DefaultHttpContext();
+            ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
+            controller.ControllerContext = new ControllerContext { HttpContext = ctx };
+
+            var result = await controller.Get();
+
+            var content = result as ContentResult;
+            Assert.IsNotNull(content, "Expected content result for a genuinely fetchable hash.");
+            Assert.AreEqual("Hello localhost!", content.Content);
+            Assert.IsTrue(osl.Called, "The verification URL should actually have been fetched.");
+            Assert.AreEqual(verifyUrl, osl.ReqUrl);
+            Assert.AreEqual("demo.hashback.dev", osl.ReqHeaders!["User-Agent"]);
+        }
+        finally
+        {
+            ServiceData.AllowGetLocalhost = false;
+        }
+    }
+
+    [TestMethod]
+    public async Task Get_VerificationUrlOffline_ThrowsExternalUrlNotAvailable()
+    {
+        ServiceData.AllowGetLocalhost = true;
+        try
+        {
+            var serviceData = GetServiceData();
+            // Nothing listens on this port.
+            var verifyUrl = new Uri("http://localhost:8001/xyz");
+            var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
+
+            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter()));
+            var ctx = new DefaultHttpContext();
+            ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
+            controller.ControllerContext = new ControllerContext { HttpContext = ctx };
+
+            var ex = await Assert.ThrowsExceptionAsync<BadRequestException>(async () => await controller.Get());
+            Assert.AreEqual("External URL not available.", ex.Title);
+        }
+        finally
+        {
+            ServiceData.AllowGetLocalhost = false;
+        }
+    }
+
+    [TestMethod]
+    public async Task Get_VerificationUrlIsIpLiteral_ThrowsUrlNotAcceptable()
+    {
+        var serviceData = GetServiceData();
+        var verifyUrl = new Uri("https://192.0.2.1/xyz");
+        var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
+
+        var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter()));
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
+        controller.ControllerContext = new ControllerContext { HttpContext = ctx };
+
+        var ex = await Assert.ThrowsExceptionAsync<BadRequestException>(async () => await controller.Get());
+        Assert.AreEqual("URL not acceptable.", ex.Title);
+        Assert.AreEqual("Host must be for a domain.", ex.Message);
+    }
+
+    [TestMethod]
+    public async Task Get_VerificationUrlReturns404_ThrowsBadVerificationUrl()
+    {
+        using var osl = new OneShotHttpListen();
+        osl.RespondStatusCode = 404;
+        osl.RespondBody = "No!";
+        osl.Start();
+
+        ServiceData.AllowGetLocalhost = true;
+        try
+        {
+            var serviceData = GetServiceData();
+            var verifyUrl = new Uri($"http://localhost:{osl.ListenPort}/xyz");
+            var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
+
+            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter()));
+            var ctx = new DefaultHttpContext();
+            ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
+            controller.ControllerContext = new ControllerContext { HttpContext = ctx };
+
+            var ex = await Assert.ThrowsExceptionAsync<BadRequestException>(async () => await controller.Get());
+            Assert.AreEqual("Bad Verification URL.", ex.Title);
+            StringAssert.Contains(ex.Message, "returned status code 404");
+        }
+        finally
+        {
+            ServiceData.AllowGetLocalhost = false;
+        }
+    }
+
     // Unhappy-path tests
 
     [TestMethod]

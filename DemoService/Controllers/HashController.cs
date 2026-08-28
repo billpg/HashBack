@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Markdig;
 using Swashbuckle.AspNetCore.Annotations;
 using Microsoft.AspNetCore.Http;
+using DemoService.Data;
 
 namespace DemoService.Controllers;
 
@@ -13,11 +14,11 @@ namespace DemoService.Controllers;
 [Route("hash")]
 public class HashController : ControllerBase
 {
-    private readonly ServiceData data;
+    private readonly IHashStore hashStore;
 
-    public HashController(ServiceData data)
+    public HashController(IHashStore hashStore)
     {
-        this.data = data;
+        this.hashStore = hashStore;
     }
 
     // GET /hash/
@@ -33,14 +34,14 @@ public class HashController : ControllerBase
     [SwaggerOperation(Summary = "Get stored hash", Description = "Returns the base64-encoded 32-byte hash previously stored for the given id if found.")]
     [SwaggerResponse(StatusCodes.Status200OK, "Hash found", typeof(string))]
     [SwaggerResponse(StatusCodes.Status404NotFound, "No entry found for the given id")]
-    public ActionResult GetById(Guid id)
+    public async Task<ActionResult> GetById(Guid id)
     {
         var requestHeaders = new StringBuilder();
         foreach (var h in Request.Headers)
             foreach (var sh in h.Value)
                 requestHeaders.AppendLine($"{h.Key}: {sh}");
 
-        var entry = data.TryGetHash(id, Request.RequestIP(), requestHeaders.ToString());
+        var entry = await hashStore.TryGetHashAsync(id, Request.RequestIP(), requestHeaders.ToString());
         if (entry == null)
             return NotFound();
         return Content(entry.HashAsString, "text/plain");
@@ -67,13 +68,14 @@ public class HashController : ControllerBase
         if (hashAsBytes == null)
             return BadRequest($"Hash must be a valid base64-encoded block of {256/8} bytes.");
 
-        /* Store the hash in the database. */
-        var entry = new StoredHash(hashAsBytes, DateTime.UtcNow, IPAddress.None);
-        var added = data.TryAddHash(id, entry);
+        /* Store the hash. Refused if this id was used within the reuse-block window.
+         * (AddedBy is deliberately IPAddress.None here, matching the original behaviour -
+         * only GET requests to retrieve a hash log the requester's IP, not the upload.) */
+        var added = await hashStore.TryAddHashAsync(id, hashAsBytes, IPAddress.None);
 
         /* Return success or otherwise. */
         if (added)
-            return Content(entry.HashAsString, "text/plain");
+            return Content(Convert.ToBase64String(hashAsBytes), "text/plain");
         else
             return Conflict($"An entry with ID {id} already exists.");
     }

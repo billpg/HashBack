@@ -1,16 +1,46 @@
-﻿using System;
-using System.IO;
+using System;
 using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using DemoService;
 using DemoService.Controllers;
+using DemoService.Data;
 
 namespace DemoServiceTests;
+
+/// <summary>
+/// A fresh, dependency-free HashDbContext backed by an in-memory SQLite database - the
+/// standard way to exercise real EF Core query/update behaviour in tests without needing a
+/// live PostgreSQL server. Its schema is built directly from the current model rather than
+/// via the real (PostgreSQL-flavoured) migrations, which is the normal approach for this
+/// kind of test database.
+/// </summary>
+internal sealed class TestHashDb : IDisposable
+{
+    private readonly SqliteConnection connection;
+    public HashDbContext Db { get; }
+
+    public TestHashDb()
+    {
+        connection = new SqliteConnection("Filename=:memory:");
+        connection.Open();
+        var options = new DbContextOptionsBuilder<HashDbContext>().UseSqlite(connection).Options;
+        Db = new HashDbContext(options);
+        Db.Database.EnsureCreated();
+    }
+
+    public void Dispose()
+    {
+        Db.Dispose();
+        connection.Dispose();
+    }
+}
 
 [TestClass]
 public sealed class HashControllerTests
@@ -19,8 +49,8 @@ public sealed class HashControllerTests
     public void Get_ReturnsHtmlContent()
     {
         // Arrange
-        var data = new ServiceData();
-        var controller = new HashController(data);
+        using var testDb = new TestHashDb();
+        var controller = new HashController(new HashStore(testDb.Db));
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         // Act
@@ -36,39 +66,38 @@ public sealed class HashControllerTests
     }
 
     [TestMethod]
-    public void GetById_NotFound_Returns404()
+    public async Task GetById_NotFound_Returns404()
     {
         // Arrange
-        var data = new ServiceData();
-        var controller = new HashController(data);
+        using var testDb = new TestHashDb();
+        var controller = new HashController(new HashStore(testDb.Db));
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         var id = Guid.NewGuid();
 
         // Act
-        var result = controller.GetById(id);
+        var result = await controller.GetById(id);
 
         // Assert
         Assert.IsInstanceOfType(result, typeof(NotFoundResult), "Expected NotFound when id does not exist.");
     }
 
     [TestMethod]
-    public void GetById_Found_ReturnsStoredHash()
+    public async Task GetById_Found_ReturnsStoredHash()
     {
         // Arrange
-        var data = new ServiceData();
+        using var testDb = new TestHashDb();
+        var store = new HashStore(testDb.Db);
         var id = Guid.NewGuid();
         var bytes = Enumerable.Range(0, 32).Select(i => (byte)i).ToArray();
         var expectedBase64 = Convert.ToBase64String(bytes);
-        var stored = new StoredHash(bytes, DateTime.UtcNow, IPAddress.Loopback);
-        var added = data.TryAddHash(id, stored);
+        var added = await store.TryAddHashAsync(id, bytes, IPAddress.Loopback);
         Assert.IsTrue(added, "Precondition: failed to add stored hash.");
 
-        var controller = new HashController(data);
-        // DefaultHttpContext is fine; Request.RequestIP will fall back to Loopback
+        var controller = new HashController(store);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         // Act
-        var result = controller.GetById(id);
+        var result = await controller.GetById(id);
 
         // Assert
         var content = result as ContentResult;
@@ -81,8 +110,9 @@ public sealed class HashControllerTests
     public async Task Put_WithValidHash_StoresAndReturns()
     {
         // Arrange
-        var data = new ServiceData();
-        var controller = new HashController(data);
+        using var testDb = new TestHashDb();
+        var store = new HashStore(testDb.Db);
+        var controller = new HashController(store);
         var ctx = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
 
@@ -101,9 +131,9 @@ public sealed class HashControllerTests
         Assert.AreEqual("text/plain", content.ContentType);
         Assert.AreEqual(base64, content.Content, "Put should return the stored base64 string.");
 
-        // Assert stored in ServiceData
-        var fetched = data.TryGetHash(id, IPAddress.Loopback, "");
-        Assert.IsNotNull(fetched, "Expected hash to be stored in ServiceData.");
+        // Assert stored, by fetching it back
+        var fetched = await store.TryGetHashAsync(id, IPAddress.Loopback, "");
+        Assert.IsNotNull(fetched, "Expected hash to be stored.");
         Assert.AreEqual(base64, fetched!.HashAsString, "Stored hash string did not match input.");
     }
 
@@ -111,12 +141,13 @@ public sealed class HashControllerTests
     public async Task Put_DuplicateId_ReturnsConflict()
     {
         // Arrange
-        var data = new ServiceData();
+        using var testDb = new TestHashDb();
+        var store = new HashStore(testDb.Db);
         var id = Guid.NewGuid();
         var initialBytes = Enumerable.Range(0, 32).Select(i => (byte)i).ToArray();
-        data.TryAddHash(id, new StoredHash(initialBytes, DateTime.UtcNow, IPAddress.Loopback));
+        await store.TryAddHashAsync(id, initialBytes, IPAddress.Loopback);
 
-        var controller = new HashController(data);
+        var controller = new HashController(store);
         var ctx = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
 
@@ -139,8 +170,8 @@ public sealed class HashControllerTests
     public async Task Put_EmptyBody_ReturnsBadRequest()
     {
         // Arrange
-        var data = new ServiceData();
-        var controller = new HashController(data);
+        using var testDb = new TestHashDb();
+        var controller = new HashController(new HashStore(testDb.Db));
         var ctx = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
 
@@ -161,8 +192,8 @@ public sealed class HashControllerTests
     public async Task Put_InvalidBase64Length_ReturnsBadRequest()
     {
         // Arrange
-        var data = new ServiceData();
-        var controller = new HashController(data);
+        using var testDb = new TestHashDb();
+        var controller = new HashController(new HashStore(testDb.Db));
         var ctx = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
 

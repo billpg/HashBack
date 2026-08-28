@@ -1,5 +1,8 @@
 ﻿using DemoService;
+using DemoService.Data;
 using DemoService.Services;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -29,6 +32,21 @@ builder.Services.AddSingleton<ServiceData>();
 builder.Services.AddSingleton<IIpFilter, IpFilter>();
 builder.Services.AddSingleton<IHttpGetter, HttpGetter>();
 
+// The /hash store, backed by PostgreSQL. The connection string (including its password)
+// is deliberately never checked into source: set it via
+//   dotnet user-secrets set "ConnectionStrings:HashDb" "Host=...;Database=...;Username=...;Password=..." --project DemoService
+// for local development, or the ConnectionStrings__HashDb environment variable in production.
+// HashController and CallController both depend on this, so it's a hard requirement now -
+// fail fast at startup rather than serve requests that can only ever fail.
+var hashDbConnectionString = builder.Configuration.GetConnectionString("HashDb")
+    ?? throw new InvalidOperationException(
+        "Missing ConnectionStrings:HashDb configuration. Set it via 'dotnet user-secrets set " +
+        "\"ConnectionStrings:HashDb\" \"Host=...;Database=...;Username=...;Password=...\"' for " +
+        "local development, or the ConnectionStrings__HashDb environment variable in production.");
+builder.Services.AddDbContext<HashDbContext>(options => options.UseNpgsql(hashDbConnectionString));
+builder.Services.AddScoped<IHashStore, HashStore>();
+builder.Services.AddHostedService<HashCleanupService>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -52,6 +70,14 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 var app = builder.Build();
+
+// Confirm the /hash store's tables exist, creating (or updating) them if not. Safe to run
+// on every startup - a database already at the latest migration is a no-op.
+using (var startupScope = app.Services.CreateScope())
+{
+    var hashDb = startupScope.ServiceProvider.GetRequiredService<HashDbContext>();
+    hashDb.Database.Migrate();
+}
 
 // Global exception handling middleware -- converts exceptions into HTTP responses
 app.UseMiddleware<ExceptionHandlingMiddleware>();

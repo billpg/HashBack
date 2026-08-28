@@ -6,6 +6,7 @@ using Swashbuckle.AspNetCore.Annotations;
 using Microsoft.AspNetCore.Http;
 using billpg.HashBackCore;
 using System.Net;
+using DemoService.Data;
 using DemoService.Services;
 using Microsoft.AspNetCore.Builder;
 
@@ -16,25 +17,31 @@ namespace DemoService.Controllers;
 public class CallController : ControllerBase
 {
     /// <summary>
-    /// Stored service data, including hashes and other state. 
+    /// Stored service data (configuration, etc).
     /// </summary>
     private readonly ServiceData data;
+
+    /// <summary>
+    /// The /hash store.
+    /// </summary>
+    private readonly IHashStore hashStore;
 
     /// <summary>
     /// HTTP Getter service.
     /// </summary>
     private readonly IHttpGetter httpGetter;
 
-    public CallController(ServiceData data, IHttpGetter httpGetter)
+    public CallController(ServiceData data, IHashStore hashStore, IHttpGetter httpGetter)
     {
         this.data = data;
+        this.hashStore = hashStore;
         this.httpGetter = httpGetter;
     }
 
     // GET /call/
     [HttpGet]
     [Produces("text/html")]
-    [SwaggerOperation(Summary = "HTML index for call endpoint", 
+    [SwaggerOperation(Summary = "HTML index for call endpoint",
         Description = "Returns an HTML page describing how to use the Call demo endpoint.")]
     public ActionResult Get()
         => Content(HtmlPages.CallRoot(), "text/html", Encoding.UTF8);
@@ -43,7 +50,7 @@ public class CallController : ControllerBase
     [HttpPost]
     [Produces("text/plain")]
     [Consumes("text/plain")]
-    [SwaggerOperation(Summary = "Submit a call requestBody", 
+    [SwaggerOperation(Summary = "Submit a call requestBody",
         Description = "Accepts a plain-text requestBody and returns a simple acknowledgement.")]
     [SwaggerResponse(StatusCodes.Status200OK, "Payload received", typeof(string))]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid request body")]
@@ -66,8 +73,7 @@ public class CallController : ControllerBase
         var verifyUrl = new Uri($"https://{data.ConfigServiceHost}/hash/{id}");
         DateTime now = DateTime.UtcNow;
         var hashBackRequest = HashBackRequest.Create(caller.Authority, now, verifyUrl);
-        var storedHash = new StoredHash(Convert.FromBase64String(hashBackRequest.VerificationHash), now, Request.RequestIP());
-        data.TryAddHash(id, storedHash);
+        await hashStore.TryAddHashAsync(id, Convert.FromBase64String(hashBackRequest.VerificationHash), Request.RequestIP());
 
         /* Make a GET request to that URL. */
         var req = new SimpleHttpRequest(caller)
@@ -75,10 +81,10 @@ public class CallController : ControllerBase
         var resp = await httpGetter.GetAsync(req);
 
         /* Report to caller. */
-        return Content(BuildReport(caller, id, resp), "text/plain");
+        return Content(await BuildReport(caller, id, resp), "text/plain");
     }
 
-    private string BuildReport(Uri caller, Guid id, SimpleHttpResponse resp)
+    private async Task<string> BuildReport(Uri caller, Guid id, SimpleHttpResponse resp)
     {
         /* Build a report of the response, including status code, headers, and body. */
         var report = new StringBuilder();
@@ -91,7 +97,7 @@ public class CallController : ControllerBase
         var body = resp.Body;
         report.AppendLine(body);
         report.AppendLine();
-        var getHashEvents = data.ListGetHashEvents(id);
+        var getHashEvents = await hashStore.ListGetHashEventsAsync(id);
         report.AppendLine($"Logged GET /hash/{id} events: ({getHashEvents.Count})");
         for (int eventIndex = 0; eventIndex < getHashEvents.Count; eventIndex++)
         {
