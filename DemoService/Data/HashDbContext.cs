@@ -20,6 +20,7 @@ public class HashDbContext : DbContext
 
     public DbSet<StoredHashRecord> StoredHashes => Set<StoredHashRecord>();
     public DbSet<HashGetEventRecord> HashGetEvents => Set<HashGetEventRecord>();
+    public DbSet<HelloRequestLogRecord> HelloRequestLogs => Set<HelloRequestLogRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +45,21 @@ public class HashDbContext : DbContext
             entity.HasIndex(e => e.HashId);
         });
 
+        modelBuilder.Entity<HelloRequestLogRecord>(entity =>
+        {
+            entity.HasKey(e => e.RecordId);
+            entity.Property(e => e.RecordId).ValueGeneratedOnAdd();
+
+            /* Stored as text (e.g. "WrongHash") rather than a bare integer, since the
+             * whole point of this table is to be queried ad hoc. */
+            entity.Property(e => e.Outcome).HasConversion<string>();
+
+            /* Queried by caller IP (to spot a history of failures) and by time (recent
+             * activity, retention cleanup). */
+            entity.HasIndex(e => e.CallerIp);
+            entity.HasIndex(e => e.RequestedAt);
+        });
+
         /* SQLite (used for fast, dependency-free tests) has no native IP address type, so
          * store it as text there. PostgreSQL's own native "inet" type is used everywhere
          * else, without needing any conversion - checking the provider name by string
@@ -54,8 +70,13 @@ public class HashDbContext : DbContext
             var ipConverter = new ValueConverter<IPAddress, string>(
                 ip => ip.ToString(),
                 s => IPAddress.Parse(s));
+            var nullableIpConverter = new ValueConverter<IPAddress?, string?>(
+                ip => ip == null ? null : ip.ToString(),
+                s => s == null ? null : IPAddress.Parse(s));
             modelBuilder.Entity<StoredHashRecord>().Property(h => h.AddedBy).HasConversion(ipConverter);
             modelBuilder.Entity<HashGetEventRecord>().Property(e => e.GotBy).HasConversion(ipConverter);
+            modelBuilder.Entity<HelloRequestLogRecord>().Property(e => e.CallerIp).HasConversion(ipConverter);
+            modelBuilder.Entity<HelloRequestLogRecord>().Property(e => e.VerificationIp).HasConversion(nullableIpConverter);
         }
     }
 }

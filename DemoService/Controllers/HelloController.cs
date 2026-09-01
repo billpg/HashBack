@@ -4,10 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using Microsoft.AspNetCore.Http;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.DataProtection.AuthenticatedEncryption.ConfigurationModel;
 using billpg.HashBackCore;
-using Microsoft.OpenApi;
 using System.Net;
+using DemoService.Data;
 using DemoService.Services;
 
 namespace DemoService.Controllers;
@@ -18,11 +17,13 @@ public class HelloController : ControllerBase
 {
     private readonly ServiceData data;
     private readonly IHttpGetter httpGetter;
+    private readonly IHelloRequestLog requestLog;
 
-    public HelloController(ServiceData data, IHttpGetter httpGetter)
+    public HelloController(ServiceData data, IHttpGetter httpGetter, IHelloRequestLog requestLog)
     {
         this.data = data;
         this.httpGetter = httpGetter;
+        this.requestLog = requestLog;
     }
 
     private const string HashBackCookieName = "HashBackDemoService";
@@ -46,7 +47,16 @@ public class HelloController : ControllerBase
         /* Perform HashBack authentication, or check the cookie. */
         string? authHeader = Request.Headers.Authorization;
         string? cookieValue = Request.Cookies[HashBackCookieName];
-        (string? authDomain, bool isCookieValid) = await Authenticate(authHeader, cookieValue);
+        (string? authDomain, bool isCookieValid, bool isBlocked) = await Authenticate(authHeader, cookieValue);
+
+        /* This caller IP has too many recent failures - turn it away without having done
+         * any of the real (expensive) work. */
+        if (isBlocked)
+        {
+            Response.Headers["Retry-After"] = ((int)HelloRequestLog.FailureLookbackWindow.TotalSeconds).ToString();
+            return StatusCode(StatusCodes.Status429TooManyRequests,
+                "Too many recent failed authentication attempts from this caller. Try again later.");
+        }
 
         /* If authentication succeeded and the cookie was not set, set it now. */
         if (authDomain != null && !isCookieValid)
@@ -73,40 +83,110 @@ public class HelloController : ControllerBase
         return Content(HtmlPages.HelloRoot(), "text/html", Encoding.UTF8);
     }
 
-    private async Task<(string? authDomain, bool isCookieValid)> Authenticate(string? authHeader, string? cookieValue)
+    private async Task<(string? authDomain, bool isCookieValid, bool isBlocked)> Authenticate(string? authHeader, string? cookieValue)
     {
         /* Check the cookie first. If its valid, return the domain inside it. */
         if (!string.IsNullOrEmpty(cookieValue))
         {
             string? domainInCookie = JWT.ParseAndValidateReturnSub(cookieValue);
             if (domainInCookie != null)
-                return (domainInCookie, true);
+                return (domainInCookie, true, false);
         }
 
-        /* If no valid cookie, check the Authorization header. */
+        /* If no valid cookie, check the Authorization header - and log the attempt,
+         * whatever it turns out to be, for later abuse-pattern review. */
         if (!string.IsNullOrEmpty(authHeader))
         {
+            IPAddress callerIp = Request.RequestIP();
+
+            /* Before doing any real (expensive) work, check whether this caller IP has
+             * already racked up too many recent failures. A blocked attempt is logged too,
+             * but as its own outcome - excluded from the failure count itself, so a blocked
+             * caller's own turned-away attempts can't keep the block going indefinitely. */
+            if (await requestLog.IsCallerBlockedAsync(callerIp))
+            {
+                await requestLog.LogAsync(callerIp, null, null, HelloRequestOutcome.CallerBlocked, null);
+                return (null, false, true);
+            }
+
+            var authDomain = await AuthenticateAndLog(authHeader, callerIp);
+            if (authDomain != null)
+                return (authDomain, false, false);
+        }
+
+        /* Not authenticated. */
+        return (null, false, false);
+    }
+
+    private async Task<string?> AuthenticateAndLog(string authHeader, IPAddress callerIp)
+    {
+        HashBackRequest? claim = null;
+        IPAddress? verificationIp = null;
+        string? authDomain = null;
+        HelloRequestOutcome outcome = HelloRequestOutcome.UnexpectedError;
+        string? detail = null;
+
+        try
+        {
+            /* Parsed separately from Authenticate (rather than the combined static
+             * Authenticate(header, policy) helper) so the claim's fields are available for
+             * logging even if authentication itself goes on to fail. */
+            claim = HashBackRequest.Parse(authHeader);
+
             HashBackPolicy policy = new();
             policy.RequireHost(data.ConfigServiceHost);
             policy.RequireNowWindow(NowToleranceSeconds);
             policy.SetSyncUnusValidate(unus => data.TryRecordUnus(unus, TimeSpan.FromSeconds(NowToleranceSeconds)));
             policy.SetSyncIdentifyUser(verify => verify.Host);
-            policy.OnGetVerificationHash = verify => GetHash(verify.ToString());
-            var authDomain = await HashBackRequest.Authenticate(authHeader, policy);
-            if (authDomain != null)
-                return (authDomain, false);
-        }
+            policy.OnGetVerificationHash = verify => GetHash(verify.ToString(), ip => verificationIp = ip);
 
-        /* Not authenticated. */
-        return (null, false);
+            authDomain = await claim.Authenticate(policy);
+            outcome = HelloRequestOutcome.Success;
+            return authDomain;
+        }
+        catch (AuthorizationParseException ex)
+        {
+            outcome = MapOutcome(ex.Reason);
+            detail = ex.Message;
+            throw;
+        }
+        catch (Exception ex) when (ex is BadRequestException or ApplicationException)
+        {
+            /* Everything HttpGetter/GetHash can throw once past parsing and policy checks -
+             * unreachable, timed out, TLS rejected, bad status, filtered IP, and so on. */
+            outcome = HelloRequestOutcome.VerificationFetchFailed;
+            detail = ex.Message;
+            throw;
+        }
+        catch (Exception ex)
+        {
+            outcome = HelloRequestOutcome.UnexpectedError;
+            detail = ex.Message;
+            throw;
+        }
+        finally
+        {
+            await requestLog.LogAsync(callerIp, claim, verificationIp, outcome, detail);
+        }
     }
 
-    private async Task<string> GetHash(string url)
+    private static HelloRequestOutcome MapOutcome(ValidateRejectionReason reason) => reason switch
+    {
+        ValidateRejectionReason.BadHeader => HelloRequestOutcome.BadHeader,
+        ValidateRejectionReason.WrongHost => HelloRequestOutcome.WrongHost,
+        ValidateRejectionReason.WrongNow => HelloRequestOutcome.WrongNow,
+        ValidateRejectionReason.ReplayedUnus => HelloRequestOutcome.ReplayedUnus,
+        ValidateRejectionReason.UnknownUser => HelloRequestOutcome.UnknownUser,
+        ValidateRejectionReason.WrongHash => HelloRequestOutcome.WrongHash,
+        _ => HelloRequestOutcome.UnexpectedError
+    };
+
+    private async Task<string> GetHash(string url, Action<IPAddress> onResolved)
     {
         /* Call the supplied verification URL and get the results. */
-        var resp = await httpGetter.GetAsync(new SimpleHttpRequest(url));
+        var resp = await httpGetter.GetAsync(new SimpleHttpRequest(url), onResolved);
         if (resp.StatusCode != 200)
-            throw new BadRequestException("Bad Verification URL.", 
+            throw new BadRequestException("Bad Verification URL.",
                 $"{url} returned status code {resp.StatusCode}");
 
         /* Split the response into tokens, looking for the first one that decodes to 256

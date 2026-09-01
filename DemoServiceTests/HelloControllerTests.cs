@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Net;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -8,13 +9,26 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using billpg.HashBackCore;
 using DemoService.Controllers;
 using DemoService;
+using DemoService.Data;
 using DemoService.Services;
 
 namespace DemoServiceTests;
 
+/// <summary>A no-op IHelloRequestLog, for tests where the logging itself isn't what's under test.</summary>
+internal sealed class NoOpHelloRequestLog : IHelloRequestLog
+{
+    public Task LogAsync(IPAddress callerIp, HashBackRequest? claim, IPAddress? verificationIp, HelloRequestOutcome outcome, string? detail)
+        => Task.CompletedTask;
+
+    public Task<bool> IsCallerBlockedAsync(IPAddress callerIp)
+        => Task.FromResult(false);
+}
+
 [TestClass]
 public sealed class HelloControllerTests
 {
+    private static readonly IHelloRequestLog NoOpRequestLog = new NoOpHelloRequestLog();
+
     ServiceData GetServiceData()
         => new ServiceData { ConfigServiceHost = $"{Guid.NewGuid()}.example" };
 
@@ -22,7 +36,7 @@ public sealed class HelloControllerTests
     public async Task Get_NoCookieNoHeader_Returns401AndWwwAuthenticateHeader()
     {
         // Arrange
-        var controller = new HelloController(GetServiceData(), new MockHttpGetter());
+        var controller = new HelloController(GetServiceData(), new MockHttpGetter(), NoOpRequestLog);
         var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
@@ -66,7 +80,7 @@ public sealed class HelloControllerTests
         var fakeGetter = new MockHttpGetter(registeredHashes);
 
         // Create controller with injected fake getter
-        var controller = new HelloController(serviceData, fakeGetter);
+        var controller = new HelloController(serviceData, fakeGetter, NoOpRequestLog);
 
         // ----- First request: use Authorization header and receive Set-Cookie -----
         var ctx1 = new DefaultHttpContext();
@@ -127,7 +141,7 @@ public sealed class HelloControllerTests
         registeredHashes[verifyUrl] = hashBackRequest.VerificationHash;
 
         var fakeGetter = new MockHttpGetter(registeredHashes);
-        var controller = new HelloController(serviceData, fakeGetter);
+        var controller = new HelloController(serviceData, fakeGetter, NoOpRequestLog);
 
         // First use: should succeed.
         var ctx1 = new DefaultHttpContext();
@@ -159,7 +173,7 @@ public sealed class HelloControllerTests
         registeredHashes[verifyUrl] = hashBackRequest.VerificationHash;
 
         var fakeGetter = new MockHttpGetter(registeredHashes);
-        var controller = new HelloController(serviceData, fakeGetter);
+        var controller = new HelloController(serviceData, fakeGetter, NoOpRequestLog);
 
         var ctx = new DefaultHttpContext();
         ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
@@ -198,7 +212,7 @@ public sealed class HelloControllerTests
         registeredHashes[verifyUrl] = base64UrlHash;
 
         var fakeGetter = new MockHttpGetter(registeredHashes);
-        var controller = new HelloController(serviceData, fakeGetter);
+        var controller = new HelloController(serviceData, fakeGetter, NoOpRequestLog);
 
         var ctx = new DefaultHttpContext();
         ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
@@ -223,7 +237,7 @@ public sealed class HelloControllerTests
         registeredHashes[verifyUrl] = hashBackRequest.VerificationHash;
 
         var fakeGetter = new MockHttpGetter(registeredHashes);
-        var controller = new HelloController(serviceData, fakeGetter);
+        var controller = new HelloController(serviceData, fakeGetter, NoOpRequestLog);
 
         var ctx1 = new DefaultHttpContext();
         ctx1.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
@@ -261,7 +275,7 @@ public sealed class HelloControllerTests
         var serviceData = GetServiceData();
         var hashBackRequest = HashBackRequest.Create(
             "not-" + serviceData.ConfigServiceHost, new Uri("https://client.example/verify"));
-        var controller = new HelloController(serviceData, new MockHttpGetter());
+        var controller = new HelloController(serviceData, new MockHttpGetter(), NoOpRequestLog);
         var ctx = new DefaultHttpContext();
         ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
@@ -278,7 +292,7 @@ public sealed class HelloControllerTests
         var hashBackRequest = HashBackRequest.Create(
             serviceData.ConfigServiceHost, (long)1_000_000_000, "Rpgt4Fc5nMDq14LOps/hYQ==",
             new Uri("https://client.example/verify"));
-        var controller = new HelloController(serviceData, new MockHttpGetter());
+        var controller = new HelloController(serviceData, new MockHttpGetter(), NoOpRequestLog);
         var ctx = new DefaultHttpContext();
         ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
@@ -308,7 +322,7 @@ public sealed class HelloControllerTests
             var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
             osl.RespondBody = hashBackRequest.VerificationHash;
 
-            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter()));
+            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter()), NoOpRequestLog);
             var ctx = new DefaultHttpContext();
             ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
             controller.ControllerContext = new ControllerContext { HttpContext = ctx };
@@ -339,7 +353,7 @@ public sealed class HelloControllerTests
             var verifyUrl = new Uri("http://localhost:8001/xyz");
             var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
 
-            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter()));
+            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter()), NoOpRequestLog);
             var ctx = new DefaultHttpContext();
             ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
             controller.ControllerContext = new ControllerContext { HttpContext = ctx };
@@ -360,7 +374,7 @@ public sealed class HelloControllerTests
         var verifyUrl = new Uri("https://192.0.2.1/xyz");
         var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
 
-        var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter()));
+        var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter()), NoOpRequestLog);
         var ctx = new DefaultHttpContext();
         ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
@@ -385,7 +399,7 @@ public sealed class HelloControllerTests
             var verifyUrl = new Uri($"http://localhost:{osl.ListenPort}/xyz");
             var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
 
-            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter()));
+            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter()), NoOpRequestLog);
             var ctx = new DefaultHttpContext();
             ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
             controller.ControllerContext = new ControllerContext { HttpContext = ctx };
@@ -406,7 +420,7 @@ public sealed class HelloControllerTests
     public async Task Get_WithMalformedAuthorizationHeader_ThrowsAuthorizationParseException()
     {
         // Arrange
-        var controller = new HelloController(GetServiceData(), new MockHttpGetter());
+        var controller = new HelloController(GetServiceData(), new MockHttpGetter(), NoOpRequestLog);
         var ctx = new DefaultHttpContext();
         // A header that is neither valid base64 nor JSON
         ctx.Request.Headers["Authorization"] = "HashBack not-a-base64-or-json!";
@@ -441,7 +455,7 @@ public sealed class HelloControllerTests
         foreach (var kv in registeredHashes)
             registeredHashes[kv.Key] = kv.Value + "tampered";
 
-        var controller = new HelloController(GetServiceData(), fakeGetter);
+        var controller = new HelloController(GetServiceData(), fakeGetter, NoOpRequestLog);
 
         var ctx = new DefaultHttpContext();
         ctx.Request.Headers["Authorization"] = "HashBack " + token;

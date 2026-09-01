@@ -45,6 +45,7 @@ var hashDbConnectionString = builder.Configuration.GetConnectionString("HashDb")
         "local development, or the ConnectionStrings__HashDb environment variable in production.");
 builder.Services.AddDbContext<HashDbContext>(options => options.UseNpgsql(hashDbConnectionString));
 builder.Services.AddScoped<IHashStore, HashStore>();
+builder.Services.AddScoped<IHelloRequestLog, HelloRequestLog>();
 builder.Services.AddHostedService<HashCleanupService>();
 
 builder.Services.AddEndpointsApiExplorer();

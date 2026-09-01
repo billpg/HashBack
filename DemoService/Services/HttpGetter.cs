@@ -16,7 +16,13 @@ namespace DemoService.Services;
 
 public interface IHttpGetter
 {
-    Task<SimpleHttpResponse> GetAsync(SimpleHttpRequest req);
+    /// <summary>
+    /// The optional onResolved callback, if supplied, is invoked with the resolved remote
+    /// IP address as soon as DNS resolution succeeds - before attempting to connect - so a
+    /// caller can find out which address was actually contacted even if the request goes
+    /// on to fail (connection refused, TLS rejected, bad status, and so on).
+    /// </summary>
+    Task<SimpleHttpResponse> GetAsync(SimpleHttpRequest req, Action<IPAddress>? onResolved = null);
 }
 
 /// <summary>
@@ -66,7 +72,7 @@ public class HttpGetter : IHttpGetter
         Uri url, X509Certificate2 certificate, X509Chain? chain, SslPolicyErrors sslPolicyErrors)
         => sslPolicyErrors == SslPolicyErrors.None;
 
-    public async Task<SimpleHttpResponse> GetAsync(SimpleHttpRequest req)
+    public async Task<SimpleHttpResponse> GetAsync(SimpleHttpRequest req, Action<IPAddress>? onResolved = null)
     {
         /* First, validate the URL. */
         ValidateUrlOrThrow(req.Url);
@@ -81,7 +87,7 @@ public class HttpGetter : IHttpGetter
         try
         {
             /* Connect TCP and handshake TLS. */
-            (tcpcli, netstr, certificateHash) = await ConnectHttp(req.Url, cancellationToken);
+            (tcpcli, netstr, certificateHash) = await ConnectHttp(req.Url, cancellationToken, onResolved);
 
             /* Build and send the HTTP request. */
             var requestLines = new List<string>
@@ -138,7 +144,8 @@ public class HttpGetter : IHttpGetter
         return Encoding.ASCII.GetString(respBytes, 0, freeIndex);
     }
 
-    internal async Task<(TcpClient tcpcli, Stream netstr, string? certificateHash)> ConnectHttp(Uri uri, CancellationToken cancellationToken)
+    internal async Task<(TcpClient tcpcli, Stream netstr, string? certificateHash)> ConnectHttp(
+        Uri uri, CancellationToken cancellationToken, Action<IPAddress>? onResolved = null)
     {
         /* Check if this is a localhost allowance. (Note: ValidateUrlOrThrow, the gate in
          * front of the public GetAsync entry point, never lets an https://localhost URL
@@ -157,6 +164,7 @@ public class HttpGetter : IHttpGetter
 
         /* Make all the precautions for public use. */
         var remoteIp = await ResolveDomain(uri.Host, isDebug, cancellationToken);
+        onResolved?.Invoke(remoteIp);
 
         /* Connect TCP. */
         var tcp = new TcpClient();

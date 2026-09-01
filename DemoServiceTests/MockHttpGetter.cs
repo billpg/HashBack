@@ -21,8 +21,10 @@ namespace DemoServiceTests
         public IDictionary<string, string>? LastHeaders { get; private set; }
         public Uri? LastUri { get; private set; }
 
-        public Task<SimpleHttpResponse> GetAsync(SimpleHttpRequest req)
+        public Task<SimpleHttpResponse> GetAsync(SimpleHttpRequest req, Action<IPAddress>? onResolved = null)
         {
+            onResolved?.Invoke(IPAddress.Loopback);
+
             if (Response == null && _registered.TryGetValue(req.Url.ToString(), out string? registeredHash))
                 Response = new SimpleHttpResponse(200)
                     .WithHeader("Content-Type", "text/plain")
