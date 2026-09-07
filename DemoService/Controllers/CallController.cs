@@ -31,11 +31,17 @@ public class CallController : ControllerBase
     /// </summary>
     private readonly IHttpGetter httpGetter;
 
-    public CallController(ServiceData data, IHashStore hashStore, IHttpGetter httpGetter)
+    /// <summary>
+    /// Checks a target has explicitly opted in to being called, before we do so.
+    /// </summary>
+    private readonly ICallPermissionChecker permissionChecker;
+
+    public CallController(ServiceData data, IHashStore hashStore, IHttpGetter httpGetter, ICallPermissionChecker permissionChecker)
     {
         this.data = data;
         this.hashStore = hashStore;
         this.httpGetter = httpGetter;
+        this.permissionChecker = permissionChecker;
     }
 
     // GET /call/
@@ -67,6 +73,14 @@ public class CallController : ControllerBase
         bool isValid = Uri.TryCreate(requestBody.Trim(), UriKind.Absolute, out var caller);
         if (!isValid || caller == null)
             return BadRequest("Request body must be a valid URL.");
+
+        /* Refuse to call a target that hasn't explicitly opted in - otherwise this
+         * endpoint is an open relay to any public HTTPS domain a caller names, whether or
+         * not its owner wants that. */
+        if (!await permissionChecker.IsCallPermittedAsync(caller))
+            return StatusCode(StatusCodes.Status403Forbidden,
+                $"This service will only call targets that have explicitly granted permission via " +
+                $"https://{caller.Host}/.well-known/demo-hashback-dev.json");
 
         /* Build the Authorization header for the caller's URL. */
         Guid id = Guid.NewGuid();

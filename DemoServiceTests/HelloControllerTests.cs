@@ -51,7 +51,11 @@ public sealed class HelloControllerTests
         // Assert WWW-Authenticate header is present and mentions the HashBack realm
         Assert.IsTrue(response.Headers.ContainsKey("WWW-Authenticate"), "WWW-Authenticate header should be present.");
         var www = response.Headers["WWW-Authenticate"].ToString();
-        StringAssert.Contains(www, "HashBack realm=\"demo.hashback.dev\"", "WWW-Authenticate header should indicate HashBack realm.");
+        // realm and set-cookie are valid RFC 9110 tokens, so billpg.WWWAuthenticateTools
+        // correctly leaves them unquoted; version contains a comma, so it must be quoted.
+        StringAssert.Contains(www, "HashBack realm=demo.hashback.dev", "WWW-Authenticate header should indicate HashBack realm.");
+        StringAssert.Contains(www, "set-cookie=HashBackDemoService", "WWW-Authenticate header should name the cookie.");
+        StringAssert.Contains(www, "version=\"BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1\"", "WWW-Authenticate header should list supported versions.");
 
         var contentResult = actionResult as ContentResult;
         Assert.IsNotNull(contentResult, "Expected a ContentResult when unauthorized.");

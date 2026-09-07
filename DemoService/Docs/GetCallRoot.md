@@ -4,6 +4,23 @@ This is a simple service that will call **your** URL with a valid HashBack heade
 in the right place ready for you to read. The response to the POST will be a log of call, including any attempts to get the
 verification hash.
 
+## Before you start: your site needs to opt in
+So this service can't be used to send an authenticated-looking request at a domain that
+never asked for it, it will only call a target that has published its own consent first, at:
+
+```
+https://{your-domain}/.well-known/demo-hashback-dev.json
+```
+
+containing:
+```json
+{ "allow": true }
+```
+
+Calling this demo service's own `/hello/` endpoint (see "Demo-Service-Ception!" below) is
+always allowed and needs no file of its own. Anything else without a matching file returns
+`403 Forbidden`.
+
 ## Making a request
 The request body should be a `text/plain` string of the URL you want this service to call.
 

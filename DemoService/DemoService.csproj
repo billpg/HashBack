@@ -35,6 +35,11 @@
     <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="10.2.3" />
   </ItemGroup>
 
+  <!-- Correct WWW-Authenticate/Authorization header parsing and building -->
+  <ItemGroup>
+    <PackageReference Include="billpg.WWWAuthenticateTools" Version="0.1.0" />
+  </ItemGroup>
+
   <!-- EF Core with the PostgreSQL provider for the hash store -->
   <ItemGroup>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />

@@ -32,6 +32,9 @@ builder.Services.AddSingleton<ServiceData>();
 builder.Services.AddSingleton<IIpFilter, IpFilter>();
 builder.Services.AddSingleton<IHttpGetter, HttpGetter>();
 
+// Singleton so its in-memory permission cache actually persists across requests.
+builder.Services.AddSingleton<ICallPermissionChecker, CallPermissionChecker>();
+
 // The /hash store, backed by PostgreSQL. The connection string (including its password)
 // is deliberately never checked into source: set it via
 //   dotnet user-secrets set "ConnectionStrings:HashDb" "Host=...;Database=...;Username=...;Password=..." --project DemoService

@@ -15,11 +15,19 @@ using DemoService.Services;
 
 namespace DemoServiceTests;
 
+/// <summary>A permission checker that always allows, for tests where the permission feature itself isn't what's under test.</summary>
+internal sealed class AlwaysAllowCallPermissionChecker : ICallPermissionChecker
+{
+    public Task<bool> IsCallPermittedAsync(Uri caller) => Task.FromResult(true);
+}
+
 [TestClass]
 public sealed class CallControllerTests
 {
     ServiceData GetServiceData()
         => new ServiceData { ConfigServiceHost = $"{Guid.NewGuid()}.example" };
+
+    private static readonly ICallPermissionChecker AlwaysAllow = new AlwaysAllowCallPermissionChecker();
 
     [TestMethod]
     public async Task Post_EmptyBody_ReturnsBadRequest()
@@ -28,7 +36,7 @@ public sealed class CallControllerTests
         var data = GetServiceData();
         using var testDb = new TestHashDb();
         var fake = new MockHttpGetter();
-        var controller = new CallController(data, new HashStore(testDb.Db), fake);
+        var controller = new CallController(data, new HashStore(testDb.Db), fake, AlwaysAllow);
         var ctx = new DefaultHttpContext();
         // Empty body
         ctx.Request.Body = new MemoryStream(Array.Empty<byte>());
@@ -48,7 +56,7 @@ public sealed class CallControllerTests
         var data = GetServiceData();
         using var testDb = new TestHashDb();
         var fake = new MockHttpGetter();
-        var controller = new CallController(data, new HashStore(testDb.Db), fake);
+        var controller = new CallController(data, new HashStore(testDb.Db), fake, AlwaysAllow);
 
         var callerUrl = "https://client.example/";
         var ctx = new DefaultHttpContext();
@@ -77,5 +85,35 @@ public sealed class CallControllerTests
         StringAssert.Contains(report, "Hello from remote caller", "Report should include the body from the fake response.");
         StringAssert.Contains(report, "RutabagaCertificateHashInBase64==",
             "Report should include the remote TLS certificate hash from the fake response.");
+    }
+
+    [TestMethod]
+    public async Task Post_TargetHasNotOptedIn_Returns403WithoutCallingIt()
+    {
+        // Arrange
+        var data = GetServiceData();
+        using var testDb = new TestHashDb();
+        var fake = new MockHttpGetter();
+        var controller = new CallController(data, new HashStore(testDb.Db), fake,
+            new DenyingCallPermissionChecker());
+
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes("https://rutabaga.example/"));
+        controller.ControllerContext = new ControllerContext { HttpContext = ctx };
+
+        // Act
+        var result = await controller.Post().ConfigureAwait(false);
+
+        // Assert
+        var statusResult = result as ObjectResult;
+        Assert.IsNotNull(statusResult, "Expected an explicit status result for a non-consenting target.");
+        Assert.AreEqual(StatusCodes.Status403Forbidden, statusResult.StatusCode);
+        StringAssert.Contains((string)statusResult.Value!, "demo-hashback-dev.json");
+        Assert.IsNull(fake.LastUri, "The target itself should never have been called.");
+    }
+
+    private sealed class DenyingCallPermissionChecker : ICallPermissionChecker
+    {
+        public Task<bool> IsCallPermittedAsync(Uri caller) => Task.FromResult(false);
     }
 }

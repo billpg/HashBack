@@ -5,6 +5,7 @@ using Swashbuckle.AspNetCore.Annotations;
 using Microsoft.AspNetCore.Http;
 using System.Threading.Tasks;
 using billpg.HashBackCore;
+using billpg.WWWAuthenticateTools;
 using System.Net;
 using DemoService.Data;
 using DemoService.Services;
@@ -75,10 +76,12 @@ public class HelloController : ControllerBase
             return Content($"Hello {authDomain}!", "text/plain");
 
         /* Failed authentication, return a 401 with some text. */
-        Response.Headers["WWW-Authenticate"]
-            = $"HashBack realm=\"demo.hashback.dev\"" +
-            $" set-cookie=\"{HashBackCookieName}\"" +
-            $" version=\"BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1\"";
+        var wwwAuthenticate = new AuthHeaders()
+            .WithScheme("HashBack")
+            .WithParam("realm", "demo.hashback.dev")
+            .WithParam("set-cookie", HashBackCookieName)
+            .WithParam("version", "BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1");
+        Response.Headers["WWW-Authenticate"] = wwwAuthenticate.ToSingleHeaderValue();
         Response.StatusCode = 401;
         return Content(HtmlPages.HelloRoot(), "text/html", Encoding.UTF8);
     }
