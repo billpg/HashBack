@@ -50,5 +50,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\billpg.HashBackCore\billpg.HashBackCore.csproj" />
+    <ProjectReference Include="..\SpartanHttpClient\billpg.SpartanHttpClient\billpg.SpartanHttpClient.csproj" />
   </ItemGroup>
 </Project>

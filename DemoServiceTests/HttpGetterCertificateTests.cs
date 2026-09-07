@@ -4,6 +4,7 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DemoService;
@@ -47,10 +48,15 @@ public class HttpGetterCertificateTests
             {
                 await sslStream.AuthenticateAsServerAsync(
                     new SslServerAuthenticationOptions { ServerCertificate = serverCert });
+
+                /* Only reached when the client accepts the handshake - write a minimal
+                 * response so the full GET/response exchange can complete. */
+                var response = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+                await sslStream.WriteAsync(response);
             }
             catch
             {
-                /* The test client may deliberately reject this handshake - nothing more to do. */
+                /* Expected when the test client deliberately rejects this handshake. */
             }
         });
 
@@ -58,7 +64,7 @@ public class HttpGetterCertificateTests
     }
 
     [TestMethod]
-    public async Task ConnectHttp_DefaultPolicy_RejectsSelfSignedCertificate()
+    public async Task FetchAsync_DefaultPolicy_RejectsSelfSignedCertificate()
     {
         using var cert = CreateSelfSignedCertificate("localhost");
         string expectedHash = Convert.ToBase64String(cert.GetCertHash(HashAlgorithmName.SHA256));
@@ -71,8 +77,7 @@ public class HttpGetterCertificateTests
                 dnsLookup: (host, ct) => Task.FromResult(new[] { IPAddress.Loopback }));
 
             var ex = await Assert.ThrowsExceptionAsync<BadRequestException>(async () =>
-                await getter.ConnectHttp(
-                    new Uri($"https://localhost:{port}/"), CancellationToken.None));
+                await getter.FetchAsync(new SimpleHttpRequest(new Uri($"https://localhost:{port}/"))));
 
             Assert.AreEqual("External URL not available.", ex.Title);
             StringAssert.Contains(ex.Message, expectedHash,
@@ -87,7 +92,7 @@ public class HttpGetterCertificateTests
     }
 
     [TestMethod]
-    public async Task ConnectHttp_CustomPolicyAcceptsIt_SucceedsAndReportsMatchingHash()
+    public async Task FetchAsync_CustomPolicyAcceptsIt_SucceedsAndReportsMatchingHash()
     {
         using var cert = CreateSelfSignedCertificate("localhost");
         string expectedHash = Convert.ToBase64String(cert.GetCertHash(HashAlgorithmName.SHA256));
@@ -100,13 +105,9 @@ public class HttpGetterCertificateTests
                 dnsLookup: (host, ct) => Task.FromResult(new[] { IPAddress.Loopback }),
                 isCertificateAcceptable: (url, presentedCert, chain, sslPolicyErrors) => true);
 
-            var (tcpcli, netstr, certificateHash) = await getter.ConnectHttp(
-                new Uri($"https://localhost:{port}/"), CancellationToken.None);
-            using (tcpcli)
-            using (netstr)
-            {
-                Assert.AreEqual(expectedHash, certificateHash);
-            }
+            var resp = await getter.FetchAsync(new SimpleHttpRequest(new Uri($"https://localhost:{port}/")));
+
+            Assert.AreEqual(expectedHash, resp.RemoteCertificateHash);
         }
         finally
         {
