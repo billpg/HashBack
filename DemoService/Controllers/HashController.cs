@@ -36,15 +36,18 @@ public class HashController : ControllerBase
     [SwaggerResponse(StatusCodes.Status404NotFound, "No entry found for the given id")]
     public async Task<ActionResult> GetById(Guid id)
     {
+        /* Collect the GET'ers headers for the /call report. */
         var requestHeaders = new StringBuilder();
         foreach (var h in Request.Headers)
-            foreach (var sh in h.Value)
+            foreach (var sh in h.Value)            
                 requestHeaders.AppendLine($"{h.Key}: {sh}");
 
+        /* Get the hash as a base-64 string from the store and log the request. 
+         * 404 if not such ID or the id has expired. */
         var entry = await hashStore.TryGetHashAsync(id, Request.RequestIP(), requestHeaders.ToString());
         if (entry == null)
             return NotFound();
-        return Content(entry.HashAsString, "text/plain");
+        return Content(entry.HashAsString + "\r\n", "text/plain");
     }
 
     // PUT /hash/{id}
@@ -68,14 +71,12 @@ public class HashController : ControllerBase
         if (hashAsBytes == null)
             return BadRequest($"Hash must be a valid base64-encoded block of {256/8} bytes.");
 
-        /* Store the hash. Refused if this id was used within the reuse-block window.
-         * (AddedBy is deliberately IPAddress.None here, matching the original behaviour -
-         * only GET requests to retrieve a hash log the requester's IP, not the upload.) */
-        var added = await hashStore.TryAddHashAsync(id, hashAsBytes, IPAddress.None);
+        /* Store the hash in the DB. Will return false if the id already exists. */
+        var added = await hashStore.TryAddHashAsync(id, hashAsBytes, Request.RequestIP());
 
         /* Return success or otherwise. */
         if (added)
-            return Content(Convert.ToBase64String(hashAsBytes), "text/plain");
+            return Content(Convert.ToBase64String(hashAsBytes) + "\r\n", "text/plain");
         else
             return Conflict($"An entry with ID {id} already exists.");
     }

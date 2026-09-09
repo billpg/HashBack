@@ -54,43 +54,26 @@ public class HashStore : IHashStore
 
     public async Task<bool> TryAddHashAsync(Guid id, byte[] hash, IPAddress addedBy)
     {
-        var now = utcNow();
+        /* Don't allow any reuse of IDs if the record is still on the DB. */
         var existing = await db.StoredHashes.FirstOrDefaultAsync(h => h.Id == id);
-
         if (existing != null)
-        {
-            /* Still within the reuse-block window: refuse, regardless of whether the
-             * existing entry is itself still retrievable. */
-            if (existing.AddedAt.Add(ReuseBlockWindow) > now)
-                return false;
+            return false;
 
-            /* The window has passed - this id is free to reuse. Clear its old GET events
-             * (cascade delete would do this too, but only on an actual row delete; we're
-             * overwriting the row in place, so it needs doing explicitly) and overwrite. */
-            db.HashGetEvents.RemoveRange(db.HashGetEvents.Where(e => e.HashId == id));
-            existing.Hash = hash;
-            existing.AddedAt = now;
-            existing.AddedBy = addedBy;
-            existing.GetCount = 0;
-        }
-        else
+        /* Attempt to add the new hash on the DB. */
+        db.StoredHashes.Add(new StoredHashRecord
         {
-            db.StoredHashes.Add(new StoredHashRecord
-            {
-                Id = id,
-                Hash = hash,
-                AddedAt = now,
-                AddedBy = addedBy,
-                GetCount = 0
-            });
-        }
-
+            Id = id,
+            Hash = hash,
+            AddedAt = utcNow(),
+            AddedBy = addedBy,
+            GetCount = 0
+        });        
         try
         {
             await db.SaveChangesAsync();
             return true;
         }
-        catch (DbUpdateException) when (existing == null)
+        catch (DbUpdateException)
         {
             /* Someone else concurrently inserted this same brand-new id between our read
              * and our write - the id's primary key uniqueness caught it for us. */
@@ -100,17 +83,18 @@ public class HashStore : IHashStore
 
     public async Task<StoredHashRecord?> TryGetHashAsync(Guid id, IPAddress gotBy, string requestHeaders)
     {
+        /* Atomically claim a GET, in a single statement, so two concurrent requests can't
+         * both slip through when only one slot is left under MaxGetCount. This is where the
+         * decision to allow the GET or not is made. Return NULL to indicate refusal. */
         var now = utcNow();
         var retrievalCutoff = now.Subtract(RetrievalWindow);
-
-        /* Atomically claim a GET, in a single statement, so two concurrent requests can't
-         * both slip through when only one slot is left under MaxGetCount. */
         int rowsUpdated = await db.StoredHashes
             .Where(h => h.Id == id && h.AddedAt > retrievalCutoff && h.GetCount < MaxGetCount)
             .ExecuteUpdateAsync(setters => setters.SetProperty(h => h.GetCount, h => h.GetCount + 1));
         if (rowsUpdated == 0)
             return null;
 
+        /* Log the GET event. */
         db.HashGetEvents.Add(new HashGetEventRecord
         {
             HashId = id,
@@ -120,6 +104,7 @@ public class HashStore : IHashStore
         });
         await db.SaveChangesAsync();
 
+        /* Return the now-updated hash record. */
         return await db.StoredHashes.AsNoTracking().FirstOrDefaultAsync(h => h.Id == id);
     }
 
