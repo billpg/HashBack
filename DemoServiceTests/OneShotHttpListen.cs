@@ -33,11 +33,11 @@ internal class OneShotHttpListen : IDisposable
                 this.ListenPort = tryPort;
                 break;
             }
-            catch (HttpListenerException ex)
+            catch (HttpListenerException)
             { /* Ignore any try a new port. */ }
         }
 
-        /* Save the dipose call for later. */
+        /* Save the dispose call for later. */
         this.listenerDispose = listen!.Close;
 
         /* Start the listen. */

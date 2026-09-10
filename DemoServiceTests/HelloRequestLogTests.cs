@@ -97,7 +97,7 @@ public sealed class HelloRequestLogTests
     }
 
     [TestMethod]
-    public async Task VerificationFetchFailure_LogsOutcomeWithVerificationIpStillCaptured()
+    public async Task VerificationFetchFailure_ConnectionRefused_LogsOutcomeWithNoVerificationIp()
     {
         using var testDb = new TestHashDb();
         var log = new HelloRequestLog(testDb.Db, NullLogger<HelloRequestLog>.Instance);
@@ -111,17 +111,21 @@ public sealed class HelloRequestLogTests
             var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
 
             var controller = new HelloController(
-                serviceData, new HttpGetter(serviceData, new IpFilter()), log);
+                serviceData, new HttpGetter(serviceData, new IpFilter(), new AlwaysAllowCallPermissionChecker()), log);
             var ctx = new DefaultHttpContext();
             ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
             controller.ControllerContext = new ControllerContext { HttpContext = ctx };
 
             await Assert.ThrowsExceptionAsync<BadRequestException>(async () => await controller.Get());
 
+            /* The verification IP is now read off the completed SpartanResponse
+             * (resp.RemoteAddress) rather than an onResolved callback fired at DNS-resolve
+             * time - so a connection that never gets that far (refused, here) can't report
+             * an IP at all. Narrower than the old callback-based capture, but simpler. */
             var entry = testDb.Db.HelloRequestLogs.Single();
             Assert.AreEqual(HelloRequestOutcome.VerificationFetchFailed, entry.Outcome);
-            Assert.AreEqual(IPAddress.Loopback, entry.VerificationIp,
-                "DNS resolution succeeded before the connection was refused, so the resolved IP should still be logged.");
+            Assert.IsNull(entry.VerificationIp,
+                "A connection that was refused never produced a SpartanResponse, so there's no RemoteAddress to log.");
         }
         finally
         {

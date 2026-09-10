@@ -26,8 +26,10 @@ public sealed class HashStoreTests
     }
 
     [TestMethod]
-    public async Task TryAddHash_ReuseAfterBlockWindowElapses_IsAllowed()
+    public async Task TryAddHash_ReuseAfterBlockWindowElapses_IsStillRejected()
     {
+        /* TryAddHashAsync refuses any id reuse permanently - there's no window after which
+         * an id frees up again, regardless of how long ago it was first used. */
         using var testDb = new TestHashDb();
         var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var store = new HashStore(testDb.Db, () => now);
@@ -37,14 +39,9 @@ public sealed class HashStoreTests
 
         Assert.IsTrue(await store.TryAddHashAsync(id, originalBytes, IPAddress.Loopback));
 
-        now = now.Add(HashStore.ReuseBlockWindow).AddSeconds(1);
-        Assert.IsTrue(await store.TryAddHashAsync(id, newBytes, IPAddress.Loopback),
-            "Reuse should be allowed once the full reuse-block window has elapsed.");
-
-        var fetched = await store.TryGetHashAsync(id, IPAddress.Loopback, "");
-        Assert.IsNotNull(fetched);
-        Assert.AreEqual(Convert.ToBase64String(newBytes), fetched!.HashAsString,
-            "The overwritten value should be the new one, not the original.");
+        now = now.AddYears(10);
+        Assert.IsFalse(await store.TryAddHashAsync(id, newBytes, IPAddress.Loopback),
+            "Reuse should still be rejected no matter how much time has passed.");
     }
 
     [TestMethod]

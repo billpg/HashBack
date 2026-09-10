@@ -81,7 +81,18 @@ public class HttpGetter : IHttpGetter
         /* Perform some basic validation on the URL before we run the GET.
          * Will throw if not acceptable. */
         ValidateUrlOrThrow(url);
+        return await FetchAsync(url, authorizationHeader);
+    }
 
+    /// <summary>
+    /// Does the actual fetch, skipping the public-use URL policy in <see cref="ValidateUrlOrThrow"/>.
+    /// Internal, and only exists so certificate-handling tests can point this at an
+    /// https://localhost URL on a non-443 port - something ValidateUrlOrThrow never lets
+    /// through regardless of AllowGetLocalhost, since "localhost" has no dot and that
+    /// bypass only covers plain HTTP.
+    /// </summary>
+    internal async Task<SpartanResponse> FetchAsync(Uri url, string? authorizationHeader = null)
+    {
         /* Check the target service's JSON permission. */
         if (!await permissionChecker.IsCallPermittedAsync(url))
             throw new BadRequestException(
@@ -89,7 +100,6 @@ public class HttpGetter : IHttpGetter
                 "This service will only call targets that have explicitly granted permission via " +
                 $"<https://{url.Host}/.well-known/demo-hashback-dev.json>. " +
                 "See https://demo.hashback.dev/permit for details.");
-
 
         /* Make the GET request. */
         var spartanRequest = new SpartanRequest(url)
@@ -110,7 +120,7 @@ public class HttpGetter : IHttpGetter
         }
     }
 
-    private async Task<IPAddress> ResolveDomainToSingleIp(string host, CancellationToken cancellationToken)
+    internal async Task<IPAddress> ResolveDomainToSingleIp(string host, CancellationToken cancellationToken)
     {
         /* Shortcut the one acceptable use of localhost - matching the same case
          * ValidateUrlOrThrow already let through. Without this, "localhost" would still

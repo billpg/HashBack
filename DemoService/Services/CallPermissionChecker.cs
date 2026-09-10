@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading.Tasks;
+using billpg.SpartanHttpClient;
 
 namespace DemoService.Services;
 
@@ -59,6 +60,7 @@ internal sealed class PermitGrant
 public class CallPermissionChecker : ICallPermissionChecker
 {
     private readonly ServiceData data;
+    private readonly ISpartanEngine engine;
     private readonly Func<DateTime> utcNow;
 
     /// <summary>How long a granted permission is trusted before re-checking.</summary>
@@ -71,16 +73,24 @@ public class CallPermissionChecker : ICallPermissionChecker
     /// </summary>
     public static readonly TimeSpan NegativeCacheDuration = TimeSpan.FromHours(1);
 
-    private readonly ConcurrentDictionary<string, (bool allowed, DateTime expiresAt)> cache = new();
-
     private static readonly JsonSerializerOptions GrantJsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    public CallPermissionChecker(ServiceData data, Func<DateTime>? utcNow = null)
+    private readonly ConcurrentDictionary<string, PermitGrant?> grantCache = new();
+    private readonly ConcurrentDictionary<string, DateTime> cacheExpiry = new();
+
+    internal void PopulateGrantCache(string host, PermitGrant? grant)
+    {
+        grantCache[host] = grant;
+        cacheExpiry[host] = utcNow().Add(grant != null ? PositiveCacheDuration : NegativeCacheDuration);
+    }
+
+    public CallPermissionChecker(ServiceData data, ISpartanEngine engine, Func<DateTime>? utcNow = null)
     {
         this.data = data;
+        this.engine = engine;
         this.utcNow = utcNow ?? (() => DateTime.UtcNow);
     }
 
@@ -92,17 +102,34 @@ public class CallPermissionChecker : ICallPermissionChecker
         if (string.Equals(target.Host, data.ConfigServiceHost, StringComparison.OrdinalIgnoreCase))
             return true;
 
+        /* Clear the expired cache entries first. */
         var now = utcNow();
-        if (cache.TryGetValue(target.Host, out var cached) && cached.expiresAt > now)
-            return cached.allowed;
+        foreach (var kvp in cacheExpiry)
+        {
+            if (kvp.Value < now)
+            {
+                cacheExpiry.TryRemove(kvp.Key, out _);
+                grantCache.TryRemove(kvp.Key, out _);
+            }
+        }
 
-        bool allowed = await FetchPermissionAsync(target.Host);
-        var cacheDuration = allowed ? PositiveCacheDuration : NegativeCacheDuration;
-        cache[target.Host] = (allowed, now.Add(cacheDuration));
-        return allowed;
+        /* Check for a cached grant object for this host. */
+        if (grantCache.TryGetValue(target.Host, out var cachedGrant))
+            return IsGrantValid(cachedGrant);
+
+        /* Load the permission file for this host. */
+        var fetchedGrant = await FetchPermissionAsync(target.Host);
+        PopulateGrantCache(target.Host, fetchedGrant);
+        return IsGrantValid(fetchedGrant);
     }
 
-    private async Task<bool> FetchPermissionAsync(string host)
+    /// <summary>A grant is only honored when it's actually addressed to this service - see
+    /// PermitGrant.GetPermissionGrantedTo. Used for both a freshly-fetched grant and one
+    /// pulled back out of the cache, so the two paths can't disagree.</summary>
+    private bool IsGrantValid(PermitGrant? grant)
+        => grant != null && string.Equals(grant.GetPermissionGrantedTo, data.ConfigServiceHost, StringComparison.OrdinalIgnoreCase);
+
+    private async Task<PermitGrant?> FetchPermissionAsync(string host)
     {
         /* Any failure at all - unreachable, a 404, malformed JSON, an explicit refusal -
          * means "not permitted". This is a permission check, not a diagnostic one: it
@@ -110,20 +137,19 @@ public class CallPermissionChecker : ICallPermissionChecker
         try
         {
             var wellKnownUrl = new Uri($"https://{host}/.well-known/demo-hashback-dev.json");
-            var req = new billpg.SpartanHttpClient.SpartanRequest(wellKnownUrl)
+            var req = engine.Request(wellKnownUrl)
                 .WithTimeout(TimeSpan.FromSeconds(5))
                 .WithHeader("User-Agent", "demo.hashback.dev")
                 .WithHeader("Accept", "application/json");
             var resp = await req.Run();
             if (resp.StatusCode != 200)
-                return false;
+                return null;
 
-            var grant = JsonSerializer.Deserialize<PermitGrant>(resp.Body, GrantJsonOptions);
-            return string.Equals(grant?.GetPermissionGrantedTo, data.ConfigServiceHost, StringComparison.OrdinalIgnoreCase);
+            return JsonSerializer.Deserialize<PermitGrant>(resp.Body, GrantJsonOptions);
         }
         catch
         {
-            return false;
+            return null;
         }
     }
 }

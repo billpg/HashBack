@@ -27,12 +27,12 @@ public class HttpGetterTests
         ServiceData.AllowGetLocalhost = true;
         try
         {
-            var getter = new HttpGetter(new ServiceData(), new IpFilter(), TimeSpan.FromMilliseconds(200));
-            var req = new SimpleHttpRequest(new Uri($"http://localhost:{port}/never-responds"));
+            var getter = new HttpGetter(new ServiceData(), new IpFilter(), new AlwaysAllowCallPermissionChecker(), TimeSpan.FromMilliseconds(200));
+            var url = new Uri($"http://localhost:{port}/never-responds");
 
             var stopwatch = Stopwatch.StartNew();
             var ex = await Assert.ThrowsExceptionAsync<BadRequestException>(
-                async () => await getter.GetAsync(req));
+                async () => await getter.GetAsync(url, null));
             stopwatch.Stop();
 
             Assert.AreEqual("External URL not available.", ex.Title);
@@ -64,9 +64,10 @@ public class HttpGetterTests
         var getter = new HttpGetter(
             new ServiceData(),
             filter,
+            new AlwaysAllowCallPermissionChecker(),
             dnsLookup: (host, ct) => Task.FromResult(new[] { rejectedAddress, acceptedAddress }));
 
-        var resolved = await getter.ResolveDomain("rutabaga-multi-homed.example", isDebug: false, CancellationToken.None);
+        var resolved = await getter.ResolveDomainToSingleIp("rutabaga-multi-homed.example", CancellationToken.None);
 
         Assert.AreEqual(acceptedAddress, resolved);
         CollectionAssert.Contains(filter.Checked, rejectedAddress);
@@ -82,10 +83,11 @@ public class HttpGetterTests
         var getter = new HttpGetter(
             new ServiceData(),
             filter,
+            new AlwaysAllowCallPermissionChecker(),
             dnsLookup: (host, ct) => Task.FromResult(new[] { rejectedAddress }));
 
         await Assert.ThrowsExceptionAsync<ApplicationException>(
-            async () => await getter.ResolveDomain("parsnip-blocked.example", isDebug: false, CancellationToken.None));
+            async () => await getter.ResolveDomainToSingleIp("parsnip-blocked.example", CancellationToken.None));
     }
 
     /// <summary>A fake IIpFilter that rejects only the addresses named at construction, recording every address it was asked about.</summary>

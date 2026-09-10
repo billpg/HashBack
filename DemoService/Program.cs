@@ -1,6 +1,7 @@
 ﻿using DemoService;
 using DemoService.Data;
 using DemoService.Services;
+using billpg.SpartanHttpClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Builder;
@@ -28,16 +29,17 @@ builder.Services.AddControllers();
 // Persist ServiceData as a singleton service so state is kept across requests
 builder.Services.AddSingleton<ServiceData>();
 
-// Register IP filter and the raw, unfiltered HTTP getter. This raw getter is what
-// ICallPermissionChecker uses internally for its own well-known fetch - see below.
+// Register IP filter and the HTTP getter.
 builder.Services.AddSingleton<IIpFilter, IpFilter>();
 builder.Services.AddSingleton<IHttpGetter, HttpGetter>();
 
-// Singleton so its in-memory permission cache actually persists across requests. Depends
-// on the raw HttpGetter directly (not the permission-checked IHttpGetter below), since its
-// own well-known fetch must not be gated by the very permission it exists to establish.
-builder.Services.AddSingleton<ICallPermissionChecker>(sp =>
-    new CallPermissionChecker(sp.GetRequiredService<ServiceData>()));
+// The real engine behind every SpartanRequest this service builds directly (currently
+// just CallPermissionChecker's own well-known fetch). Tests substitute a fake
+// ISpartanEngine instead of talking real HTTP.
+builder.Services.AddSingleton<ISpartanEngine, SpartanEngine>();
+
+// Singleton so its in-memory permission cache actually persists across requests.
+builder.Services.AddSingleton<ICallPermissionChecker, CallPermissionChecker>();
 
 // The /hash store, backed by PostgreSQL. The connection string (including its password)
 // is deliberately never checked into source: set it via

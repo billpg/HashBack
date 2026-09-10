@@ -103,7 +103,7 @@ public sealed class HashControllerTests
         var content = result as ContentResult;
         Assert.IsNotNull(content, "Expected ContentResult when hash is found.");
         Assert.AreEqual("text/plain", content.ContentType, "Expected text/plain content type.");
-        Assert.AreEqual(expectedBase64, content.Content, "Returned hash string did not match stored value.");
+        Assert.AreEqual(expectedBase64 + "\r\n", content.Content, "Returned hash string did not match stored value.");
     }
 
     [TestMethod]
@@ -129,7 +129,7 @@ public sealed class HashControllerTests
         var content = action as ContentResult;
         Assert.IsNotNull(content, "Expected ContentResult on successful Put.");
         Assert.AreEqual("text/plain", content.ContentType);
-        Assert.AreEqual(base64, content.Content, "Put should return the stored base64 string.");
+        Assert.AreEqual(base64 + "\r\n", content.Content, "Put should return the stored base64 string.");
 
         // Assert stored, by fetching it back
         var fetched = await store.TryGetHashAsync(id, IPAddress.Loopback, "");

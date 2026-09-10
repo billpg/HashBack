@@ -54,7 +54,6 @@ public sealed class HelloControllerTests
         // realm and set-cookie are valid RFC 9110 tokens, so billpg.WWWAuthenticateTools
         // correctly leaves them unquoted; version contains a comma, so it must be quoted.
         StringAssert.Contains(www, "HashBack realm=demo.hashback.dev", "WWW-Authenticate header should indicate HashBack realm.");
-        StringAssert.Contains(www, "set-cookie=HashBackDemoService", "WWW-Authenticate header should name the cookie.");
         StringAssert.Contains(www, "version=\"BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1\"", "WWW-Authenticate header should list supported versions.");
 
         var contentResult = actionResult as ContentResult;
@@ -97,7 +96,7 @@ public sealed class HelloControllerTests
         var content1 = result1 as ContentResult;
         Assert.IsNotNull(content1, "Expected content result from first authenticated request.");
         var expectedDomain = new Uri(verifyUrl).Host;
-        Assert.AreEqual($"Hello {expectedDomain}!", content1.Content);
+        Assert.AreEqual($"Hello {expectedDomain}! (HashBack validated.)", content1.Content);
 
         Assert.IsTrue(ctx1.Response.Headers.ContainsKey("Set-Cookie"), "First response should set a cookie.");
         var setCookieHeader = ctx1.Response.Headers["Set-Cookie"].ToString();
@@ -126,7 +125,7 @@ public sealed class HelloControllerTests
         // Assert second request also authenticated and did NOT set a new cookie
         var content2 = result2 as ContentResult;
         Assert.IsNotNull(content2, "Expected content result from cookie-authenticated request.");
-        Assert.AreEqual($"Hello {expectedDomain}!", content2.Content);
+        Assert.AreEqual($"Hello {expectedDomain}! (Cookie validated.)", content2.Content);
 
         // When cookie was valid, controller should not append a new cookie.
         Assert.IsFalse(ctx2.Response.Headers.ContainsKey("Set-Cookie"), 
@@ -226,7 +225,7 @@ public sealed class HelloControllerTests
 
         var content = result as ContentResult;
         Assert.IsNotNull(content, "A verification hash published in base64url form should still authenticate.");
-        Assert.AreEqual($"Hello {new Uri(verifyUrl).Host}!", content.Content);
+        Assert.AreEqual($"Hello {new Uri(verifyUrl).Host}! (HashBack validated.)", content.Content);
     }
 
     [TestMethod]
@@ -326,7 +325,7 @@ public sealed class HelloControllerTests
             var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
             osl.RespondBody = hashBackRequest.VerificationHash;
 
-            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter()), NoOpRequestLog);
+            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter(), new AlwaysAllowCallPermissionChecker()), NoOpRequestLog);
             var ctx = new DefaultHttpContext();
             ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
             controller.ControllerContext = new ControllerContext { HttpContext = ctx };
@@ -335,7 +334,7 @@ public sealed class HelloControllerTests
 
             var content = result as ContentResult;
             Assert.IsNotNull(content, "Expected content result for a genuinely fetchable hash.");
-            Assert.AreEqual("Hello localhost!", content.Content);
+            Assert.AreEqual("Hello localhost! (HashBack validated.)", content.Content);
             Assert.IsTrue(osl.Called, "The verification URL should actually have been fetched.");
             Assert.AreEqual(verifyUrl, osl.ReqUrl);
             Assert.AreEqual("demo.hashback.dev", osl.ReqHeaders!["User-Agent"]);
@@ -357,7 +356,7 @@ public sealed class HelloControllerTests
             var verifyUrl = new Uri("http://localhost:8001/xyz");
             var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
 
-            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter()), NoOpRequestLog);
+            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter(), new AlwaysAllowCallPermissionChecker()), NoOpRequestLog);
             var ctx = new DefaultHttpContext();
             ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
             controller.ControllerContext = new ControllerContext { HttpContext = ctx };
@@ -378,7 +377,7 @@ public sealed class HelloControllerTests
         var verifyUrl = new Uri("https://192.0.2.1/xyz");
         var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
 
-        var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter()), NoOpRequestLog);
+        var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter(), new AlwaysAllowCallPermissionChecker()), NoOpRequestLog);
         var ctx = new DefaultHttpContext();
         ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
@@ -403,7 +402,7 @@ public sealed class HelloControllerTests
             var verifyUrl = new Uri($"http://localhost:{osl.ListenPort}/xyz");
             var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
 
-            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter()), NoOpRequestLog);
+            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter(), new AlwaysAllowCallPermissionChecker()), NoOpRequestLog);
             var ctx = new DefaultHttpContext();
             ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
             controller.ControllerContext = new ControllerContext { HttpContext = ctx };

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -12,22 +12,15 @@ using DemoService;
 using DemoService.Controllers;
 using DemoService.Data;
 using DemoService.Services;
+using billpg.SpartanHttpClient;
 
 namespace DemoServiceTests;
-
-/// <summary>A permission checker that always allows, for tests where the permission feature itself isn't what's under test.</summary>
-internal sealed class AlwaysAllowCallPermissionChecker : ICallPermissionChecker
-{
-    public Task<bool> IsCallPermittedAsync(Uri caller) => Task.FromResult(true);
-}
 
 [TestClass]
 public sealed class CallControllerTests
 {
     ServiceData GetServiceData()
         => new ServiceData { ConfigServiceHost = $"{Guid.NewGuid()}.example" };
-
-    private static readonly ICallPermissionChecker AlwaysAllow = new AlwaysAllowCallPermissionChecker();
 
     [TestMethod]
     public async Task Post_EmptyBody_ReturnsBadRequest()
@@ -36,7 +29,7 @@ public sealed class CallControllerTests
         var data = GetServiceData();
         using var testDb = new TestHashDb();
         var fake = new MockHttpGetter();
-        var controller = new CallController(data, new HashStore(testDb.Db), fake, AlwaysAllow);
+        var controller = new CallController(data, new HashStore(testDb.Db), fake);
         var ctx = new DefaultHttpContext();
         // Empty body
         ctx.Request.Body = new MemoryStream(Array.Empty<byte>());
@@ -56,17 +49,18 @@ public sealed class CallControllerTests
         var data = GetServiceData();
         using var testDb = new TestHashDb();
         var fake = new MockHttpGetter();
-        var controller = new CallController(data, new HashStore(testDb.Db), fake, AlwaysAllow);
+        var controller = new CallController(data, new HashStore(testDb.Db), fake);
 
-        var callerUrl = "https://client.example/";
+        var targetUrl = "https://client.example/";
         var ctx = new DefaultHttpContext();
-        ctx.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(callerUrl));
+        ctx.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(targetUrl));
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
 
-        // Prepare a fake response from the remote caller and set it on the fake getter.
-        fake.Response = new SimpleHttpResponse(200)
+        // Prepare a fake response from the remote target and set it on the fake getter.
+        fake.Response = new SpartanResponse()
+            .WithStatusCode(200)
             .WithHeader("X-Remote", "value")
-            .WithBody("Hello from remote caller")
+            .WithBody("Hello from remote target")
             .WithRemoteCertificateHash("RutabagaCertificateHashInBase64==");
 
         // Act
@@ -79,41 +73,42 @@ public sealed class CallControllerTests
             "Expected text/plain content type.");
 
         var report = contentResult.Content ?? string.Empty;
-        StringAssert.Contains(report, $"GET {callerUrl}:", "Report should include the GET line for the caller URL.");
+        StringAssert.Contains(report, $"GET {targetUrl}:", "Report should include the GET line for the target URL.");
         StringAssert.Contains(report, "Status: 200", "Report should include the status code from the fake response.");
         StringAssert.Contains(report, "X-Remote: value", "Report should include headers from the fake response.");
-        StringAssert.Contains(report, "Hello from remote caller", "Report should include the body from the fake response.");
+        StringAssert.Contains(report, "Hello from remote target", "Report should include the body from the fake response.");
         StringAssert.Contains(report, "RutabagaCertificateHashInBase64==",
             "Report should include the remote TLS certificate hash from the fake response.");
     }
 
     [TestMethod]
-    public async Task Post_TargetHasNotOptedIn_Returns403WithoutCallingIt()
+    public async Task Post_HttpGetterThrows_ExceptionPropagatesUncaught()
     {
-        // Arrange
+        /* CallController no longer decides target-permission itself - that now lives in
+         * HttpGetter.GetAsync, which throws BadRequestException before ever making the
+         * outbound call. This proves CallController doesn't swallow that - or any other -
+         * exception from IHttpGetter.GetAsync, leaving it to ExceptionHandlingMiddleware. */
         var data = GetServiceData();
         using var testDb = new TestHashDb();
-        var fake = new MockHttpGetter();
-        var controller = new CallController(data, new HashStore(testDb.Db), fake,
-            new DenyingCallPermissionChecker());
+        var fake = new ThrowingHttpGetter();
+        var controller = new CallController(data, new HashStore(testDb.Db), fake);
 
         var ctx = new DefaultHttpContext();
         ctx.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes("https://rutabaga.example/"));
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
 
-        // Act
-        var result = await controller.Post().ConfigureAwait(false);
+        var ex = await Assert.ThrowsExceptionAsync<BadRequestException>(
+            async () => await controller.Post());
 
-        // Assert
-        var statusResult = result as ObjectResult;
-        Assert.IsNotNull(statusResult, "Expected an explicit status result for a non-consenting target.");
-        Assert.AreEqual(StatusCodes.Status403Forbidden, statusResult.StatusCode);
-        StringAssert.Contains((string)statusResult.Value!, "demo-hashback-dev.json");
-        Assert.IsNull(fake.LastUri, "The target itself should never have been called.");
+        StringAssert.Contains(ex.Message, "demo-hashback-dev.json");
     }
 
-    private sealed class DenyingCallPermissionChecker : ICallPermissionChecker
+    private sealed class ThrowingHttpGetter : IHttpGetter
     {
-        public Task<bool> IsCallPermittedAsync(Uri caller) => Task.FromResult(false);
+        public Task<SpartanResponse> GetAsync(Uri url, string? authorizationHeader)
+            => throw new BadRequestException(
+                "Target not opted in.",
+                $"This service will only call targets that have explicitly granted permission via " +
+                $"https://{url.Host}/.well-known/demo-hashback-dev.json");
     }
 }

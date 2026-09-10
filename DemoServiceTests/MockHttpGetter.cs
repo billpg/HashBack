@@ -1,11 +1,9 @@
-﻿using DemoService.Services;
+using DemoService.Services;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Text;
 using System.Threading.Tasks;
+using billpg.SpartanHttpClient;
 
 namespace DemoServiceTests
 {
@@ -16,24 +14,24 @@ namespace DemoServiceTests
         {
             _registered = registered ?? new ConcurrentDictionary<string, string>();
         }
-        
-        public SimpleHttpResponse? Response { get; set; }
-        public IDictionary<string, string>? LastHeaders { get; private set; }
+
+        public SpartanResponse? Response { get; set; }
+        public string? LastAuthorizationHeader { get; private set; }
         public Uri? LastUri { get; private set; }
 
-        public Task<SimpleHttpResponse> GetAsync(SimpleHttpRequest req, Action<IPAddress>? onResolved = null)
+        public Task<SpartanResponse> GetAsync(Uri url, string? authorizationHeader)
         {
-            onResolved?.Invoke(IPAddress.Loopback);
-
-            if (Response == null && _registered.TryGetValue(req.Url.ToString(), out string? registeredHash))
-                Response = new SimpleHttpResponse(200)
+            if (Response == null && _registered.TryGetValue(url.ToString(), out string? registeredHash))
+                Response = new SpartanResponse()
+                    .WithStatusCode(200)
                     .WithHeader("Content-Type", "text/plain")
                     .WithHeader("Server", "unit test")
                     .WithBody(registeredHash);
-                   
-            LastUri = req.Url;
-            LastHeaders = req.Headers;
-            return Task.FromResult(Response ?? new SimpleHttpResponse(404));
+
+            LastUri = url;
+            LastAuthorizationHeader = authorizationHeader;
+            var resp = Response ?? new SpartanResponse().WithStatusCode(404);
+            return Task.FromResult(resp.WithRemoteAddress(IPAddress.Loopback));
         }
     }
 }

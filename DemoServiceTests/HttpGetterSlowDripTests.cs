@@ -54,12 +54,12 @@ public class HttpGetterSlowDripTests
         ServiceData.AllowGetLocalhost = true;
         try
         {
-            var getter = new HttpGetter(new ServiceData(), new IpFilter(), TimeSpan.FromMilliseconds(configuredTimeoutMs));
-            var req = new SimpleHttpRequest(new Uri($"http://localhost:{port}/slow-drip"));
+            var getter = new HttpGetter(new ServiceData(), new IpFilter(), new AlwaysAllowCallPermissionChecker(), TimeSpan.FromMilliseconds(configuredTimeoutMs));
+            var url = new Uri($"http://localhost:{port}/slow-drip");
 
             var stopwatch = Stopwatch.StartNew();
             var ex = await Assert.ThrowsExceptionAsync<BadRequestException>(
-                async () => await getter.GetAsync(req));
+                async () => await getter.GetAsync(url, null));
             stopwatch.Stop();
 
             Assert.AreEqual("External URL not available.", ex.Title);

@@ -4,7 +4,7 @@ using System.Collections.Concurrent;
 namespace DemoService;
 public class ServiceData
 {
-    public string ConfigServiceHost { get; set; } = "localhost:9001";
+    public string ConfigServiceHost { get; set; } = "demo.hashback.dev"; // "localhost:9001";
     public static bool AllowGetLocalhost { get; internal set; } = false;
 
     private readonly ConcurrentDictionary<string, DateTime> seenUnusUntil = new();

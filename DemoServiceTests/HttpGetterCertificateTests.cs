@@ -73,11 +73,11 @@ public class HttpGetterCertificateTests
         try
         {
             var getter = new HttpGetter(
-                new ServiceData(), new IpFilter(),
+                new ServiceData(), new IpFilter(), new AlwaysAllowCallPermissionChecker(),
                 dnsLookup: (host, ct) => Task.FromResult(new[] { IPAddress.Loopback }));
 
             var ex = await Assert.ThrowsExceptionAsync<BadRequestException>(async () =>
-                await getter.FetchAsync(new SimpleHttpRequest(new Uri($"https://localhost:{port}/"))));
+                await getter.FetchAsync(new Uri($"https://localhost:{port}/")));
 
             Assert.AreEqual("External URL not available.", ex.Title);
             StringAssert.Contains(ex.Message, expectedHash,
@@ -101,11 +101,11 @@ public class HttpGetterCertificateTests
         try
         {
             var getter = new HttpGetter(
-                new ServiceData(), new IpFilter(),
+                new ServiceData(), new IpFilter(), new AlwaysAllowCallPermissionChecker(),
                 dnsLookup: (host, ct) => Task.FromResult(new[] { IPAddress.Loopback }),
                 isCertificateAcceptable: (url, presentedCert, chain, sslPolicyErrors) => true);
 
-            var resp = await getter.FetchAsync(new SimpleHttpRequest(new Uri($"https://localhost:{port}/")));
+            var resp = await getter.FetchAsync(new Uri($"https://localhost:{port}/"));
 
             Assert.AreEqual(expectedHash, resp.RemoteCertificateHash);
         }

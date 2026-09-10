@@ -55,11 +55,11 @@ public class HttpGetterLargeResponseTests
         ServiceData.AllowGetLocalhost = true;
         try
         {
-            var getter = new HttpGetter(new ServiceData(), new IpFilter(), TimeSpan.FromSeconds(10));
-            var req = new SimpleHttpRequest(new Uri($"http://localhost:{port}/huge-file"));
+            var getter = new HttpGetter(new ServiceData(), new IpFilter(), new AlwaysAllowCallPermissionChecker(), TimeSpan.FromSeconds(10));
+            var url = new Uri($"http://localhost:{port}/huge-file");
 
             var stopwatch = Stopwatch.StartNew();
-            var resp = await getter.GetAsync(req);
+            var resp = await getter.GetAsync(url, null);
             stopwatch.Stop();
 
             Assert.AreEqual(200, resp.StatusCode);

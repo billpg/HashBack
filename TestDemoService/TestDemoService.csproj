@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\..\Documents\GitHub\HashBack_main\billpg.HashBackCore\billpg.HashBackCore.csproj" />
+    <ProjectReference Include="../billpg.HashBackCore/billpg.HashBackCore.csproj" />
   </ItemGroup>
 
 </Project>
