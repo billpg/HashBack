@@ -24,6 +24,9 @@ internal class HtmlPages
     internal static string CallRoot()
         => GetHtmlByResource("DemoService.Docs.GetCallRoot.md");
 
+    internal static string Permit()
+        => GetHtmlByResource("DemoService.Docs.GetPermit.md");
+
     private static string GetHtmlByResource(string resourceName)
     {
         /* Get the embedded stream and convert to HTML. If anything is missing a null
@@ -92,7 +95,7 @@ internal class HtmlPages
         }
 
         /* Complete HTML. */
-        return "<!doctype html>\r\n" + htmlOut.ToString();
+        return "<!doctype html>\r\n" + htmlOut.ToString(SaveOptions.DisableFormatting);
     }
 
 
@@ -111,7 +114,7 @@ internal static class HtmlExtensions
     /// Look for elements with a particular class on the list.
     /// </summary>
     /// <param name="elements">Elements to scan.</param>
-    /// <param name="className">Class name saught.</param>
+    /// <param name="className">Class name sought.</param>
     /// <returns>Enumerable list of elements with this class.</returns>
     public static IEnumerable<XElement> WhereClass(this IEnumerable<XElement> elements, string className)
     {
@@ -122,7 +125,7 @@ internal static class HtmlExtensions
             if (classAttr == null)
                 continue;
 
-            /* Split the class atribute into single classes and
+            /* Split the class attribute into single classes and
              * if the one we want is listed, return it. */
             if (classAttr.Split(' ').Contains(className))
                 yield return element;

@@ -17,7 +17,7 @@ public interface IHttpGetter
     /// caller can find out which address was actually contacted even if the request goes
     /// on to fail (connection refused, TLS rejected, bad status, and so on).
     /// </summary>
-    Task<SimpleHttpResponse> GetAsync(SimpleHttpRequest req, Action<IPAddress>? onResolved = null);
+    Task<SpartanResponse> GetAsync(Uri url, string? authorizationHeader);
 }
 
 /// <summary>
@@ -41,6 +41,7 @@ public delegate bool IsCertificateAcceptableDelegate(
 public class HttpGetter : IHttpGetter
 {
     private readonly IIpFilter ipFilter;
+    private readonly ICallPermissionChecker permissionChecker;
     private readonly TimeSpan timeout;
     private readonly Func<string, CancellationToken, Task<IPAddress[]>> dnsLookup;
     private readonly IsCertificateAcceptableDelegate isCertificateAcceptable;
@@ -59,12 +60,14 @@ public class HttpGetter : IHttpGetter
     public HttpGetter(
         ServiceData data,
         IIpFilter ipFilter,
+        ICallPermissionChecker permissionChecker,
         TimeSpan? timeout = null,
         Func<string, CancellationToken, Task<IPAddress[]>>? dnsLookup = null,
         IsCertificateAcceptableDelegate? isCertificateAcceptable = null)
     {
         this.ipFilter = ipFilter;
         this.dnsLookup = dnsLookup ?? Dns.GetHostAddressesAsync;
+        this.permissionChecker = permissionChecker;
         this.timeout = timeout ?? TimeSpan.FromSeconds(10);
         this.isCertificateAcceptable = isCertificateAcceptable ?? DefaultIsCertificateAcceptable;
     }
@@ -73,50 +76,33 @@ public class HttpGetter : IHttpGetter
         Uri url, X509Certificate2 certificate, X509Chain? chain, SslPolicyErrors sslPolicyErrors)
         => sslPolicyErrors == SslPolicyErrors.None;
 
-    public async Task<SimpleHttpResponse> GetAsync(SimpleHttpRequest req, Action<IPAddress>? onResolved = null)
+    public async Task<SpartanResponse> GetAsync(Uri url, string? authorizationHeader)
     {
-        ValidateUrlOrThrow(req.Url);
-        return await FetchAsync(req, onResolved);
-    }
+        /* Perform some basic validation on the URL before we run the GET.
+         * Will throw if not acceptable. */
+        ValidateUrlOrThrow(url);
 
-    /// <summary>
-    /// Does the actual fetch, skipping the public-use URL policy in <see cref="ValidateUrlOrThrow"/>.
-    /// Internal, and only exists so certificate-handling tests can point this at an
-    /// https://localhost URL on a non-443 port - something ValidateUrlOrThrow never lets
-    /// through regardless of AllowGetLocalhost, since "localhost" has no dot and that
-    /// bypass only covers plain HTTP.
-    /// </summary>
-    internal async Task<SimpleHttpResponse> FetchAsync(SimpleHttpRequest req, Action<IPAddress>? onResolved = null)
-    {
-        bool isDebug = ServiceData.AllowGetLocalhost
-            && (req.Url.Scheme == "http" || req.Url.Scheme == "https")
-            && req.Url.Host == "localhost";
+        /* Check the target service's JSON permission. */
+        if (!await permissionChecker.IsCallPermittedAsync(url))
+            throw new BadRequestException(
+                "Target not opted in.",
+                "This service will only call targets that have explicitly granted permission via " +
+                $"<https://{url.Host}/.well-known/demo-hashback-dev.json>. " +
+                "See https://demo.hashback.dev/permit for details.");
 
-        var spartanRequest = new SpartanRequest(req.Url)
+
+        /* Make the GET request. */
+        var spartanRequest = new SpartanRequest(url)
             .WithTimeout(timeout)
             .WithMaxResponseBytes(1000)
+            .WithHeader("Authorization", authorizationHeader)
             .WithHeader("User-Agent", "demo.hashback.dev")
-            .WithIpLookupHandler(async (host, ct) =>
-            {
-                var ip = await ResolveDomain(host, isDebug, ct);
-                onResolved?.Invoke(ip);
-                return ip;
-            })
-            .WithCertificateValidator((url, cert, chain, sslPolicyErrors)
-                => isCertificateAcceptable(url, cert, chain, sslPolicyErrors));
-
-        foreach (var kv in req.Headers)
-            spartanRequest = spartanRequest.WithHeader(kv.Key, kv.Value);
+            .WithIpLookupHandler(ResolveDomainToSingleIp)
+            .WithCertificateValidator(MyIsCertificateAcceptable);
 
         try
         {
-            var response = await spartanRequest.Run();
-
-            var resp = new SimpleHttpResponse(response.StatusCode, response.Body, null)
-                .WithRemoteCertificateHash(response.RemoteCertificateHash);
-            foreach (var kv in response.Headers)
-                resp = resp.WithHeader(kv.Key, kv.Value);
-            return resp;
+            return await spartanRequest.Run();
         }
         catch (SpartanHttpException ex)
         {
@@ -124,10 +110,13 @@ public class HttpGetter : IHttpGetter
         }
     }
 
-    internal async Task<IPAddress> ResolveDomain(string host, bool isDebug, CancellationToken cancellationToken)
+    private async Task<IPAddress> ResolveDomainToSingleIp(string host, CancellationToken cancellationToken)
     {
-        /* Shortcut the one acceptable use of localhost. */
-        if (host == "localhost" && isDebug)
+        /* Shortcut the one acceptable use of localhost - matching the same case
+         * ValidateUrlOrThrow already let through. Without this, "localhost" would still
+         * resolve via the real DNS lookup to a loopback address, which IpFilter always
+         * rejects regardless of AllowGetLocalhost. */
+        if (ServiceData.AllowGetLocalhost && host == "localhost")
             return IPAddress.Loopback;
 
         /* Load the various IPs for this host and use the first one that passes the IP
@@ -145,6 +134,11 @@ public class HttpGetter : IHttpGetter
         /* None of the resolved addresses were acceptable. */
         throw new ApplicationException(
             $"None of the {candidates.Length} IP address(es) for host ({host}) are acceptable.");
+    }
+
+    private bool MyIsCertificateAcceptable(Uri url, X509Certificate2 certificate, X509Chain? chain, SslPolicyErrors sslPolicyErrors)
+    {
+        return sslPolicyErrors == SslPolicyErrors.None || isCertificateAcceptable(url, certificate, chain, sslPolicyErrors);
     }
 
     private static void ValidateUrlOrThrow(Uri url)
@@ -166,7 +160,7 @@ public class HttpGetter : IHttpGetter
         if (url.Port != 443)
             throw Ex($"URL must be HTTPS and port 443.");
 
-        /* If the host is less than five charcters, reject it. */
+        /* If the host is less than five characters, reject it. */
         if (url.Host.Length < 5)
             throw Ex("URL host is too short.");
 
@@ -189,5 +183,4 @@ public class HttpGetter : IHttpGetter
         /* Anything else is considered secure. */
         return;
     }
-
 }

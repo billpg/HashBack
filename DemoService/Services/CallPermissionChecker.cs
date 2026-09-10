@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
-using System.Text.Json.Nodes;
+using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace DemoService.Services;
@@ -8,27 +9,55 @@ namespace DemoService.Services;
 public interface ICallPermissionChecker
 {
     /// <summary>
-    /// True if the target of a /call request has explicitly granted permission to be
-    /// called, via a well-known JSON file published on its own domain - or if the target
-    /// is this service's own domain (the documented "call yourself" feature, which needs
-    /// no separate opt-in).
+    /// True if this target has explicitly granted permission to be called, via a
+    /// well-known JSON file published on its own domain - or if the target is this
+    /// service's own domain (the documented "call yourself" feature, which needs no
+    /// separate opt-in).
     /// </summary>
-    Task<bool> IsCallPermittedAsync(Uri caller);
+    Task<bool> IsCallPermittedAsync(Uri target);
+}
+
+/// <summary>
+/// The shape of a /.well-known/demo-hashback-dev.json grant, as documented at /permit.
+/// Every property but GetPermissionGrantedTo is optional - null or omitted means
+/// unrestricted. CallerIP, Url, and GetsPerHour aren't enforced yet (this is the "basic
+/// deserialization" step); today, a grant is honored purely on GetPermissionGrantedTo
+/// matching this service's own host.
+/// </summary>
+internal sealed class PermitGrant
+{
+    /// <summary>Must equal this service's own host, so a coincidental, unrelated JSON
+    /// file at the well-known path is never misread as a grant.</summary>
+    public string? GetPermissionGrantedTo { get; set; }
+
+    /// <summary>IPv4/IPv6 addresses or networks the caller (the IP invoking /hello or
+    /// /call on this service) may come from. Null/omitted means any caller IP.</summary>
+    public List<string>? CallerIP { get; set; }
+
+    /// <summary>Allowed prefixes of the target URL's local part. Null/omitted means any
+    /// URL on this domain.</summary>
+    public List<string>? Url { get; set; }
+
+    /// <summary>Shared quota, across the whole grant, for GETs per hour - covering both
+    /// /hello fetching a verification hash and /call making an authenticated request.
+    /// Null/omitted means no limit.</summary>
+    public int? GetsPerHour { get; set; }
 }
 
 /// <summary>
 /// Requires a target site to have explicitly opted in - via a
-/// /.well-known/demo-hashback-dev.json file on its own domain - before /call will make an
-/// outbound request to it. Without this, /call is effectively an open relay: anyone can
-/// make this service issue an authenticated-looking request to any public HTTPS domain
-/// they name, whether or not its owner wants that. Results are cached in memory (not
-/// persisted - a cache miss just costs one extra, cheap, well-known fetch; there's no
-/// state here worth surviving a restart) since otherwise checking permission would itself
-/// double the outbound traffic to any given target.
+/// /.well-known/demo-hashback-dev.json file on its own domain - before this service will
+/// make an outbound request to it. Checked directly by HttpGetter, so it covers every
+/// outbound fetch this service makes: /call's caller-supplied target, and /hello's
+/// caller-supplied Verify URL alike. Without this, both endpoints are effectively an open
+/// relay: anyone can make this service issue an authenticated-looking request to any
+/// public HTTPS domain they name, whether or not its owner wants that. Results are cached
+/// in memory (not persisted - a cache miss just costs one extra, cheap, well-known fetch;
+/// there's no state here worth surviving a restart) since otherwise checking permission
+/// would itself double the outbound traffic to any given target.
 /// </summary>
 public class CallPermissionChecker : ICallPermissionChecker
 {
-    private readonly IHttpGetter httpGetter;
     private readonly ServiceData data;
     private readonly Func<DateTime> utcNow;
 
@@ -44,28 +73,32 @@ public class CallPermissionChecker : ICallPermissionChecker
 
     private readonly ConcurrentDictionary<string, (bool allowed, DateTime expiresAt)> cache = new();
 
-    public CallPermissionChecker(IHttpGetter httpGetter, ServiceData data, Func<DateTime>? utcNow = null)
+    private static readonly JsonSerializerOptions GrantJsonOptions = new()
     {
-        this.httpGetter = httpGetter;
+        PropertyNameCaseInsensitive = true
+    };
+
+    public CallPermissionChecker(ServiceData data, Func<DateTime>? utcNow = null)
+    {
         this.data = data;
         this.utcNow = utcNow ?? (() => DateTime.UtcNow);
     }
 
-    public async Task<bool> IsCallPermittedAsync(Uri caller)
+    public async Task<bool> IsCallPermittedAsync(Uri target)
     {
         /* Calling our own /hello (the "Demo-Service-Ception" feature documented at
          * /call/) is always fine - it makes no sense to require this service to publish
          * a permission file granting itself permission to call itself. */
-        if (string.Equals(caller.Host, data.ConfigServiceHost, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(target.Host, data.ConfigServiceHost, StringComparison.OrdinalIgnoreCase))
             return true;
 
         var now = utcNow();
-        if (cache.TryGetValue(caller.Host, out var cached) && cached.expiresAt > now)
+        if (cache.TryGetValue(target.Host, out var cached) && cached.expiresAt > now)
             return cached.allowed;
 
-        bool allowed = await FetchPermissionAsync(caller.Host);
+        bool allowed = await FetchPermissionAsync(target.Host);
         var cacheDuration = allowed ? PositiveCacheDuration : NegativeCacheDuration;
-        cache[caller.Host] = (allowed, now.Add(cacheDuration));
+        cache[target.Host] = (allowed, now.Add(cacheDuration));
         return allowed;
     }
 
@@ -77,12 +110,16 @@ public class CallPermissionChecker : ICallPermissionChecker
         try
         {
             var wellKnownUrl = new Uri($"https://{host}/.well-known/demo-hashback-dev.json");
-            var resp = await httpGetter.GetAsync(new SimpleHttpRequest(wellKnownUrl));
+            var req = new billpg.SpartanHttpClient.SpartanRequest(wellKnownUrl)
+                .WithTimeout(TimeSpan.FromSeconds(5))
+                .WithHeader("User-Agent", "demo.hashback.dev")
+                .WithHeader("Accept", "application/json");
+            var resp = await req.Run();
             if (resp.StatusCode != 200)
                 return false;
 
-            var json = (JsonObject?)JsonNode.Parse(resp.Body);
-            return json?["allow"]?.GetValue<bool>() == true;
+            var grant = JsonSerializer.Deserialize<PermitGrant>(resp.Body, GrantJsonOptions);
+            return string.Equals(grant?.GetPermissionGrantedTo, data.ConfigServiceHost, StringComparison.OrdinalIgnoreCase);
         }
         catch
         {

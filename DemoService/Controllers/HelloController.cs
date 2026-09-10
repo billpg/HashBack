@@ -5,10 +5,10 @@ using Swashbuckle.AspNetCore.Annotations;
 using Microsoft.AspNetCore.Http;
 using System.Threading.Tasks;
 using billpg.HashBackCore;
-using billpg.WWWAuthenticateTools;
 using System.Net;
 using DemoService.Data;
 using DemoService.Services;
+using billpg.WWWAuthenticateTools;
 
 namespace DemoService.Controllers;
 
@@ -73,15 +73,17 @@ public class HelloController : ControllerBase
 
         /* If authenticated, return the hello message. */
         if (authDomain != null)
-            return Content($"Hello {authDomain}!", "text/plain");
+            return Content($"Hello {authDomain}! ({(isCookieValid?"Cookie":"HashBack")} validated.)", "text/plain");
 
         /* Failed authentication, return a 401 with some text. */
-        var wwwAuthenticate = new AuthHeaders()
+        var wwwAuthHeader = new AuthHeaders()
             .WithScheme("HashBack")
             .WithParam("realm", "demo.hashback.dev")
-            .WithParam("set-cookie", HashBackCookieName)
-            .WithParam("version", "BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1");
-        Response.Headers["WWW-Authenticate"] = wwwAuthenticate.ToSingleHeaderValue();
+            .WithParam("version", "BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1")
+            .WithScheme("Cookie")
+            .WithParam("realm", "demo.hashback.dev")
+            .WithParam("name", HashBackCookieName);
+        Response.Headers["WWW-Authenticate"] = wwwAuthHeader.ToSingleHeaderValue();
         Response.StatusCode = 401;
         return Content(HtmlPages.HelloRoot(), "text/html", Encoding.UTF8);
     }
@@ -101,18 +103,7 @@ public class HelloController : ControllerBase
         if (!string.IsNullOrEmpty(authHeader))
         {
             IPAddress callerIp = Request.RequestIP();
-
-            /* Before doing any real (expensive) work, check whether this caller IP has
-             * already racked up too many recent failures. A blocked attempt is logged too,
-             * but as its own outcome - excluded from the failure count itself, so a blocked
-             * caller's own turned-away attempts can't keep the block going indefinitely. */
-            if (await requestLog.IsCallerBlockedAsync(callerIp))
-            {
-                await requestLog.LogAsync(callerIp, null, null, HelloRequestOutcome.CallerBlocked, null);
-                return (null, false, true);
-            }
-
-            var authDomain = await AuthenticateAndLog(authHeader, callerIp);
+            var authDomain = await AuthenticateHashBack(authHeader, callerIp);
             if (authDomain != null)
                 return (authDomain, false, false);
         }
@@ -121,7 +112,7 @@ public class HelloController : ControllerBase
         return (null, false, false);
     }
 
-    private async Task<string?> AuthenticateAndLog(string authHeader, IPAddress callerIp)
+    private async Task<string?> AuthenticateHashBack(string authHeader, IPAddress callerIp)
     {
         HashBackRequest? claim = null;
         IPAddress? verificationIp = null;
@@ -141,7 +132,7 @@ public class HelloController : ControllerBase
             policy.RequireNowWindow(NowToleranceSeconds);
             policy.SetSyncUnusValidate(unus => data.TryRecordUnus(unus, TimeSpan.FromSeconds(NowToleranceSeconds)));
             policy.SetSyncIdentifyUser(verify => verify.Host);
-            policy.OnGetVerificationHash = verify => GetHash(verify.ToString(), ip => verificationIp = ip);
+            policy.OnGetVerificationHash = BuildGetHash(ip => verificationIp = ip);
 
             authDomain = await claim.Authenticate(policy);
             outcome = HelloRequestOutcome.Success;
@@ -184,29 +175,37 @@ public class HelloController : ControllerBase
         _ => HelloRequestOutcome.UnexpectedError
     };
 
-    private async Task<string> GetHash(string url, Action<IPAddress> onResolved)
+
+    private HashBackPolicy.GetVerificationHashDelegate BuildGetHash(Action<IPAddress> storeVerificationIp)
     {
-        /* Call the supplied verification URL and get the results. */
-        var resp = await httpGetter.GetAsync(new SimpleHttpRequest(url), onResolved);
-        if (resp.StatusCode != 200)
-            throw new BadRequestException("Bad Verification URL.",
-                $"{url} returned status code {resp.StatusCode}");
-
-        /* Split the response into tokens, looking for the first one that decodes to 256
-         * bits. This will allow chunked to work, as the length-of-chunk line will be
-         * ignored. The comparison against the expected hash happens on the decoded bytes -
-         * by re-encoding here to standard base64 - rather than on this raw text, so a hash
-         * published using the alternate hyphen/underscore (base64url) form is still
-         * accepted. */
-        foreach (string token in resp.Body.Split(" \r\n\t".ToCharArray()))
+        /* Return a delegate that fits the OnGetVeificationHash, but also
+         * calls the supplied action to save the verification IP address too. */
+        return InternalGetHash;
+        async Task<string> InternalGetHash(Uri url)
         {
-            byte[]? hashBytes = Helpers.TryParseBase64(token, 256 / 8);
-            if (hashBytes != null)
-                return Convert.ToBase64String(hashBytes);
-        }
+            /* Call the supplied verification URL and get the results. */
+            var resp = await httpGetter.GetAsync(url, null);
+            if (resp.StatusCode != 200)
+                throw new BadRequestException("Bad Verification URL.",
+                    $"{url} returned status code {resp.StatusCode}");
+            storeVerificationIp(resp.RemoteAddress!);
+            
+            /* Split the response into tokens, looking for the first one that decodes to 256
+            * bits. This will allow chunked to work, as the length-of-chunk line will be
+            * ignored. The comparison against the expected hash happens on the decoded bytes -
+            * by re-encoding here to standard base64 - rather than on this raw text, so a hash
+            * published using the alternate hyphen/underscore (base64url) form is still
+            * accepted. */
+            foreach (string token in resp.Body.Split(" \r\n\t".ToCharArray()))
+            {
+                byte[]? hashBytes = Helpers.TryParseBase64(token, 256 / 8);
+                if (hashBytes != null)
+                    return Convert.ToBase64String(hashBytes);
+            }
 
-        /* No lines fit. */
-        throw new BadRequestException("Bad Verification Hash",
-            $"{url} did not return a suitable base-64 verification hash.");
+            /* No lines fit. */
+            throw new BadRequestException("Bad Verification Hash",
+                $"{url} did not return a suitable base-64 verification hash.");
+        }
     }
 }

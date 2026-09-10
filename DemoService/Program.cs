@@ -28,12 +28,16 @@ builder.Services.AddControllers();
 // Persist ServiceData as a singleton service so state is kept across requests
 builder.Services.AddSingleton<ServiceData>();
 
-// Register IP filter and IHttpGetter implementation
+// Register IP filter and the raw, unfiltered HTTP getter. This raw getter is what
+// ICallPermissionChecker uses internally for its own well-known fetch - see below.
 builder.Services.AddSingleton<IIpFilter, IpFilter>();
 builder.Services.AddSingleton<IHttpGetter, HttpGetter>();
 
-// Singleton so its in-memory permission cache actually persists across requests.
-builder.Services.AddSingleton<ICallPermissionChecker, CallPermissionChecker>();
+// Singleton so its in-memory permission cache actually persists across requests. Depends
+// on the raw HttpGetter directly (not the permission-checked IHttpGetter below), since its
+// own well-known fetch must not be gated by the very permission it exists to establish.
+builder.Services.AddSingleton<ICallPermissionChecker>(sp =>
+    new CallPermissionChecker(sp.GetRequiredService<ServiceData>()));
 
 // The /hash store, backed by PostgreSQL. The connection string (including its password)
 // is deliberately never checked into source: set it via
@@ -108,8 +112,10 @@ app.MapGet("/openapi", (HttpContext ctx) =>
     return Results.StatusCode(StatusCodes.Status302Found);
 });
 
-// Return the generated HTML home page
+// Documentation pages.
+app.MapGet("/permit", () => Results.Content(HtmlPages.Permit(), "text/html; charset=utf-8"));
 app.MapGet("/", () => Results.Content(HtmlPages.Home(), "text/html; charset=utf-8"));
+app.MapGet("/.well-known/demo-hashback-dev.json", () => Results.Redirect("https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
 
 // Start the service. This function will continue until the process stops.
 app.Run();
