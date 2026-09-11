@@ -29,7 +29,7 @@ public class CallController : ControllerBase
 
     /// <summary>
     /// HTTP Getter service. Refuses targets that haven't opted in via their own
-    /// /.well-known/demo-hashback-dev.json file - see PermissionCheckedHttpGetter.
+    /// /.well-known/demo-hashback-dev.json file.
     /// </summary>
     private readonly IHttpGetter httpGetter;
 
@@ -78,7 +78,7 @@ public class CallController : ControllerBase
         await hashStore.TryAddHashAsync(id, Convert.FromBase64String(hashBackRequest.VerificationHash), Request.RequestIP());
 
         /* Make a GET request to that URL. */
-        var resp = await httpGetter.GetAsync(target, "HashBack " + hashBackRequest.AuthToken);
+        var resp = await httpGetter.GetAsync(target, "HashBack " + hashBackRequest.AuthToken, Request.RequestIP(), OutboundGetSource.Call);
 
         /* Report to caller. */
         return Content(await BuildReport(target, id, resp), "text/plain");

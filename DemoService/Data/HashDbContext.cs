@@ -21,6 +21,7 @@ public class HashDbContext : DbContext
     public DbSet<StoredHashRecord> StoredHashes => Set<StoredHashRecord>();
     public DbSet<HashGetEventRecord> HashGetEvents => Set<HashGetEventRecord>();
     public DbSet<HelloRequestLogRecord> HelloRequestLogs => Set<HelloRequestLogRecord>();
+    public DbSet<OutboundGetLogRecord> OutboundGetLogs => Set<OutboundGetLogRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -60,6 +61,19 @@ public class HashDbContext : DbContext
             entity.HasIndex(e => e.RequestedAt);
         });
 
+        modelBuilder.Entity<OutboundGetLogRecord>(entity =>
+        {
+            entity.HasKey(e => e.RecordId);
+            entity.Property(e => e.RecordId).ValueGeneratedOnAdd();
+
+            entity.Property(e => e.Source).HasConversion<string>();
+
+            /* Queried by target host and time - counting how many GETs a target has
+             * received in the past hour, to check against its own declared GetsPerHour
+             * quota (see CallPermissionChecker.PermitGrant). */
+            entity.HasIndex(e => new { e.TargetHost, e.RequestedAt });
+        });
+
         /* SQLite (used for fast, dependency-free tests) has no native IP address type, so
          * store it as text there. PostgreSQL's own native "inet" type is used everywhere
          * else, without needing any conversion - checking the provider name by string
@@ -77,6 +91,7 @@ public class HashDbContext : DbContext
             modelBuilder.Entity<HashGetEventRecord>().Property(e => e.GotBy).HasConversion(ipConverter);
             modelBuilder.Entity<HelloRequestLogRecord>().Property(e => e.CallerIp).HasConversion(ipConverter);
             modelBuilder.Entity<HelloRequestLogRecord>().Property(e => e.VerificationIp).HasConversion(nullableIpConverter);
+            modelBuilder.Entity<OutboundGetLogRecord>().Property(e => e.CallerIp).HasConversion(ipConverter);
         }
     }
 }

@@ -6,18 +6,18 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using billpg.SpartanHttpClient;
+using DemoService.Data;
 
 namespace DemoService.Services;
 
 public interface IHttpGetter
 {
     /// <summary>
-    /// The optional onResolved callback, if supplied, is invoked with the resolved remote
-    /// IP address as soon as DNS resolution succeeds - before attempting to connect - so a
-    /// caller can find out which address was actually contacted even if the request goes
-    /// on to fail (connection refused, TLS rejected, bad status, and so on).
+    /// Fetches url on this service's behalf, logging the attempt to OutboundGetLog first -
+    /// callerIp and source (Hello or Call) identify which caller, hitting which of this
+    /// service's own endpoints, triggered it.
     /// </summary>
-    Task<SpartanResponse> GetAsync(Uri url, string? authorizationHeader);
+    Task<SpartanResponse> GetAsync(Uri url, string? authorizationHeader, IPAddress callerIp, OutboundGetSource source);
 }
 
 /// <summary>
@@ -42,6 +42,7 @@ public class HttpGetter : IHttpGetter
 {
     private readonly IIpFilter ipFilter;
     private readonly ICallPermissionChecker permissionChecker;
+    private readonly IOutboundGetLog outboundGetLog;
     private readonly TimeSpan timeout;
     private readonly Func<string, CancellationToken, Task<IPAddress[]>> dnsLookup;
     private readonly IsCertificateAcceptableDelegate isCertificateAcceptable;
@@ -61,6 +62,7 @@ public class HttpGetter : IHttpGetter
         ServiceData data,
         IIpFilter ipFilter,
         ICallPermissionChecker permissionChecker,
+        IOutboundGetLog outboundGetLog,
         TimeSpan? timeout = null,
         Func<string, CancellationToken, Task<IPAddress[]>>? dnsLookup = null,
         IsCertificateAcceptableDelegate? isCertificateAcceptable = null)
@@ -68,6 +70,7 @@ public class HttpGetter : IHttpGetter
         this.ipFilter = ipFilter;
         this.dnsLookup = dnsLookup ?? Dns.GetHostAddressesAsync;
         this.permissionChecker = permissionChecker;
+        this.outboundGetLog = outboundGetLog;
         this.timeout = timeout ?? TimeSpan.FromSeconds(10);
         this.isCertificateAcceptable = isCertificateAcceptable ?? DefaultIsCertificateAcceptable;
     }
@@ -76,12 +79,12 @@ public class HttpGetter : IHttpGetter
         Uri url, X509Certificate2 certificate, X509Chain? chain, SslPolicyErrors sslPolicyErrors)
         => sslPolicyErrors == SslPolicyErrors.None;
 
-    public async Task<SpartanResponse> GetAsync(Uri url, string? authorizationHeader)
+    public async Task<SpartanResponse> GetAsync(Uri url, string? authorizationHeader, IPAddress callerIp, OutboundGetSource source)
     {
         /* Perform some basic validation on the URL before we run the GET.
          * Will throw if not acceptable. */
         ValidateUrlOrThrow(url);
-        return await FetchAsync(url, authorizationHeader);
+        return await FetchAsync(url, authorizationHeader, callerIp, source);
     }
 
     /// <summary>
@@ -89,17 +92,24 @@ public class HttpGetter : IHttpGetter
     /// Internal, and only exists so certificate-handling tests can point this at an
     /// https://localhost URL on a non-443 port - something ValidateUrlOrThrow never lets
     /// through regardless of AllowGetLocalhost, since "localhost" has no dot and that
-    /// bypass only covers plain HTTP.
+    /// bypass only covers plain HTTP. callerIp/source default to a filler value, since
+    /// those tests don't care about the logged attempt itself.
     /// </summary>
-    internal async Task<SpartanResponse> FetchAsync(Uri url, string? authorizationHeader = null)
+    internal async Task<SpartanResponse> FetchAsync(
+        Uri url, string? authorizationHeader = null, IPAddress? callerIp = null, OutboundGetSource source = OutboundGetSource.Hello)
     {
+        var effectiveCallerIp = callerIp ?? IPAddress.Loopback;
+
         /* Check the target service's JSON permission. */
-        if (!await permissionChecker.IsCallPermittedAsync(url))
+        if (!await permissionChecker.IsCallPermittedAsync(url, effectiveCallerIp))
             throw new BadRequestException(
                 "Target not opted in.",
                 "This service will only call targets that have explicitly granted permission via " +
                 $"<https://{url.Host}/.well-known/demo-hashback-dev.json>. " +
                 "See https://demo.hashback.dev/permit for details.");
+
+        /* Log the attempt regardless of whether the fetch itself goes on to succeed. */
+        await outboundGetLog.LogAsync(effectiveCallerIp, source, url);
 
         /* Make the GET request. */
         var spartanRequest = new SpartanRequest(url)

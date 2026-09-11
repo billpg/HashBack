@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using DemoService;
+using DemoService.Data;
 using DemoService.Services;
 
 namespace DemoServiceTests;
@@ -54,12 +55,12 @@ public class HttpGetterSlowDripTests
         ServiceData.AllowGetLocalhost = true;
         try
         {
-            var getter = new HttpGetter(new ServiceData(), new IpFilter(), new AlwaysAllowCallPermissionChecker(), TimeSpan.FromMilliseconds(configuredTimeoutMs));
+            var getter = new HttpGetter(new ServiceData(), new IpFilter(), new AlwaysAllowCallPermissionChecker(), new NoOpOutboundGetLog(), TimeSpan.FromMilliseconds(configuredTimeoutMs));
             var url = new Uri($"http://localhost:{port}/slow-drip");
 
             var stopwatch = Stopwatch.StartNew();
             var ex = await Assert.ThrowsExceptionAsync<BadRequestException>(
-                async () => await getter.GetAsync(url, null));
+                async () => await getter.GetAsync(url, null, IPAddress.Loopback, OutboundGetSource.Hello));
             stopwatch.Stop();
 
             Assert.AreEqual("External URL not available.", ex.Title);

@@ -62,13 +62,16 @@ public class HelloController : ControllerBase
         /* If authentication succeeded and the cookie was not set, set it now. */
         if (authDomain != null && !isCookieValid)
         {
-            Response.Cookies.Append(HashBackCookieName, JWT.Create(authDomain), new CookieOptions
+            var options = new CookieOptions
             {
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.Strict,
                 Expires = DateTimeOffset.UtcNow.Add(JWT.Lifetime)
-            });
+            };
+            options.Extensions.Add("Auth-Scheme=HashBack");
+            options.Extensions.Add("Auth-Realm=demo.hashback.dev");
+            Response.Cookies.Append(HashBackCookieName, JWT.Create(authDomain), options);
         }
 
         /* If authenticated, return the hello message. */
@@ -132,7 +135,7 @@ public class HelloController : ControllerBase
             policy.RequireNowWindow(NowToleranceSeconds);
             policy.SetSyncUnusValidate(unus => data.TryRecordUnus(unus, TimeSpan.FromSeconds(NowToleranceSeconds)));
             policy.SetSyncIdentifyUser(verify => verify.Host);
-            policy.OnGetVerificationHash = BuildGetHash(ip => verificationIp = ip);
+            policy.OnGetVerificationHash = BuildGetHash(callerIp, ip => verificationIp = ip);
 
             authDomain = await claim.Authenticate(policy);
             outcome = HelloRequestOutcome.Success;
@@ -176,7 +179,7 @@ public class HelloController : ControllerBase
     };
 
 
-    private HashBackPolicy.GetVerificationHashDelegate BuildGetHash(Action<IPAddress> storeVerificationIp)
+    private HashBackPolicy.GetVerificationHashDelegate BuildGetHash(IPAddress callerIp, Action<IPAddress> storeVerificationIp)
     {
         /* Return a delegate that fits the OnGetVeificationHash, but also
          * calls the supplied action to save the verification IP address too. */
@@ -184,7 +187,7 @@ public class HelloController : ControllerBase
         async Task<string> InternalGetHash(Uri url)
         {
             /* Call the supplied verification URL and get the results. */
-            var resp = await httpGetter.GetAsync(url, null);
+            var resp = await httpGetter.GetAsync(url, null, callerIp, OutboundGetSource.Hello);
             if (resp.StatusCode != 200)
                 throw new BadRequestException("Bad Verification URL.",
                     $"{url} returned status code {resp.StatusCode}");

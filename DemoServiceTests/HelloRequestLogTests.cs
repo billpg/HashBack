@@ -111,7 +111,7 @@ public sealed class HelloRequestLogTests
             var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
 
             var controller = new HelloController(
-                serviceData, new HttpGetter(serviceData, new IpFilter(), new AlwaysAllowCallPermissionChecker()), log);
+                serviceData, new HttpGetter(serviceData, new IpFilter(), new AlwaysAllowCallPermissionChecker(), new NoOpOutboundGetLog()), log);
             var ctx = new DefaultHttpContext();
             ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
             controller.ControllerContext = new ControllerContext { HttpContext = ctx };

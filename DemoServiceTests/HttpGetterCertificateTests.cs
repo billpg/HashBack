@@ -73,7 +73,7 @@ public class HttpGetterCertificateTests
         try
         {
             var getter = new HttpGetter(
-                new ServiceData(), new IpFilter(), new AlwaysAllowCallPermissionChecker(),
+                new ServiceData(), new IpFilter(), new AlwaysAllowCallPermissionChecker(), new NoOpOutboundGetLog(),
                 dnsLookup: (host, ct) => Task.FromResult(new[] { IPAddress.Loopback }));
 
             var ex = await Assert.ThrowsExceptionAsync<BadRequestException>(async () =>
@@ -101,7 +101,7 @@ public class HttpGetterCertificateTests
         try
         {
             var getter = new HttpGetter(
-                new ServiceData(), new IpFilter(), new AlwaysAllowCallPermissionChecker(),
+                new ServiceData(), new IpFilter(), new AlwaysAllowCallPermissionChecker(), new NoOpOutboundGetLog(),
                 dnsLookup: (host, ct) => Task.FromResult(new[] { IPAddress.Loopback }),
                 isCertificateAcceptable: (url, presentedCert, chain, sslPolicyErrors) => true);
 

@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using DemoService;
+using DemoService.Data;
 using DemoService.Services;
 
 namespace DemoServiceTests;
@@ -55,11 +56,11 @@ public class HttpGetterLargeResponseTests
         ServiceData.AllowGetLocalhost = true;
         try
         {
-            var getter = new HttpGetter(new ServiceData(), new IpFilter(), new AlwaysAllowCallPermissionChecker(), TimeSpan.FromSeconds(10));
+            var getter = new HttpGetter(new ServiceData(), new IpFilter(), new AlwaysAllowCallPermissionChecker(), new NoOpOutboundGetLog(), TimeSpan.FromSeconds(10));
             var url = new Uri($"http://localhost:{port}/huge-file");
 
             var stopwatch = Stopwatch.StartNew();
-            var resp = await getter.GetAsync(url, null);
+            var resp = await getter.GetAsync(url, null, IPAddress.Loopback, OutboundGetSource.Hello);
             stopwatch.Stop();
 
             Assert.AreEqual(200, resp.StatusCode);

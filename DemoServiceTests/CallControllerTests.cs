@@ -105,7 +105,7 @@ public sealed class CallControllerTests
 
     private sealed class ThrowingHttpGetter : IHttpGetter
     {
-        public Task<SpartanResponse> GetAsync(Uri url, string? authorizationHeader)
+        public Task<SpartanResponse> GetAsync(Uri url, string? authorizationHeader, IPAddress callerIp, OutboundGetSource source)
             => throw new BadRequestException(
                 "Target not opted in.",
                 $"This service will only call targets that have explicitly granted permission via " +

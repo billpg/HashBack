@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using DemoService;
+using DemoService.Data;
 using DemoService.Services;
 
 namespace DemoServiceTests;
@@ -27,12 +28,12 @@ public class HttpGetterTests
         ServiceData.AllowGetLocalhost = true;
         try
         {
-            var getter = new HttpGetter(new ServiceData(), new IpFilter(), new AlwaysAllowCallPermissionChecker(), TimeSpan.FromMilliseconds(200));
+            var getter = new HttpGetter(new ServiceData(), new IpFilter(), new AlwaysAllowCallPermissionChecker(), new NoOpOutboundGetLog(), TimeSpan.FromMilliseconds(200));
             var url = new Uri($"http://localhost:{port}/never-responds");
 
             var stopwatch = Stopwatch.StartNew();
             var ex = await Assert.ThrowsExceptionAsync<BadRequestException>(
-                async () => await getter.GetAsync(url, null));
+                async () => await getter.GetAsync(url, null, IPAddress.Loopback, OutboundGetSource.Hello));
             stopwatch.Stop();
 
             Assert.AreEqual("External URL not available.", ex.Title);
@@ -65,6 +66,7 @@ public class HttpGetterTests
             new ServiceData(),
             filter,
             new AlwaysAllowCallPermissionChecker(),
+            new NoOpOutboundGetLog(),
             dnsLookup: (host, ct) => Task.FromResult(new[] { rejectedAddress, acceptedAddress }));
 
         var resolved = await getter.ResolveDomainToSingleIp("rutabaga-multi-homed.example", CancellationToken.None);
@@ -84,6 +86,7 @@ public class HttpGetterTests
             new ServiceData(),
             filter,
             new AlwaysAllowCallPermissionChecker(),
+            new NoOpOutboundGetLog(),
             dnsLookup: (host, ct) => Task.FromResult(new[] { rejectedAddress }));
 
         await Assert.ThrowsExceptionAsync<ApplicationException>(

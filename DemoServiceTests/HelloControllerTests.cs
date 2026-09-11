@@ -325,7 +325,7 @@ public sealed class HelloControllerTests
             var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
             osl.RespondBody = hashBackRequest.VerificationHash;
 
-            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter(), new AlwaysAllowCallPermissionChecker()), NoOpRequestLog);
+            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter(), new AlwaysAllowCallPermissionChecker(), new NoOpOutboundGetLog()), NoOpRequestLog);
             var ctx = new DefaultHttpContext();
             ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
             controller.ControllerContext = new ControllerContext { HttpContext = ctx };
@@ -356,7 +356,7 @@ public sealed class HelloControllerTests
             var verifyUrl = new Uri("http://localhost:8001/xyz");
             var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
 
-            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter(), new AlwaysAllowCallPermissionChecker()), NoOpRequestLog);
+            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter(), new AlwaysAllowCallPermissionChecker(), new NoOpOutboundGetLog()), NoOpRequestLog);
             var ctx = new DefaultHttpContext();
             ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
             controller.ControllerContext = new ControllerContext { HttpContext = ctx };
@@ -377,7 +377,7 @@ public sealed class HelloControllerTests
         var verifyUrl = new Uri("https://192.0.2.1/xyz");
         var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
 
-        var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter(), new AlwaysAllowCallPermissionChecker()), NoOpRequestLog);
+        var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter(), new AlwaysAllowCallPermissionChecker(), new NoOpOutboundGetLog()), NoOpRequestLog);
         var ctx = new DefaultHttpContext();
         ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
@@ -402,7 +402,7 @@ public sealed class HelloControllerTests
             var verifyUrl = new Uri($"http://localhost:{osl.ListenPort}/xyz");
             var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, verifyUrl);
 
-            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter(), new AlwaysAllowCallPermissionChecker()), NoOpRequestLog);
+            var controller = new HelloController(serviceData, new HttpGetter(serviceData, new IpFilter(), new AlwaysAllowCallPermissionChecker(), new NoOpOutboundGetLog()), NoOpRequestLog);
             var ctx = new DefaultHttpContext();
             ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
             controller.ControllerContext = new ControllerContext { HttpContext = ctx };

@@ -1,3 +1,4 @@
+using DemoService.Data;
 using DemoService.Services;
 using System;
 using System.Collections.Concurrent;
@@ -18,8 +19,10 @@ namespace DemoServiceTests
         public SpartanResponse? Response { get; set; }
         public string? LastAuthorizationHeader { get; private set; }
         public Uri? LastUri { get; private set; }
+        public IPAddress? LastCallerIp { get; private set; }
+        public OutboundGetSource? LastSource { get; private set; }
 
-        public Task<SpartanResponse> GetAsync(Uri url, string? authorizationHeader)
+        public Task<SpartanResponse> GetAsync(Uri url, string? authorizationHeader, IPAddress callerIp, OutboundGetSource source)
         {
             if (Response == null && _registered.TryGetValue(url.ToString(), out string? registeredHash))
                 Response = new SpartanResponse()
@@ -30,6 +33,8 @@ namespace DemoServiceTests
 
             LastUri = url;
             LastAuthorizationHeader = authorizationHeader;
+            LastCallerIp = callerIp;
+            LastSource = source;
             var resp = Response ?? new SpartanResponse().WithStatusCode(404);
             return Task.FromResult(resp.WithRemoteAddress(IPAddress.Loopback));
         }

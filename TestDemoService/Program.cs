@@ -38,4 +38,9 @@ var respHello = await httpHello.GetAsync("http://demo.hashback.dev/hello/");
 respHello.EnsureSuccessStatusCode();
 var helloBody = await respHello.Content.ReadAsStringAsync();
 
-{ }
+/* Report results. */
+Console.WriteLine(respHello.StatusCode);
+foreach (var header in respHello.Headers)
+    Console.WriteLine($"{header.Key}: {string.Join(", ", header.Value)}");
+Console.WriteLine(helloBody);
+

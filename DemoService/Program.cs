@@ -29,9 +29,8 @@ builder.Services.AddControllers();
 // Persist ServiceData as a singleton service so state is kept across requests
 builder.Services.AddSingleton<ServiceData>();
 
-// Register IP filter and the HTTP getter.
+// Register IP filter.
 builder.Services.AddSingleton<IIpFilter, IpFilter>();
-builder.Services.AddSingleton<IHttpGetter, HttpGetter>();
 
 // The real engine behind every SpartanRequest this service builds directly (currently
 // just CallPermissionChecker's own well-known fetch). Tests substitute a fake
@@ -55,7 +54,12 @@ var hashDbConnectionString = builder.Configuration.GetConnectionString("HashDb")
 builder.Services.AddDbContext<HashDbContext>(options => options.UseNpgsql(hashDbConnectionString));
 builder.Services.AddScoped<IHashStore, HashStore>();
 builder.Services.AddScoped<IHelloRequestLog, HelloRequestLog>();
+builder.Services.AddScoped<IOutboundGetLog, OutboundGetLog>();
 builder.Services.AddHostedService<HashCleanupService>();
+
+// The HTTP getter. Scoped (not Singleton) because it now logs every fetch via
+// IOutboundGetLog, which is itself Scoped to match HashDbContext.
+builder.Services.AddScoped<IHttpGetter, HttpGetter>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
