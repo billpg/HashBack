@@ -93,6 +93,10 @@ using (var startupScope = app.Services.CreateScope())
     hashDb.Database.Migrate();
 }
 
+// Log every request - first in the pipeline so it captures everything, even a request a
+// later middleware goes on to reject.
+app.UseMiddleware<RequestLoggingMiddleware>();
+
 // Global exception handling middleware -- converts exceptions into HTTP responses
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 

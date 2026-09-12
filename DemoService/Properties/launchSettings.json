@@ -2,7 +2,10 @@
   "profiles": {
     "DemoService": {
       "commandName": "Project",
-      "commandLineArgs": "GetLocalhost"
+      "commandLineArgs": "GetLocalhost",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
     }
   }
 }
