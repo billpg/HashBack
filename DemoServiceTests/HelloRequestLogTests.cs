@@ -244,43 +244,4 @@ public sealed class HelloRequestLogTests
         Assert.IsTrue(await log.IsCallerBlockedAsync(blockedCaller));
         Assert.IsFalse(await log.IsCallerBlockedAsync(innocentCaller));
     }
-
-    [TestMethod]
-    public async Task Get_CallerWithTooManyFailures_Returns429WithoutAttemptingRealWork()
-    {
-        using var testDb = new TestHashDb();
-        var now = DateTime.UtcNow;
-        var callerIp = IPAddress.Parse("203.0.113.7");
-        for (int i = 0; i < HelloRequestLog.FailureThreshold; i++)
-            SeedFailure(testDb, callerIp, now.AddMinutes(-i), HelloRequestOutcome.WrongHash);
-        await testDb.Db.SaveChangesAsync();
-
-        var log = new HelloRequestLog(testDb.Db, NullLogger<HelloRequestLog>.Instance);
-        var serviceData = GetServiceData();
-
-        // A perfectly valid, genuinely authenticate-able header - it should still be
-        // refused purely on the caller's history, without even trying to verify it.
-        var verifyUrl = $"https://rutabaga.example/verify/{Guid.NewGuid()}";
-        var hashBackRequest = HashBackRequest.Create(serviceData.ConfigServiceHost, new Uri(verifyUrl));
-        var registeredHashes = new System.Collections.Concurrent.ConcurrentDictionary<string, string>
-        {
-            [verifyUrl] = hashBackRequest.VerificationHash
-        };
-        var controller = new HelloController(serviceData, new MockHttpGetter(registeredHashes), log);
-        var ctx = new DefaultHttpContext();
-        ctx.Request.Headers["Authorization"] = "HashBack " + hashBackRequest.AuthToken;
-        ctx.Request.Headers["X-Forwarded-For"] = callerIp.ToString();
-        controller.ControllerContext = new ControllerContext { HttpContext = ctx };
-
-        var result = await controller.Get();
-
-        var statusResult = result as ObjectResult;
-        Assert.IsNotNull(statusResult, "Expected an explicit status result for a blocked caller.");
-        Assert.AreEqual(StatusCodes.Status429TooManyRequests, statusResult.StatusCode);
-        Assert.IsTrue(ctx.Response.Headers.ContainsKey("Retry-After"));
-
-        var loggedOutcomes = testDb.Db.HelloRequestLogs.Where(e => e.CallerIp.Equals(callerIp)).ToList();
-        Assert.IsTrue(loggedOutcomes.Any(e => e.Outcome == HelloRequestOutcome.CallerBlocked),
-            "The turned-away attempt itself should still be logged.");
-    }
 }

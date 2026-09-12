@@ -73,9 +73,9 @@ public sealed class CallControllerTests
             "Expected text/plain content type.");
 
         var report = contentResult.Content ?? string.Empty;
-        StringAssert.Contains(report, $"GET {targetUrl}:", "Report should include the GET line for the target URL.");
-        StringAssert.Contains(report, "Status: 200", "Report should include the status code from the fake response.");
-        StringAssert.Contains(report, "X-Remote: value", "Report should include headers from the fake response.");
+        StringAssert.Contains(report, $"outbound GET to `{targetUrl}`", "Report should include the GET line for the target URL.");
+        StringAssert.Contains(report, "Response Status: 200", "Report should include the status code from the fake response.");
+        StringAssert.Contains(report, "`X-Remote`: `value`", "Report should include headers from the fake response.");
         StringAssert.Contains(report, "Hello from remote target", "Report should include the body from the fake response.");
         StringAssert.Contains(report, "RutabagaCertificateHashInBase64==",
             "Report should include the remote TLS certificate hash from the fake response.");
