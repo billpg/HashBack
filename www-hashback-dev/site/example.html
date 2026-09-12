@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>HashBack | An Example Session</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <nav class="topbar">
+        <a href=".">🦔 HashBack Authentication</a>
+        <a href="https://github.com/billpg/HashBack" target="_blank">🔨 GitHub</a>
+        <a href="https://billpg.com/" target="_blank">🦉 billpg.com</a>
+      </nav>
+      <section class="hero">
+        <div>
+          <h1>An example HashBack session</h1>
+          <div class="panel introduction">Let's follow one request from the client's first thought to the server's final nod. <i>Hashbert</i> the Hedgehog will annotate the important bits, because authentication is easier to understand when someone points at the spiky details.</div>
+        </div>
+        <img class="badge" src="HashBack-Badge-Logo.png" alt="HashBack Logo" />
+      </section>
+      <section class="step">
+        <div class="step-header">
+          <span class="number">Step 1</span>
+          <h2>Declare the range of URLs you control</h2>
+        </div>
+        <p>
+          <b>Ahead of time</b>, the client administrator registers the exact narrow HTTPS URL or folder where verification hashes will be published. The service uses this declaration to map the URL back to the client and must reject URLs outside it. Avoid areas where the public might be able to inject text such as comment forms.</p>
+        <div class="preprecode">
+          <code>My&nbsp;verification&nbsp;hashes&nbsp;will&nbsp;be&nbsp;published&nbsp;at:</code>
+          <br />
+          <code>&nbsp;&nbsp;&nbsp;&nbsp;https://client.example/api/hashback?id=*</code>
+          <br />
+        </div>
+        <p class="hashbert">
+          <strong>🦔 Hashbert says:</strong> “Choose a small patch of ground that you control. A single doorway is splendid, but handing over the whole house is a bit much, even for a hedgehog with a clipboard.”</p>
+      </section>
+      <section class="step">
+        <div class="step-header">
+          <span class="number">Step 2</span>
+          <h2>Write the authentication request JSON</h2>
+        </div>
+        <p>When you want to make <b>an authenticated request</b>, write a fresh JSON claim. This package of data will combine the version, destination host, current UTC time, a unique random value, and the URL where you're going to publish the hash of this JSON later.</p>
+        <div class="preprecode">
+          <code>{</code>
+          <br />
+          <code>&nbsp;&nbsp;&nbsp;&nbsp;"Version":&nbsp;"BILLPG_DRAFT_4.2",</code>
+          <br />
+          <code>&nbsp;&nbsp;&nbsp;&nbsp;"Host":&nbsp;"server.example",</code>
+          <br />
+          <code>&nbsp;&nbsp;&nbsp;&nbsp;"Now":&nbsp;529297200,</code>
+          <br />
+          <code>&nbsp;&nbsp;&nbsp;&nbsp;"Unus":&nbsp;"Rpgt4Fc5nMDq14LOps/hYQ==",</code>
+          <br />
+          <code>&nbsp;&nbsp;&nbsp;&nbsp;"Verify":&nbsp;"https://client.example/api/hashback?id=502542886"</code>
+          <br />
+          <code>}</code>
+          <br />
+        </div>
+        <p>The <code><b>Unus</b></code> value prevents anyone from reusing your verification hash to impersonate you. Everything else in the JSON is predictable, but this field is fresh, random and known only to you and the server you’re talking to.</p>
+        <p>Cryptographers would call it a <i>“nonce”</i>, but in England that word has… other connotations. I’m hoping the community will adopt this alternative name instead. (<b>Unus</b> is Latin for <i>“Once”</i>.)</p>
+        <p class="hashbert">
+          <strong>🦔 Hashbert says:</strong> “This claim is fresh, specific, and meant for one destination. The <code>Unus</code> value must be unpredictable and unique, so a stale claim cannot simply wander back in wearing a fake moustache.”</p>
+      </section>
+      <section class="step">
+        <div class="step-header">
+          <span class="number">Step 3</span>
+          <h2>Hash the JSON and publish the result</h2>
+        </div>
+        <p>Run a <b>salted SHA-256 hash over your JSON</b> and base-64 the result. Publish that string as a one-line text file at the URL you listed in your JSON earlier.</p>
+        <div class="preprecode">
+          <code>$&nbsp;cat&nbsp;hashback-salt.bin&nbsp;auth.json&nbsp;\</code>
+          <br />
+          <code>&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;sha256sum&nbsp;\</code>
+          <br />
+          <code>&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;cut&nbsp;-d&nbsp;'&nbsp;'&nbsp;-f1&nbsp;\</code>
+          <br />
+          <code>&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;xxd&nbsp;-r&nbsp;-p&nbsp;\</code>
+          <br />
+          <code>&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;base64&nbsp;&gt;&nbsp;verification-hash.txt</code>
+          <br />
+          <code>$&nbsp;scp&nbsp;verification-hash.txt&nbsp;user@host:/user/client.example/data/hashback/502542886.txt</code>
+          <br />
+        </div>
+        <p>The salt is fixed and exists to make sure that the hashes are only useful for this exchange. Because the salt is not sent over the wire, we avoid the possibility of abusing public hashing services.</p>
+        <p>The salt itself, along with how it was derived, is on the GitHub site.</p>
+        <p class="hashbert">
+          <strong>🦔 Hashbert says:</strong> “The hash sits there, waiting to be retrieved, ready to exclaim <b>"That Was Me!"</b>.”</p>
+      </section>
+      <section class="step">
+        <div class="step-header">
+          <span class="number">Step 4</span>
+          <h2>Make the HTTP request</h2>
+        </div>
+        <p>Encode the bytes of your JSON with base-64 and <b>add it to your request's headers</b> as an <code>Authorization: Hashback</code> header.</p>
+        <p>(You'd put the entire base-64 block as a single line without spaces. We've split it up on this example for clarity.)</p>
+        <div class="preprecode">
+          <code>POST&nbsp;/api/order&nbsp;HTTP/1.1</code>
+          <br />
+          <code>Host:&nbsp;server.example</code>
+          <br />
+          <code>Accept:&nbsp;application/json</code>
+          <br />
+          <code>Authorization:&nbsp;HashBack&nbsp;eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMi</code>
+          <br />
+          <code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v</code>
+          <br />
+          <code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYz</code>
+          <br />
+          <code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;VuTURxMTRMT3BzL2hZUT09IiwiVmVyaWZ5Ijoi</code>
+          <br />
+          <code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;aHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9hcGkvaG</code>
+          <br />
+          <code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FzaGJhY2s/aWQ9NTAyNTQyODg2In0=</code>
+          <br />
+        </div>
+        <p class="hashbert">
+          <strong>🦔 Hashbert says:</strong> “The header carries the claim. The verification hash confirms the claim is real.”</p>
+      </section>
+      <section class="step">
+        <div class="step-header">
+          <span class="number">Step 5</span>
+          <h2>The server verifies the hash</h2>
+        </div>
+        <p>Now the server has your JSON, they can now <b>check everything is right</b>.</p>
+        <table class="checklist" border="0">
+          <tr>
+            <td>&nbsp;✅&nbsp;</td>
+            <td>The JSON is valid.</td>
+          </tr>
+          <tr>
+            <td>&nbsp;✅&nbsp;</td>
+            <td>The <code>Host</code> is correct.</td>
+          </tr>
+          <tr>
+            <td>&nbsp;✅&nbsp;</td>
+            <td>The <code>Now</code> timestamp is recent.</td>
+          </tr>
+          <tr>
+            <td>&nbsp;✅&nbsp;</td>
+            <td>The <code>Verify</code> URL belongs to a known user. (You.)</td>
+          </tr>
+          <tr>
+            <td>&nbsp;✅&nbsp;</td>
+            <td>The hash was retrieved over TLS with a known CA.</td>
+          </tr>
+        </table>
+        <p>With the supplied verification hash in hand, the server may now repeat the salted SHA-256 and check it matches the expected verification hash. If they match, it must have come from you!</p>
+        <div class="flow">
+          <div>
+            <strong>1. Decode</strong> Read the JSON claim from the header.</div>
+          <div>
+            <strong>2. Recalculate</strong> Hash the claim with the fixed salt.</div>
+          <div>
+            <strong>3. Compare</strong> Accept an exact match.</div>
+        </div>
+        <p class="hashbert">
+          <strong>🦔 Hashbert says:</strong> “A matching result confirms control of the registered website. The server has not been handed a long-lived secret but fresh proof from the right location. That is such a satisfactory conclusion it makes my spines wiggle.”</p>
+      </section>
+      <section class="panel">
+        <div class="btn-row">
+          <a class="btn btn-primary" href="acme.html">Next: Wait! Isn't that ACME?</a>
+          <a class="btn btn-secondary" href=".">Home</a>
+          <a class="btn btn-secondary" href="demo.html">Play with the demo service.</a>
+          <a class="btn btn-secondary" href="help.html">Can you Help?</a>
+        </div>
+      </section>
+      <p class="footer">
+        <span>HashBack was engineered and © William Godfrey, 2026.</span>
+        <span>
+          <a href="https://billpg.com" target="_blank">🦉 billpg industries</a>.</span>
+        <span>Hosted by <a href="https://statichost.uk" target="_blank">statichost.uk</a>.</span>
+        <span>May your rutabagas be tasty.</span>
+      </p>
+    </main>
+  </body>
+</html>

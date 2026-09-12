@@ -7,8 +7,13 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 
-/* Locate and load README.md into memory. */
-string readmePath = FindFileByName("README.md");
+/* Locate the repo root via the (uniquely named) billpg.HashBackCore folder,
+ * then load README.md and Helpers.cs from their known locations. Looking these
+ * up by bare file name is unreliable: both "Helpers.cs" and "README.md" exist
+ * in more than one project folder, and an unqualified search could silently
+ * pick the wrong one and corrupt it. */
+string coreProjectFolder = FindFolderByName("billpg.HashBackCore");
+string readmePath = Path.Combine(Directory.GetParent(coreProjectFolder)!.FullName, "README.md");
 var readmeLines = File.ReadAllLines(readmePath).ToList();
 var readmeOrigText = string.Join("\r\n", readmeLines);
 
@@ -38,7 +43,7 @@ SetTextByMarker(readmeLines, "<!--FIXED_SALT_HEX-->", $"- Hex: `{BytesToHex(fixe
 SetTextByMarker(readmeLines, "<!--FIXED_SALT_B64-->", $"- Base64: `{Convert.ToBase64String(fixedSaltBytes)}`");
 
 /* Rewrite the HashBackCore copy of the fixed salt in source. */
-string helpersPath = FindFileByName("Helpers.cs");
+string helpersPath = Path.Combine(coreProjectFolder, "Helpers.cs");
 var helpersLines = File.ReadAllLines(helpersPath).ToList();
 InsertByteArrayAsText(helpersLines, "FixedSalt42", "[", "]", fixedSaltBytes);
 File.WriteAllLines(helpersPath, helpersLines);
@@ -127,17 +132,12 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     string xnHostDomain = new System.Globalization.IdnMapping().GetAscii(hostDomainName);
 
     /* Use HashBackCore to build the Authorization header JSON. */
-    var builder = new billpg.HashBackCore.HashBackBuilder();
-    builder.Host = hostDomainName;
-    builder.NowGetter = () => billpg.HashBackCore.Helpers.ToUnixTimeSeconds(now);
-    builder.UnusGetter = () => GenerateUnus(128, keyBase);
-    builder.SetVerify(verifyUrl);
-    string verificationHash = "";
-    builder.SetSyncHashRegister((url, hash) => verificationHash = hash);
-    var authHeader = builder.Build().Result;
+    var built = billpg.HashBackCore.HashBackRequest.Create(
+        hostDomainName, now, GenerateUnus(128, keyBase), new Uri(verifyUrl));
+    var (token, hash) = (built.AuthToken, built.VerificationHash);
 
     /* Bring the base64 block back into bytes and parse as JSON. */
-    byte[] jsonAsBytes = Convert.FromBase64String(authHeader);
+    byte[] jsonAsBytes = Convert.FromBase64String(token);
     string jsonAsString = Encoding.UTF8.GetString(jsonAsBytes);
     var requestJson = JObject.Parse(jsonAsString);
 
@@ -170,7 +170,7 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     if (hash1066Index > 0)
     {
         var lineByQuotes = readmeLines[hash1066Index].Split('`');
-        readmeLines[hash1066Index] = lineByQuotes[0] + "`" + verificationHash + "`" + lineByQuotes[2];
+        readmeLines[hash1066Index] = lineByQuotes[0] + "`" + hash + "`" + lineByQuotes[2];
     }
 
     /* Build Set-Cookie header. */
@@ -245,19 +245,19 @@ void ReplaceJson(string tag, JObject insert)
     readmeLines.Insert(openBraceIndex, jsonAsString.ToString());
 }
 
-/* Find the file with the given name, starting from this file's folder moving upwards. */
-string FindFileByName(string fileName)
+/* Find the folder with the given name, starting from this file's folder moving upwards. */
+string FindFolderByName(string folderName)
 {
     /* Start with this file's folder. */
     var folder = new FileInfo(thisFilePath()).Directory;
     string thisFilePath([CallerFilePath] string path = "")
         => path;
 
-    /* Keep going until we find a file with the right name. */
+    /* Keep going until we find a folder with the right name. */
     while (folder != null)
     {
-        /* Is the file here? */
-        var found = folder.GetFiles(fileName, SearchOption.AllDirectories).FirstOrDefault();
+        /* Is the folder here? */
+        var found = folder.GetDirectories(folderName, SearchOption.AllDirectories).FirstOrDefault();
         if (found != null)
             return found.FullName;
 
@@ -265,8 +265,8 @@ string FindFileByName(string fileName)
         folder = folder.Parent;
     }
 
-    /* Couldn't find file anywhere. */
-    throw new Exception("Could not find " + fileName);
+    /* Couldn't find folder anywhere. */
+    throw new Exception("Could not find " + folderName);
 }
 
 /* Create a random-looking 256-bit Base64 encoded string from a starting string. */

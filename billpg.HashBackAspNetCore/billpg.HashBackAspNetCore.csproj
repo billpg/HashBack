@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- ASP.NET Core authentication types (AuthenticationHandler, IHttpClientFactory, etc.)
+       come from the shared framework rather than a NuGet package. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\billpg.HashBackCore\billpg.HashBackCore.csproj" />
+  </ItemGroup>
+
+</Project>

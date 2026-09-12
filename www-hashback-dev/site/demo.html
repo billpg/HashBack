@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>HashBack | Demo Service</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <nav class="topbar">
+        <a href=".">🦔 HashBack Authentication</a>
+        <a href="https://github.com/billpg/HashBack" target="_blank">🔨 GitHub</a>
+        <a href="https://billpg.com/" target="_blank">🦉 billpg.com</a>
+      </nav>
+      <section class="hero">
+        <div>
+          <h1>Try the Demo Service</h1>
+          <div class="panel introduction">Experience HashBack authentication in action. Use our demo with your own code to see how the exchange works. We'll even host your verification hashes while you're testing.</div>
+        </div>
+        <img class="badge" src="HashBack-Badge-Logo.png" alt="HashBack Logo" />
+      </section>
+      <section class="panel">
+        <h2>Test Your Client Code</h2>
+        <div class="feature-item">
+          <strong>
+            <code>https://demo.hashback.dev/hello/</code>
+          </strong> Send a GET request to this URL and it'll respond with a cheery "Hello" message, but only if a valid HashBack authentication header is included in the request. (If you don't, it'll return full documentation for this service including some sample code you can copy.) Use this to test your client code will generate a  valid claim and will publish valid hashes.</div>
+        <p class="hashbert">
+          <strong>🦔 Hashbert says:</strong> “Is it me you're looking for?”</p>
+      </section>
+      <section class="panel">
+        <h2>Test Your Client Code</h2>
+        <div class="feature-item">
+          <strong>
+            <code>https://demo.hashback.dev/call/</code>
+          </strong> Send a POST request, including the URL of <i>your</i> service in the request body, and this demo service will make properly-formed HashBack authenticated GET request to that URL. Once completed, the demo service will return a full log of the request and response, including the requests when anyone tried to GET the verification hash.</div>
+        <p class="hashbert">
+          <strong>🦔 Hashbert says:</strong> “You can point the "call" handler at the "hello" handler if you want. It's like shaking hands with yourself.”</p>
+      </section>
+      <section class="panel">
+        <h2>We'll host your hashes!</h2>
+        <div class="feature-item">
+          <strong>
+            <code>https://demo.hashback.dev/hash/</code>
+          </strong> If you're developing your own HashBack client but you don't have a web server ready to host your verification hashes yet, we've got your back. You can upload your hash text on the demo server, ready for anyone to request it. For a minute or so. And it'll be  deleted after three GETs.</div>
+        <p class="hashbert">
+          <strong>🦔 Hashbert says:</strong> “Don't use that for anything important. Anyone can claim to be the demo service. Even badgers!”</p>
+      </section>
+      <section class="panel">
+        <h2>Try it now!</h2>
+        <a class="btn btn-primary btn-big-center" href="https://demo.hashback.dev/" target="_blank">Demo.HashBack.dev</a>
+      </section>
+      <section class="panel">
+        <div class="btn-row">
+          <a class="btn btn-primary" href="help.html">Next: Can you help?</a>
+          <a class="btn btn-secondary" href=".">Home</a>
+          <a class="btn btn-secondary" href="example.html">Example Walk-Through</a>
+          <a class="btn btn-secondary" href="acme.html">Isn't that ACME?</a>
+        </div>
+      </section>
+      <p class="footer">
+        <span>HashBack was engineered and © William Godfrey, 2026.</span>
+        <span>
+          <a href="https://billpg.com" target="_blank">🦉 billpg industries</a>.</span>
+        <span>Hosted by <a href="https://statichost.uk" target="_blank">statichost.uk</a>.</span>
+        <span>May your rutabagas be tasty.</span>
+      </p>
+    </main>
+  </body>
+</html>

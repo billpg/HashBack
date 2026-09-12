@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "DemoService": {
+      "commandName": "Project",
+      "commandLineArgs": "GetLocalhost",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
