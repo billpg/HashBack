@@ -1,17 +1,17 @@
-using Newtonsoft.Json.Linq;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Nodes;
 
 [assembly:InternalsVisibleTo("UpdateReadme")]
 
 namespace billpg.HashBackCore
 {
-    public static class Helpers
+    internal static class Helpers
     {
         // HashBack version strings.
-        private const string VersionString41 = "BILLPG_DRAFT_4.1";
-        private const string VersionString42 = "BILLPG_DRAFT_4.2";
+        internal const string VersionString41 = "BILLPG_DRAFT_4.1";
+        internal const string VersionString42 = "BILLPG_DRAFT_4.2";
 
         /// <summary>
         /// Returns an immutable list of supported HashBack version strings.
@@ -64,14 +64,14 @@ namespace billpg.HashBackCore
         public static (string authHeader, string verificationHash) Build(string host, long now, string unus, string verify)
         {
             /* Serialize parameters to JSON and encode. */
-            string json = new JObject
+            string json = new JsonObject
             {
                 ["Version"] = VersionString42,
                 ["Host"] = host,
                 ["Now"] = now,
                 ["Unus"] = unus,
                 ["Verify"] = verify
-            }.ToString(Newtonsoft.Json.Formatting.None);
+            }.ToShortJson();
             byte[] jsonAsBytes = Encoding.UTF8.GetBytes(json);
 
             /* Compute the verification hash from the above byte array and return. */
@@ -151,21 +151,26 @@ namespace billpg.HashBackCore
             }
         }
 
-        internal static JObject? TryJsonParse(string json)
+        internal static JsonObject? TryJsonParse(string json)
         {
             try
             {
-                return JObject.Parse(json);
+                return (JsonObject)JsonNode.Parse(json)!;
             }
-            catch (Newtonsoft.Json.JsonReaderException)
+            catch (System.Text.Json.JsonException)
             {
                 return null!;
             }
         }
 
-        public static string ToShortJson(this JObject j)
-            => j.ToString(Newtonsoft.Json.Formatting.None);
+        private static readonly System.Text.Json.JsonSerializerOptions shortJsonOptions
+            = new() { WriteIndented = false };
 
+        public static string ToShortJson(this JsonObject j)
+            => j.ToJsonString(shortJsonOptions);
+        
+        internal static byte[] ToUtf8(this string s)
+            => Encoding.UTF8.GetBytes(s);
 
         /// <summary>
         /// DateTime.UtcNow wrapped in a function, 
@@ -191,6 +196,15 @@ namespace billpg.HashBackCore
         /// name="separator"/> string.</returns>
         internal static string ToSeparatedString(this IEnumerable<string> items, string separator)
             => string.Join(separator, items);
+
+        internal static string GenerateUnus()
+        {
+            /* Generate 16 cryptographic-quality 
+             * random bytes and encode as BASE-64. */
+            byte[] unusBytes = new byte[16];
+            RandomNumberGenerator.Fill(unusBytes);
+            return Convert.ToBase64String(unusBytes);
+        }
     }
 
     public enum ValidateRejectionReason
@@ -198,6 +212,7 @@ namespace billpg.HashBackCore
         BadHeader,
         WrongHost,
         WrongNow,
+        ReplayedUnus,
         UnknownUser,
         WrongHash
     }

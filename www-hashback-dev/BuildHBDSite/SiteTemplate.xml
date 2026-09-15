@@ -1,0 +1,31 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title/>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <nav class="topbar">
+        <a href=".">🦔 HashBack Authentication</a>
+        <a href="https://github.com/billpg/HashBack" target="_blank">🔨 GitHub</a>
+        <a href="https://billpg.com/" target="_blank">🦉 billpg.com</a>
+      </nav>
+      <section class="hero">
+        <div>
+          <h1 />
+          <div class="panel introduction" />
+        </div>
+        <img class="badge" src="HashBack-Badge-Logo.png" alt="HashBack Logo" />
+      </section>
+      <p class="footer">
+        <span>HashBack was engineered and © William Godfrey, 2026.</span>
+        <span><a href="https://billpg.com" target="_blank">🦉 billpg industries</a>.</span>
+        <span>Hosted by <a href="https://statichost.uk" target="_blank">statichost.uk</a>.</span>
+        <span>May your rutabagas be tasty.</span>
+      </p>
+    </main>
+  </body>
+</html>

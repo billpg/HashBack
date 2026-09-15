@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>HashBack | Server-to-Server authentication without secret storage</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <nav class="topbar">
+        <a href=".">🦔 HashBack Authentication</a>
+        <a href="https://github.com/billpg/HashBack" target="_blank">🔨 GitHub</a>
+        <a href="https://billpg.com/" target="_blank">🦉 billpg.com</a>
+      </nav>
+      <section class="hero">
+        <div>
+          <h1>HashBack</h1>
+          <div class="panel introduction">Cloud servers shouldn’t need to hold onto long‑lived secrets like passwords, API tokens or private keys. <b>HashBack</b> removes that burden. Rather than storing credentials, your service can rely on the TLS keys it already uses every day. With two short HTTPS transactions — one to declare who you are, and one to prove it — both sides gain confidence without ever sharing or keeping a secret. It’s simple, tidy and built on the infrastructure you already trust.</div>
+        </div>
+        <img class="badge" src="HashBack-Badge-Logo.png" alt="HashBack Logo" />
+      </section>
+      <section class="cards">
+        <article class="card">
+          <h3>Zero secret storage</h3>
+          <p>Remove the need to keep and manage cryptographic keys or bearer tokens around for long periods of time.</p>
+          <p>You've already invested in TLS. <b>Use it!</b></p>
+        </article>
+        <article class="card">
+          <h3>Two HTTPS transactions</h3>
+          <p>HashBack keeps the exchange short and friendly.</p>
+          <p>One call out, one call back.</p>
+        </article>
+        <article class="card">
+          <h3>Server-to-Server</h3>
+          <p>Use it for general-purpose authentication between internet-facing services.</p>
+        </article>
+      </section>
+      <section class="panel">
+        <h2>From a simple analogy to a practical authentication mechanism</h2>
+        <p>HashBack takes inspiration from a phone-call analogy. The caller knows who they are calling, but the recipient doesn't know who that call is coming from. <small>("1471"? "Star-69"? What's that?)</small></p>
+        <p>But what if the recipient can call that original caller back! Now they can be reassured that the caller actually was who they say they were.</p>
+        <div class="gallery">
+          <img src="PhoneCall-Frame-1.png" alt="Hi Bob. I'm Alice!" />
+          <img src="PhoneCall-Frame-2.png" alt="Prove it." />
+          <img src="PhoneCall-Frame-3.png" alt="You know my number. Call me back." />
+          <img src="PhoneCall-Frame-4.png" alt="Hi Alice. Did you call me just now?" />
+        </div>
+        <p>Did you see what <b>didn't</b> happen? <b>No-one</b> needed a cryptographic key or secret token.</p>
+        <p>Now apply that idea to web authentication. The client knows, thanks to TLS, who they are  connecting to, but the server doesn't know who that incoming connection is from. If the server can call the client back, this time the server knows, thanks again to TLS, that the client is who they say they are. The two connections in opposite directions complete the loop.</p>
+      </section>
+      <section class="panel">
+        <div class="btn-row">
+          <a class="btn btn-primary" href="example.html">Next: Walking through an example session</a>
+          <a class="btn btn-secondary" href="acme.html">Isn't that ACME?</a>
+          <a class="btn btn-secondary" href="demo.html">Play with the demo service.</a>
+          <a class="btn btn-secondary" href="help.html">Can you Help?</a>
+        </div>
+      </section>
+      <p class="footer">
+        <span>HashBack was engineered and © William Godfrey, 2026.</span>
+        <span>
+          <a href="https://billpg.com" target="_blank">🦉 billpg industries</a>.</span>
+        <span>Hosted by <a href="https://statichost.uk" target="_blank">statichost.uk</a>.</span>
+        <span>May your rutabagas be tasty.</span>
+      </p>
+    </main>
+  </body>
+</html>

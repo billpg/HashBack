@@ -1,11 +1,11 @@
-﻿# HashBack Authentication: Trust, Verified.
+﻿# HashBack: Server-to-Server Authentication
 HashBack is a two-step authentication exchange over HTTPS/TLS. Your identity is proven by publishing a hash, not sharing a secret. One Request. One Verification. Zero Secrets.
 
 <img src="docs/assets/HashBack-Badge-Logo.png" align="right" alt="" width="150" height="150" />
 
 This version of the document is a **public-draft** for review and discussion tagged as version **4.2**. I will update this number if I make any substantive updates. If you have any comments or notes, please open an issue on this project's public github.
 
-This document is Copyright William Godfrey, 2025. You may use its contents under the terms of the Creative-Commons Attribution license.
+This document is Copyright William Godfrey, 2026. You may use its contents under the terms of the Creative-Commons Attribution license.
 
 ## 🚠 The elevator pitch.
 <table>
@@ -36,7 +36,7 @@ If you're running a service out in the cloud which interacts with an external se
 
 This repository of secrets will need to be managed. The service won't be able to manage these things for itself because it'll need to identify itself to the service that issues these tokens, moving the problem one layer away without eliminating the problem itself. Either that or you make the decision that these secret tokens stay valid for long periods of time.
 
-Repositories of secret tokens or keys. They have to be so secure that passersby can't access them, but so available that your code running in cloud can access them.
+Repositories of secret tokens need to be both so secure that passers-by can't access them, but so available that your unattended code running in cloud can access them.
 
 HashBack Authentication is an attempt to eliminate the need for long-term secret storage entirely.
 
@@ -98,7 +98,7 @@ The JSON object is made from the following properties. All are required and the 
 - **`Version`**
   - A string indicating the version of this exchange in use.
   - This version is indicated by the string `"BILLPG_DRAFT_4.2"`.
-  - Note that as this proceeds to a formal standard, this value may change. I anticipate that the IETF drafts will necessiate a new version string, replacing "BILLPG" with "IETF". The final RFC form will likely be "RFC_xxxx" with the RFC number assigned to the final document.
+  - Note that as this proceeds to a formal standard, this value may change. I anticipate that the IETF drafts will necessitate a new version string, replacing "BILLPG" with "IETF". The final RFC form will likely be "RFC_xxxx" with the RFC number assigned to the final document.
   - See also the section describing the `WWW-Authenticate` header below for how servers may advertise which versions they support.
 - **`Host`**
   - The full domain name of the server being called in this request.
@@ -165,6 +165,8 @@ For your convenience, here is the 32 byte fixed salt block in a variety of encod
 
 Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The returned string itself must be one line with the BASE-64 encoded hash in ASCII as that only line. It must either have no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence. The response must be `200 OK` and the TLS certificate must be valid.
 
+The verification URL must not be any kind of redirect response. You should know what the final URL is when you're creating the JSON claim and this avoids complicating validation for the server and any possibility of SSRF attacks.
+
 The expected hash of the above example is: 
 - `/+Zc/xVCVgnnfC69tEybe2TAluOk21ScdystX0/1Ayk=`<!--1066_EXAMPLE_HASH-->
 
@@ -217,7 +219,7 @@ If you are developing the receiving end of a HashBack request, please add a `Set
 
 One such customer is Petunia Parsnip, founder of **The Underground Supper Club**, a high-end vegan patisserie that specializes in root-vegetable-themed banquets. Her clients expect nothing less than the finest rutabaga souffles and parsnip pavlovas, delivered with flair and precision.
 
-Petunia has recently signed up with The Rutabaga Republic and logged into their customer portal. On her authentication page under the *HashBack Authentication* section, she's configured her account affirming that `https://petunia.example/hashback` is under her sole control and where her verification hashes will be made available.
+Petunia has recently signed up with The Rutabaga Republic and logged into their customer portal. On her authentication page under the *HashBack Authentication* section, she's configured her account affirming that `https://Petunia.example/api/hashback` is under her sole control and where her verification hashes will be made available.
 
 > 🦔 *"All the world's a rutabaga."*
 
@@ -322,7 +324,7 @@ This is why the user must, ahead of time, affirm to the server exactly which URL
 ### TLS supports client-side certificates.
 To use client-side certificates, the client side would need access to a private key. This would need secure storage for the key which the caller code has access to. Avoidance of this is the main motivation of this exchange.
 
-### What if an attacker attempts to eavesdrop on either request?"
+### What if an attacker attempts to eavesdrop on either request?
 The attacker can't eavesdrop because TLS is securing the channel.
 
 ### What if either HTTP transaction uses a self-signed TLS certificate or one signed by an untrusted root?
@@ -338,7 +340,7 @@ If this is a serious concern, you could keep your own collection of trusted TLS 
 ### What if an attacker sends a fake Authorization header?
 The recipient will attempt to retrieve a verification hash file from the real client's website. As there won't be a verification hash that matches the fake header, the attempt will fail.
 
-### What if an attacker can predict the verification hash URL or has a verification hash intended for another server?"
+### What if an attacker can predict the verification hash URL or has a verification hash intended for another server?
 Let them.
 
 Suppose an attacker knows a current request's verification hash URL. They would be able to make that GET request and from that know the verification hash. Additionally, they could construct their own Authorization header to a genuine server, using the known `Verify` value with knowledge the genuine client's website will respond again to a second GET request with the same known verification hash.
@@ -463,7 +465,7 @@ In due course, I plan to deploy a publicly accessible test API which you could u
 
 Ultimately, I hope to publish this as an RFC and establish it as a public standard.
 
-<a href="billpg.HashBackCore/">`HashBackCore`</a> is my reference implementation, handling the process for both validating a header and generating one. This is written with hooks for you to supply your own code when needed, including for registering your own verification hashes and retrieving a client's verification hash. (See that project's README file for usage notes.) It deliberately doesn't interface with HTTP, leaving that to your handler code. By calling to handler code, it allows an extensive set of unit tests that bypass that complication. These are implemented in the <a href="HashBackCoreTests">`HashBackCoreTests`</a> libary.
+<a href="billpg.HashBackCore/">`HashBackCore`</a> is my reference implementation, handling the process for both validating a header and generating one. This is written with hooks for you to supply your own code when needed, including for registering your own verification hashes and retrieving a client's verification hash. (See that project's README file for usage notes.) It deliberately doesn't interface with HTTP, leaving that to your handler code. By calling to handler code, it allows an extensive set of unit tests that bypass that complication. These are implemented in the <a href="HashBackCoreTests">`HashBackCoreTests`</a> library.
 
 > 🦔 *"Onward, brave hedgehog!"*
 

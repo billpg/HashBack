@@ -1,0 +1,4 @@
+[submodule "SpartanHttpClient"]
+	path = SpartanHttpClient
+	url = https://github.com/billpg/SpartanHttpClient.git
+	branch = feature/extract-http-getter

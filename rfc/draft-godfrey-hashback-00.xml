@@ -1,0 +1,776 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE rfc [
+<!ENTITY nbsp "&#160;">
+]>
+<rfc xmlns:xi="http://www.w3.org/2001/XInclude"
+     category="std"
+     docName="draft-godfrey-hashback-00"
+     ipr="trust200902"
+     submissionType="independent"
+     xml:lang="en"
+     version="3"
+     consensus="false">
+
+  <front>
+    <title abbrev="HashBack">HashBack: Server-to-Server Authentication by Published Hash</title>
+
+    <author fullname="William Godfrey" initials="W." surname="Godfrey">
+      <organization>billpg industries</organization>
+      <address>
+        <email>billpg@gmail.com</email>
+        <uri>https://billpg.com/</uri>
+      </address>
+    </author>
+
+    <date year="2026" month="August" day="28"/>
+
+    <area>Security</area>
+
+    <keyword>authentication</keyword>
+    <keyword>HTTP</keyword>
+    <keyword>server-to-server</keyword>
+    <keyword>call back</keyword>
+
+    <abstract>
+      <t>
+        HashBack is a two-step authentication exchange carried over HTTPS/TLS
+        that allows one HTTP server to authenticate another, without either
+        party holding a long-term shared secret, bearer token, or private
+        key. A caller proves its identity by publishing a short cryptographic
+        hash on a website it controls; the recipient of a request fetches
+        that hash over a second, independent HTTPS connection and compares
+        it against a value it calculates itself. If the two values match,
+        the recipient is reassured that the caller is who it claims to be.
+        This document describes the HashBack exchange, the format of the
+        <tt>Authorization</tt> header it defines, and the security
+        considerations that apply to implementations.
+      </t>
+    </abstract>
+  </front>
+
+  <middle>
+
+    <section anchor="introduction" numbered="true" toc="default">
+      <name>Introduction</name>
+      <t>
+        A server that calls out to another server over the Internet
+        typically needs some way to prove its identity: an API key, a
+        bearer token, a shared secret, or a private key backing a client
+        TLS certificate. Whichever form it takes, that credential has to be
+        generated, distributed to the calling service, stored securely at
+        both ends, and eventually rotated - all before the two services can
+        exchange a single authenticated request.
+      </t>
+      <t>
+        HashBack removes the need for that long-term credential entirely.
+        Instead, it relies on a property both parties already have if they
+        are communicating over HTTPS at all: each side runs a TLS-secured
+        web server that the other side can reach. HashBack uses this in a
+        manner similar to a phone call placed to a trusted number and then
+        immediately hung up so the other side can call back: the caller
+        tells the recipient "I am the operator of this URL - call me back
+        there to check", and publishes a value at that URL for the
+        recipient to retrieve.
+      </t>
+      <t>
+        This is deliberately similar in spirit to the challenge exchange
+        used by the Automatic Certificate Management Environment (ACME)
+        <xref target="RFC8555"/>, which validates control of a domain name
+        by asking the requester to publish a token there ahead of a
+        certificate being issued. HashBack applies the same "prove control
+        of a URL" idea to general-purpose API authentication, and reduces
+        the exchange to two HTTP transactions instead of three.
+      </t>
+      <t>
+        This document is an early, individual Internet-Draft. It has not
+        been adopted by any IETF working group. It is published to invite
+        review and comment ahead of a future submission for standardization.
+      </t>
+    </section>
+
+    <section anchor="terminology" numbered="true" toc="default">
+      <name>Terminology and Notation</name>
+      <t>
+        The key words "<bcp14>MUST</bcp14>", "<bcp14>MUST NOT</bcp14>",
+        "<bcp14>REQUIRED</bcp14>", "<bcp14>SHALL</bcp14>", "<bcp14>SHALL
+        NOT</bcp14>", "<bcp14>SHOULD</bcp14>", "<bcp14>SHOULD NOT</bcp14>",
+        "<bcp14>RECOMMENDED</bcp14>", "<bcp14>NOT RECOMMENDED</bcp14>",
+        "<bcp14>MAY</bcp14>", and "<bcp14>OPTIONAL</bcp14>" in this document
+        are to be interpreted as described in BCP&nbsp;14
+        <xref target="RFC2119"/> <xref target="RFC8174"/> when, and only
+        when, they appear in all capitals, as shown here.
+      </t>
+      <t>
+        This document additionally uses the following terms:
+      </t>
+      <dl newline="false" spacing="normal">
+        <dt>Caller:</dt>
+        <dd>
+          The party sending the HTTP request being authenticated. Also
+          referred to as the client.
+        </dd>
+        <dt>Recipient:</dt>
+        <dd>
+          The party receiving and authenticating the HTTP request. Also
+          referred to as the server.
+        </dd>
+        <dt>Unus:</dt>
+        <dd>
+          A 128-bit cryptographic-quality random value, encoded in Base64,
+          included in every request to make its verification hash
+          unpredictable. Equivalent in purpose to a cryptographic nonce.
+          The name is the Latin word for "one" or "single".
+        </dd>
+        <dt>Verify URL:</dt>
+        <dd>
+          An HTTPS URL, under the Caller's control, where the Caller
+          publishes the verification hash for a given request.
+        </dd>
+        <dt>Verification hash:</dt>
+        <dd>
+          The Base64-encoded, salted SHA-256 hash of a request's JSON
+          object, as described in <xref target="hashing"/>.
+        </dd>
+        <dt>Fixed Salt:</dt>
+        <dd>
+          A 32-byte value, fixed by this document and not secret, prepended
+          to a request's bytes before hashing. See <xref target="hashing"/>.
+        </dd>
+      </dl>
+    </section>
+
+    <section anchor="overview" numbered="true" toc="default">
+      <name>Protocol Overview</name>
+      <t>
+        In outline, the Caller builds a JSON object describing the request
+        it is about to make, including the URL where it will publish that
+        object's hash. It sends this object, Base64-encoded, in the HTTP
+        <tt>Authorization</tt> header of its request. Before or immediately
+        after sending that request, it publishes the object's verification
+        hash at the declared URL.
+      </t>
+      <t>
+        On receiving the request, the Recipient parses the
+        <tt>Authorization</tt> header, applies its own policy checks (see
+        <xref target="checks"/>), and then makes a separate HTTPS GET
+        request to the Verify URL to retrieve the published hash. The
+        Recipient computes the same hash itself from the bytes it received
+        and compares the two values. If they match, the Recipient has
+        confirmed that whoever controls the Verify URL endorses this
+        specific request, and processes it accordingly.
+      </t>
+      <t>
+        Two independent HTTPS connections are used: the original request,
+        and the Recipient's GET request to the Verify URL. Because TLS
+        secures both connections, and because the published value is a hash
+        of the specific request rather than a fixed shared secret, this
+        exchange requires no pre-agreed credential beyond the Recipient
+        knowing which range of Verify URLs belong to which Caller (see
+        <xref target="prereq"/>).
+      </t>
+    </section>
+
+    <section anchor="prereq" numbered="true" toc="default">
+      <name>Prerequisite: Declaring a Verify URL Range</name>
+      <t>
+        Before this exchange can take place, the Recipient <bcp14>MUST</bcp14>
+        have a way to map an incoming Verify URL to a specific, known Caller
+        identity. Exactly how this mapping is established and stored is
+        outside the scope of this document (it might be an entry in a
+        configuration file, a row in a database populated through a
+        self-service web portal, or a value baked into deployment
+        configuration), but the range of URLs accepted for any one Caller
+        <bcp14>MUST</bcp14> be narrow enough that no other party could
+        plausibly publish content there.
+      </t>
+      <t>
+        A single fixed URL, or a URL varying only in a query string
+        parameter or a restricted path segment, is appropriate. A URL
+        prefix that could allow the Caller's other users to publish
+        arbitrary content (for example, a path serving user comments or a
+        public wiki) is not, because it would let an unrelated party
+        impersonate the Caller by publishing a hash of their own choosing
+        under that same prefix.
+      </t>
+      <t>Examples of acceptable and unacceptable declarations:</t>
+      <table anchor="table-verify-examples">
+        <name>Verify URL range examples</name>
+        <thead>
+          <tr><th>Pattern</th><th>Acceptable?</th><th>Reason</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>https://example.com/hashback?id=*</td>
+            <td>Yes</td>
+            <td>Single fixed path, varying only in a query parameter</td>
+          </tr>
+          <tr>
+            <td>https://example.com/hashback/*.txt</td>
+            <td>Yes</td>
+            <td>Single restricted folder, no further subfolders</td>
+          </tr>
+          <tr>
+            <td>http://example.com/hashback/*</td>
+            <td>No</td>
+            <td>Not protected by TLS</td>
+          </tr>
+          <tr>
+            <td>https://example.com/*</td>
+            <td>No</td>
+            <td>Too broad; covers content the Caller does not control</td>
+          </tr>
+          <tr>
+            <td>https://example.com/blog/*</td>
+            <td>No</td>
+            <td>May allow third-party comments</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section anchor="authz-header" numbered="true" toc="default">
+      <name>The Authorization Header</name>
+      <t>
+        The Caller authenticates its request using the HTTP
+        <tt>Authorization</tt> request header field, using the auth-scheme
+        token <tt>HashBack</tt>:
+      </t>
+      <artwork name="" type="abnf" align="left" alt=""><![CDATA[
+Authorization = "HashBack" 1*SP token68
+]]></artwork>
+      <t>
+        where <tt>token68</tt> is as defined by
+        <xref target="RFC9110" section="11.3"/>. The token68 value
+        <bcp14>MUST</bcp14> be the standard Base64 encoding (including
+        padding, and without line breaks) of a JSON object, encoded as
+        UTF-8, described below. (Line breaks shown in examples in this
+        document are for presentation only and are not part of the header
+        value.)
+      </t>
+
+      <section anchor="json-props" numbered="true" toc="default">
+        <name>JSON Object Properties</name>
+        <t>
+          The JSON object <bcp14>MUST</bcp14> be a JSON object, as defined
+          by <xref target="RFC8259"/>, containing exactly the following
+          members. All values are strings unless stated otherwise. All
+          members are <bcp14>REQUIRED</bcp14>.
+        </t>
+        <dl newline="false" spacing="normal">
+          <dt>Version:</dt>
+          <dd>
+            A string identifying the version of this exchange in use. This
+            revision of this exchange is identified by the string
+            "<tt>BILLPG_DRAFT_4.2</tt>", for compatibility with the
+            reference implementation published alongside earlier drafts of
+            this document. A future revision of this document, once
+            adopted as an IETF work item, is expected to define a new
+            version string of the form "<tt>RFC_NNNN</tt>", where NNNN is
+            the number ultimately assigned to that RFC.
+          </dd>
+          <dt>Host:</dt>
+          <dd>
+            The full domain name of the Recipient being called in this
+            request. Because intermediaries such as load balancers and
+            content delivery networks can rewrite the HTTP
+            <tt>Host</tt> header, this property carries an authoritative
+            copy included in the hashed material, so there is no ambiguity
+            about which name the Caller intended. The Recipient
+            <bcp14>MUST</bcp14> reject any request whose <tt>Host</tt>
+            property does not match one of its own recognized names,
+            including generic names such as "<tt>localhost</tt>" that
+            belong to no specific service. See
+            <xref target="relay-attack"/>.
+          </dd>
+          <dt>Now:</dt>
+          <dd>
+            The current UTC time, expressed as an integer number of seconds
+            since the start of 1970 (a Unix timestamp). Values
+            <bcp14>MUST</bcp14> use an integer type wider than 32 bits, so
+            that this mechanism continues to function beyond the year 2038.
+            The Recipient <bcp14>SHOULD</bcp14> reject a request if this
+            value is too far from its own clock; this document does not
+            mandate a specific threshold, leaving that to the Recipient's
+            own configuration.
+          </dd>
+          <dt>Unus:</dt>
+          <dd>
+            128 bits of cryptographic-quality randomness, Base64-encoded
+            including any trailing "<tt>=</tt>" padding. Every other
+            property of this JSON object is potentially predictable to an
+            attacker; the security of this exchange depends on this value,
+            and only this value, being unpredictable (see
+            <xref target="predictability"/>). A Caller
+            <bcp14>MUST NOT</bcp14> reuse a <tt>Unus</tt> value across
+            requests. A Recipient <bcp14>SHOULD</bcp14> reject any request
+            reusing a <tt>Unus</tt> value it has already seen within its
+            configured <tt>Now</tt> tolerance window.
+          </dd>
+          <dt>Verify:</dt>
+          <dd>
+            An <tt>https://</tt> URL, belonging to the Caller, from which
+            the Recipient can retrieve the verification hash with an HTTP
+            GET request. This URL <bcp14>MUST</bcp14> fall within a range
+            the Recipient has already associated with a specific Caller
+            identity, per <xref target="prereq"/>.
+          </dd>
+        </dl>
+        <t>
+          If either the <tt>Host</tt> or <tt>Verify</tt> property would
+          otherwise contain a non-ASCII internationalized domain name, that
+          name <bcp14>MUST</bcp14> be normalized and represented either as
+          literal UTF-8 or using JSON's <tt>\u</tt> escape notation, and
+          <bcp14>MUST NOT</bcp14> use the ToASCII ("<tt>xn--</tt>") form.
+        </t>
+        <t>For example, the following JSON object:</t>
+        <sourcecode type="json"><![CDATA[
+{
+    "Version": "BILLPG_DRAFT_4.2",
+    "Host": "server.example",
+    "Now": 529297200,
+    "Unus": "Rpgt4Fc5nMDq14LOps/hYQ==",
+    "Verify": "https://client.example/api/hashback?id=502542886"
+}
+]]></sourcecode>
+        <t>
+          is Base64-encoded and sent as the following
+          <tt>Authorization</tt> header field:
+        </t>
+        <sourcecode type="http-message"><![CDATA[
+Authorization: HashBack
+ eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMiIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v
+ dyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYzVuTURxMTRMT3BzL2hZUT09IiwiVmVyaWZ5Ijoi
+ aHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9hcGkvaGFzaGJhY2s/aWQ9NTAyNTQyODg2In0=
+]]></sourcecode>
+      </section>
+    </section>
+
+    <section anchor="hashing" numbered="true" toc="default">
+      <name>Verification Hash Calculation and Publication</name>
+      <t>
+        Both the Caller and the Recipient compute the verification hash the
+        same way, from the same bytes: the exact UTF-8 byte sequence that
+        was (or will be) Base64-decoded from the <tt>Authorization</tt>
+        header. The hash <bcp14>MUST</bcp14> be computed as follows:
+      </t>
+      <ol type="1">
+        <li>
+          Concatenate the 32-byte Fixed Salt below with the UTF-8 bytes of
+          the JSON object, salt first.
+        </li>
+        <li>Compute the SHA-256 digest of the concatenated bytes.</li>
+        <li>
+          Base64-encode the 32-byte digest, including any trailing
+          "<tt>=</tt>" padding.
+        </li>
+      </ol>
+      <t>The Fixed Salt is the following 32 bytes:</t>
+      <artwork name="" type="" align="left" alt=""><![CDATA[
+48,106,239,61,141,188,122,117,
+71,242,89,164,154,89,44,47,
+20,42,34,245,250,230,139,30,
+56,240,40,168,35,184,92,252
+]]></artwork>
+      <t>
+        equivalently, in Base64:
+        <tt>MGrvPY28enVH8lmkmlksLxQqIvX65oseOPAoqCO4XPw=</tt>, or in
+        hexadecimal:
+        <tt>306AEF3D8DBC7A7547F259A49A592C2F142A22F5FAE68B1E38F028A823B85CFC</tt>.
+      </t>
+      <t>
+        The Fixed Salt is <bcp14>NOT</bcp14> a secret. Its only purpose is
+        to ensure a HashBack verification hash cannot be confused with, or
+        produced by, an unrelated general-purpose hashing service, since
+        that service would not have prepended this same value. It was
+        generated using PBKDF2 with the following parameters, provided
+        here for transparency and reproducibility rather than as part of
+        the algorithm implementers need to run:
+      </t>
+      <dl newline="false" spacing="compact">
+        <dt>Password:</dt><dd>"HashBack is dedicated to my Treacle."</dd>
+        <dt>Salt:</dt><dd>"I love you to the moon and back."</dd>
+        <dt>Hash algorithm:</dt><dd>SHA-512</dd>
+        <dt>Iterations:</dt><dd>477708</dd>
+        <dt>Output:</dt><dd>256 bits</dd>
+      </dl>
+      <t>
+        The expected verification hash for the example request in
+        <xref target="json-props"/> is
+        <tt>/+Zc/xVCVgnnfC69tEybe2TAluOk21ScdystX0/1Ayk=</tt>.
+      </t>
+      <t>
+        Once computed, the Caller <bcp14>MUST</bcp14> publish the
+        verification hash at the Verify URL before, or without excessive
+        delay after, sending the authenticated request, so that it is
+        available by the time the Recipient fetches it. The response to a
+        GET request for the Verify URL <bcp14>MUST</bcp14>:
+      </t>
+      <ul spacing="normal">
+        <li>Use the <tt>200 OK</tt> status code;</li>
+        <li>present a valid TLS certificate for the Verify URL's host;</li>
+        <li>
+          not be a redirect of any kind - the Recipient
+          <bcp14>MUST NOT</bcp14> follow redirects when fetching this URL,
+          both because the Caller is expected to know the final URL when
+          building the request and to avoid exposing the Recipient to
+          server-side request forgery (SSRF) risk; and
+        </li>
+        <li>
+          return, as its entire body, a single line of text containing the
+          Base64-encoded verification hash in ASCII, with no end-of-line
+          sequence or a single CR, LF, or CRLF sequence following it.
+        </li>
+      </ul>
+      <t>
+        The Recipient compares the hash it downloads against the hash it
+        computes itself from the bytes it decoded from the
+        <tt>Authorization</tt> header. If the Recipient cannot retrieve a
+        matching hash - because of a network failure, an unexpected status
+        code, a certificate problem, or a mismatched value - it
+        <bcp14>MUST</bcp14> treat the request as unauthenticated and
+        respond with a suitable HTTP error, with enough detail in the
+        response to help a reasonably experienced developer correct the
+        problem.
+      </t>
+    </section>
+
+    <section anchor="checks" numbered="true" toc="default">
+      <name>Recipient Processing</name>
+      <t>
+        On receiving a request bearing a HashBack
+        <tt>Authorization</tt> header, the Recipient
+        <bcp14>MUST</bcp14> perform the following checks, in any order,
+        before treating the request as authenticated:
+      </t>
+      <ol type="1">
+        <li>
+          The request arrived over HTTPS, the <tt>Authorization</tt> header
+          uses the <tt>HashBack</tt> auth-scheme, and its token68 value
+          Base64-decodes to a well-formed JSON object with all the members
+          listed in <xref target="json-props"/>.
+        </li>
+        <li>
+          The <tt>Version</tt> property is one this Recipient implements.
+        </li>
+        <li>
+          The <tt>Host</tt> property is a name this Recipient recognizes as
+          itself (see <xref target="relay-attack"/>).
+        </li>
+        <li>
+          The <tt>Now</tt> property is within the Recipient's configured
+          tolerance of its own clock.
+        </li>
+        <li>
+          The <tt>Unus</tt> property is well-formed and, if replay
+          protection is configured, has not already been seen.
+        </li>
+        <li>
+          The <tt>Verify</tt> property is an HTTPS URL the Recipient can
+          map to a specific, known Caller identity, per
+          <xref target="prereq"/>.
+        </li>
+        <li>
+          The verification hash retrieved from the <tt>Verify</tt> URL
+          matches the hash the Recipient computes itself, per
+          <xref target="hashing"/>.
+        </li>
+      </ol>
+      <t>
+        If every check passes, the Recipient treats the request as
+        authenticated as the Caller identity associated with the
+        <tt>Verify</tt> URL, and proceeds to process the request that
+        carried the header. If any check fails, the Recipient
+        <bcp14>MUST NOT</bcp14> process the request and
+        <bcp14>SHOULD</bcp14> respond with an HTTP <tt>4xx</tt> status
+        code.
+      </t>
+    </section>
+
+    <section anchor="www-authenticate" numbered="true" toc="default">
+      <name>Advertising Support via WWW-Authenticate</name>
+      <t>
+        A Recipient rejecting an unauthenticated request with a
+        <tt>401</tt> response <bcp14>MAY</bcp14> advertise support for this
+        exchange using a <tt>WWW-Authenticate</tt> response header field
+        <xref target="RFC9110" section="11.6.1"/> whose auth-scheme is
+        <tt>HashBack</tt>. An optional <tt>realm</tt> auth-param
+        <bcp14>MAY</bcp14> be present. An optional <tt>version</tt>
+        auth-param, if present, <bcp14>MUST</bcp14> be a comma-separated
+        list of <tt>Version</tt> values this Recipient accepts, most
+        preferred first; a Caller <bcp14>SHOULD</bcp14> select a value from
+        this list when building its next request. Absence of the
+        <tt>version</tt> parameter does not imply that HashBack is
+        unsupported.
+      </t>
+      <sourcecode type="http-message"><![CDATA[
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
+ version="RFC1234,BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1"
+]]></sourcecode>
+      <t>
+        A Caller that already knows a Recipient supports HashBack
+        <bcp14>MAY</bcp14> send the <tt>Authorization</tt> header on its
+        first request, skipping this discovery step.
+      </t>
+    </section>
+
+    <section anchor="repeated-requests" numbered="true" toc="default">
+      <name>Repeated Requests</name>
+      <t>
+        Every HashBack exchange requires a fresh JSON object, a freshly
+        published verification hash, and therefore a second HTTPS round
+        trip on the Recipient's side. This is inherently more expensive
+        than reusing a bearer token, and this document intentionally does
+        not define a token format or refresh mechanism to sit on top of it.
+      </t>
+      <t>
+        Implementations that need to authenticate many requests in
+        succession are <bcp14>RECOMMENDED</bcp14> to run one HashBack
+        exchange and then have the Recipient issue its own short-lived
+        credential - for example, a bearer token or a <tt>Set-Cookie</tt>
+        response header - that the Caller then presents for subsequent
+        requests until it expires, at which point the HashBack exchange is
+        repeated. The format, lifetime, and transport of that credential is
+        outside the scope of this document.
+      </t>
+    </section>
+
+    <section anchor="security" numbered="true" toc="default">
+      <name>Security Considerations</name>
+
+      <section anchor="tls-dependency" numbered="true" toc="default">
+        <name>Dependency on TLS</name>
+        <t>
+          This exchange depends entirely on the security properties of TLS
+          for both HTTP transactions. It provides no security of its own
+          against an attacker capable of defeating TLS - such as one
+          holding a certificate improperly issued by a trusted certificate
+          authority - beyond whatever precautions an implementation
+          separately takes, such as maintaining its own restricted set of
+          trusted certificate authorities or pinning certificates for known
+          Callers.
+        </t>
+      </section>
+
+      <section anchor="relay-attack" numbered="true" toc="default">
+        <name>Relay ("Pass-Along") Attacks</name>
+        <t>
+          Without the <tt>Host</tt> property, a Recipient that is itself
+          malicious, or that has been compromised, could take a valid
+          request received from a genuine Caller and forward it unmodified
+          to a third Recipient, which would retrieve the same verification
+          hash and be fooled into believing it was talking directly to the
+          original Caller. Because <tt>Host</tt> is included in the hashed
+          material, a forwarded request would carry the wrong
+          <tt>Host</tt> value for the third Recipient, and
+          <xref target="checks"/> requires that value be rejected. For this
+          reason, a Recipient <bcp14>MUST</bcp14> reject any request whose
+          <tt>Host</tt> property is not a name it recognizes as its own,
+          including generic names such as "<tt>localhost</tt>" that could
+          belong to any server.
+        </t>
+      </section>
+
+      <section anchor="predictability" numbered="true" toc="default">
+        <name>Predictability of Request Contents</name>
+        <t>
+          With the exception of <tt>Unus</tt>, every property of the JSON
+          object described in <xref target="json-props"/> may be entirely
+          predictable to an attacker without weakening this exchange. An
+          attacker who can predict or observe a Verify URL and its
+          published hash still cannot construct a valid request for a
+          different Recipient, because doing so requires finding a JSON
+          object - including a <tt>Unus</tt> value - that hashes to that
+          same value, which is computationally infeasible against SHA-256.
+          Implementations therefore <bcp14>MUST</bcp14> generate
+          <tt>Unus</tt> using a cryptographically secure random number
+          generator, and <bcp14>MUST NOT</bcp14> reuse a value.
+        </t>
+      </section>
+
+      <section anchor="why-hash" numbered="true" toc="default">
+        <name>Rationale for Publishing a Hash Rather Than a Token</name>
+        <t>
+          An earlier design considered simply publishing a random value and
+          including that same value directly in the request, without
+          hashing. This does not work: it recreates the relay attack
+          described in <xref target="relay-attack"/> without the
+          <tt>Host</tt> binding being sufficient to stop it, since a
+          malicious intermediate Recipient could republish an unmodified
+          copy of the random value itself. Requiring the published value to
+          be a hash of the entire request - including the intended
+          Recipient's <tt>Host</tt> - ties the published proof to one
+          specific request. Changing or reusing any part of that request
+          changes the expected hash, and the forwarded copy will not
+          satisfy an unrelated Recipient's own check.
+        </t>
+      </section>
+
+      <section anchor="ssrf" numbered="true" toc="default">
+        <name>Server-Side Request Forgery Considerations</name>
+        <t>
+          Fetching a URL supplied in an incoming request carries the usual
+          SSRF risks associated with any user-supplied URL fetch.
+          Implementations <bcp14>SHOULD</bcp14> apply the same precautions
+          they would to any other outbound fetch of caller-supplied data:
+          resolving and validating the destination address before
+          connecting, rejecting internal or loopback address ranges unless
+          explicitly intended (for example, during local development),
+          declining to follow redirects (see <xref target="hashing"/>), and
+          applying a request timeout.
+        </t>
+      </section>
+
+      <section anchor="dos" numbered="true" toc="default">
+        <name>Denial of Service Considerations</name>
+        <t>
+          Because every incoming request with a HashBack header causes the
+          Recipient to make a further outbound HTTPS request, a flood of
+          fabricated <tt>Authorization</tt> headers could be used to
+          exhaust a Recipient's outbound connection capacity, even though
+          every one of those requests will ultimately fail verification.
+          Implementations <bcp14>SHOULD</bcp14> apply a short connection
+          and response timeout to the Verify URL fetch, and
+          <bcp14>MAY</bcp14> track and rate-limit sources of requests that
+          repeatedly fail verification.
+        </t>
+        <t>
+          A related concern is a malicious Verify URL that accepts the
+          connection but never completes the response, tying up a
+          connection on the Recipient for as long as it is willing to wait.
+          A short, strictly enforced timeout on the Verify URL fetch
+          mitigates this; the timeout only needs to be long enough for the
+          expected response to arrive under normal network conditions.
+        </t>
+      </section>
+    </section>
+
+    <section anchor="iana" numbered="true" toc="default">
+      <name>IANA Considerations</name>
+      <t>
+        This document requests registration of "HashBack" in the
+        "Hypertext Transfer Protocol (HTTP) Authentication Scheme
+        Registry" defined by <xref target="RFC9110" section="16.4"/>:
+      </t>
+      <table anchor="table-iana-authscheme">
+        <name>HTTP Authentication Scheme Registration</name>
+        <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Authentication Scheme Name</td><td>HashBack</td></tr>
+          <tr><td>Pointer to specification text</td><td>This document</td></tr>
+          <tr><td>Notes</td><td>(none)</td></tr>
+        </tbody>
+      </table>
+      <t>
+        This document defines no new media types, URI schemes, or other
+        IANA registries at this time.
+      </t>
+    </section>
+
+    <section anchor="acknowledgements" numbered="true" toc="default">
+      <name>Acknowledgements</name>
+      <t>
+        The author thanks Danny Wilson for feedback and for developing an
+        independent implementation of this exchange; multiple independent
+        implementations are valuable when establishing a new standard.
+        The author also thanks Ollie Hayman for bringing ACME to his
+        attention, and "buzer" of Hacker News for raising the
+        slow-verification-URL denial-of-service concern discussed in
+        <xref target="dos"/>.
+      </t>
+    </section>
+
+  </middle>
+
+  <back>
+    <references>
+      <name>Normative References</name>
+      <reference anchor="RFC2119" target="https://www.rfc-editor.org/info/rfc2119">
+        <front>
+          <title>Key words for use in RFCs to Indicate Requirement Levels</title>
+          <author initials="S." surname="Bradner" fullname="S. Bradner"/>
+          <date year="1997" month="March"/>
+        </front>
+        <seriesInfo name="BCP" value="14"/>
+        <seriesInfo name="RFC" value="2119"/>
+      </reference>
+      <reference anchor="RFC8174" target="https://www.rfc-editor.org/info/rfc8174">
+        <front>
+          <title>Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words</title>
+          <author initials="B." surname="Leiba" fullname="B. Leiba"/>
+          <date year="2017" month="May"/>
+        </front>
+        <seriesInfo name="BCP" value="14"/>
+        <seriesInfo name="RFC" value="8174"/>
+      </reference>
+      <reference anchor="RFC8259" target="https://www.rfc-editor.org/info/rfc8259">
+        <front>
+          <title>The JavaScript Object Notation (JSON) Data Interchange Format</title>
+          <author initials="T." surname="Bray" fullname="T. Bray" role="editor"/>
+          <date year="2017" month="December"/>
+        </front>
+        <seriesInfo name="STD" value="90"/>
+        <seriesInfo name="RFC" value="8259"/>
+      </reference>
+      <reference anchor="RFC9110" target="https://www.rfc-editor.org/info/rfc9110">
+        <front>
+          <title>HTTP Semantics</title>
+          <author initials="R." surname="Fielding" fullname="R. Fielding" role="editor"/>
+          <author initials="M." surname="Nottingham" fullname="M. Nottingham" role="editor"/>
+          <author initials="J." surname="Reschke" fullname="J. Reschke" role="editor"/>
+          <date year="2022" month="June"/>
+        </front>
+        <seriesInfo name="STD" value="97"/>
+        <seriesInfo name="RFC" value="9110"/>
+      </reference>
+      <reference anchor="RFC4648" target="https://www.rfc-editor.org/info/rfc4648">
+        <front>
+          <title>The Base16, Base32, and Base64 Data Encodings</title>
+          <author initials="S." surname="Josefsson" fullname="S. Josefsson"/>
+          <date year="2006" month="October"/>
+        </front>
+        <seriesInfo name="RFC" value="4648"/>
+      </reference>
+      <reference anchor="RFC6234" target="https://www.rfc-editor.org/info/rfc6234">
+        <front>
+          <title>US Secure Hash Algorithms (SHA and SHA-based HMAC and HKDF)</title>
+          <author initials="D." surname="Eastlake 3rd" fullname="D. Eastlake 3rd"/>
+          <author initials="T." surname="Hansen" fullname="T. Hansen"/>
+          <date year="2011" month="May"/>
+        </front>
+        <seriesInfo name="RFC" value="6234"/>
+      </reference>
+    </references>
+
+    <references>
+      <name>Informative References</name>
+      <reference anchor="RFC8555" target="https://www.rfc-editor.org/info/rfc8555">
+        <front>
+          <title>Automatic Certificate Management Environment (ACME)</title>
+          <author initials="R." surname="Barnes" fullname="R. Barnes"/>
+          <author initials="J." surname="Hoffman-Andrews" fullname="J. Hoffman-Andrews"/>
+          <author initials="D." surname="McCarney" fullname="D. McCarney"/>
+          <author initials="J." surname="Kasten" fullname="J. Kasten"/>
+          <date year="2019" month="March"/>
+        </front>
+        <seriesInfo name="RFC" value="8555"/>
+      </reference>
+    </references>
+
+    <section anchor="reference-impl" numbered="true" toc="default">
+      <name>Reference Implementation</name>
+      <t>
+        A reference implementation in C# ("HashBackCore"), along with a
+        publicly reachable demo service exercising both the Caller and
+        Recipient roles, is maintained alongside the source of this
+        document at
+        <eref target="https://github.com/billpg/HashBack"/>. Interested
+        implementers are encouraged to test their own implementations
+        against it and to report interoperability issues there.
+      </t>
+    </section>
+
+  </back>
+</rfc>
