@@ -40,6 +40,11 @@
     <PackageReference Include="billpg.WWWAuthenticateTools" Version="0.1.0" />
   </ItemGroup>
 
+  <!-- Outbound HTTP fetches, with DNS-resolution/SSRF-filtering hooks -->
+  <ItemGroup>
+    <PackageReference Include="billpg.SpartanHttpClient" Version="0.1.0" />
+  </ItemGroup>
+
   <!-- EF Core with the PostgreSQL provider for the hash store -->
   <ItemGroup>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
@@ -50,6 +55,5 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\billpg.HashBackCore\billpg.HashBackCore.csproj" />
-    <ProjectReference Include="..\SpartanHttpClient\billpg.SpartanHttpClient\billpg.SpartanHttpClient.csproj" />
   </ItemGroup>
 </Project>
