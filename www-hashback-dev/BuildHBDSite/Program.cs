@@ -77,7 +77,7 @@ var buttons = new Dictionary<string, string>
 
 void SaveHtml(XDocument doc, string filename)
 {
-    string html = "<!doctype html>\r\n" + doc.ToString();
+    string html = "<!doctype html>\n" + doc.ToString();
     html = html.Replace(((char)160).ToString(), "&nbsp;");
     File.WriteAllBytes(Path.Combine(siteFolder, filename), Encoding.UTF8.GetBytes(html));
 }
@@ -246,11 +246,22 @@ void SaveHtml(XDocument doc, string filename)
         "Experience HashBack authentication in action. Use our demo with your own code to see how the" +
         " exchange works. We'll even host your verification hashes while you're testing.");
 
+    var permit = html.AddSection("panel");
+    permit.AddHtml("<h2>Give Me Permission First!</h2>");
+    permit.AddHtml(
+        "<div class=\"feature-item\">" +
+        codeLink("permit") +
+        " This page shows you how to grant permission to this demo service to access your" +
+        " website. Publish a small JSON file in your <code>.well-known</code> folder " +
+        " and we'll read it before we start sending masses of GET requests to your server." +
+        "</div>");
+    permit.AddHashbert("Even a hedgehog knocks before wandering into someone's garden. Publish your permission file, and so will we.");
+
     var hello = html.AddSection("panel");
     hello.AddHtml("<h2>Test Your Client Code</h2>");
     hello.AddHtml(
         "<div class=\"feature-item\">" +
-        "<strong><code>https://demo.hashback.dev/hello/</code></strong>" +
+        codeLink("hello") +
         " Send a GET request to this URL and it'll respond with a cheery \"Hello\" message," +
         " but only if a valid HashBack authentication header is included in the request." +
         " (If you don't, it'll return full documentation for this service including some" +
@@ -264,7 +275,7 @@ void SaveHtml(XDocument doc, string filename)
     call.AddHtml("<h2>Test Your Service Code</h2>");
     call.AddHtml(
         "<div class=\"feature-item\">" +
-        "<strong><code>https://demo.hashback.dev/call/</code></strong>" +
+        codeLink("call") +
         " Send a POST request, including the URL of <i>your</i> service in the request body," +
         " and this demo service will make properly-formed HashBack authenticated GET request" +
         " to that URL. Once completed, the demo service will return a full log of the request" +
@@ -277,7 +288,7 @@ void SaveHtml(XDocument doc, string filename)
     hash.AddHtml("<h2>We'll host your hashes!</h2>");
     hash.AddHtml(
         "<div class=\"feature-item\">" +
-        "<strong><code>https://demo.hashback.dev/hash/</code></strong>" +
+        codeLink("hash") +
         " If you're developing your own HashBack client but you don't have a web server ready to" +
         " host your verification hashes yet, we've got your back. You can upload your hash text" +
         " on the demo server, ready for anyone to request it. For a minute or so. And it'll be " +
@@ -294,6 +305,10 @@ void SaveHtml(XDocument doc, string filename)
     goToDemoButton.SetValue("Demo.HashBack.dev");
     html.AddSection("panel").AddButtons(buttons,  "demo.html", "help.html", "Next: Can you help?");
     SaveHtml(html, "demo.html");
+
+    string codeLink(string page)
+        => $"<div><strong><code><a href=\"https://demo.hashback.dev/{page}/\">https://demo.hashback.dev/{page}/</a></code></strong></div>";
+
 }
 
 // Help
@@ -355,6 +370,10 @@ void SaveHtml(XDocument doc, string filename)
     money.AddHtml("<h2>Sponsor me! 💰💲🤑💲💰</h2>");
     money.AddHtml("<p>Would you like to support ongoing development?</p>" +
         "<p>The exact mechanism is still to be discussed — but if you're interested, please let me know.</p>");
+    money.AddHtml("<p>Another good way to support this project is to employ me! I'm an experienced software "+
+        "engineer with experience in robust designs, distributed systems, cloud systems and resilience when"+ 
+        " the world reminds you that <b>Failure is Always an Option!™</b>.</p>");
+    money.AddHtml("<p><b><a href=\"https://cv.billpg.com/\">CV.BILLPG.COM</a></b></p>");
     money.AddHashbert("If you help HashBack, you help me. And I am adorable.");
 
     html.AddSection("panel").AddButtons(buttons, "help.html", "https://github.com/billpg/HashBack/", 
