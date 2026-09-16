@@ -13,3 +13,7 @@ TestResults/
 # NuGet packages
 *.nupkg
 packages/
+
+# Python
+__pycache__
+
