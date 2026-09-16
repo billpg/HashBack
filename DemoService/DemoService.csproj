@@ -21,6 +21,7 @@
     <EmbeddedResource Include="Docs\GetCallRoot.md" />
     <EmbeddedResource Include="Docs\GetHashRoot.md" />
     <EmbeddedResource Include="Docs\GetHelloRoot.md" />
+    <EmbeddedResource Include="Docs\GetPermit.md" />
   </ItemGroup>
 
   <!-- ASP.NET Core shared framework -->
