@@ -12,6 +12,14 @@
     <None Remove="Docs\GetCallRoot.md" />
   </ItemGroup>
 
+  <!-- Plain Microsoft.NET.Sdk (not Sdk.Web) doesn't copy appsettings.json to the output
+       directory on its own, so that has to be declared explicitly. -->
+  <ItemGroup>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <ItemGroup>
     <EmbeddedResource Include="..\www-hashback-dev\BuildHBDSite\SiteTemplate.xml" Link="Docs\SiteTemplate.xml" />
   </ItemGroup>
