@@ -11,11 +11,22 @@ namespace billpg.HashBackCore;
 /// </summary>
 public class HashBackPolicy
 {
+    /// <summary>Checks whether the given Host value is acceptable. See <see cref="OnHostValidate"/>.</summary>
     public delegate Task<bool> HostValidateDelegate(string host);
+
+    /// <summary>Checks whether the given Now value (Unix seconds) is acceptable. See <see cref="OnNowValidate"/>.</summary>
     public delegate Task<bool> NowValidateDelegate(long now);
+
+    /// <summary>Checks whether the given Unus value is acceptable. See <see cref="OnUnusValidate"/>.</summary>
     public delegate Task<bool> UnusValidateDelegate(string unus);
+
+    /// <summary>Maps a Verify URL to the identity of the user who controls it, or null if unrecognized. See <see cref="OnIdentifyUser"/>.</summary>
     public delegate Task<string?> IdentifyUserDelegate(Uri verify);
+
+    /// <summary>Downloads the verification hash text published at a Verify URL. See <see cref="OnGetVerificationHash"/>.</summary>
     public delegate Task<string> GetVerificationHashDelegate(Uri verify);
+
+    /// <summary>Receives a diagnostic log line. See <see cref="OnLogWrite"/>.</summary>
     public delegate void LogWriteDelegate(string logText);
 
     /// <summary>Checks the request's Host property is one this server recognizes as itself.</summary>
@@ -49,18 +60,23 @@ public class HashBackPolicy
     public LogWriteDelegate OnLogWrite { get; set; }
         = Helpers.DefaultLogWrite;
 
+    /// <summary>Sets <see cref="OnHostValidate"/> from a simpler, non-async function.</summary>
     public void SetSyncHostValidate(Func<string, bool> fn)
         => OnHostValidate = host => Task.FromResult(fn(host));
 
+    /// <summary>Sets <see cref="OnNowValidate"/> from a simpler, non-async function.</summary>
     public void SetSyncNowValidate(Func<long, bool> fn)
         => OnNowValidate = now => Task.FromResult(fn(now));
 
+    /// <summary>Sets <see cref="OnUnusValidate"/> from a simpler, non-async function.</summary>
     public void SetSyncUnusValidate(Func<string, bool> fn)
         => OnUnusValidate = unus => Task.FromResult(fn(unus));
 
+    /// <summary>Sets <see cref="OnIdentifyUser"/> from a simpler, non-async function.</summary>
     public void SetSyncIdentifyUser(Func<Uri, string?> fn)
         => OnIdentifyUser = verify => Task.FromResult(fn(verify));
 
+    /// <summary>Sets <see cref="OnGetVerificationHash"/> from a simpler, non-async function.</summary>
     public void SetSyncGetVerificationHash(Func<Uri, string> fn)
         => OnGetVerificationHash = verify => Task.FromResult(fn(verify));
 }

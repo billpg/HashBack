@@ -14,11 +14,22 @@ namespace billpg.HashBackCore;
 /// </summary>
 public class HashBackRequest
 {
+    /// <summary>The HashBack draft version string this request was built or parsed as, e.g. "BILLPG_DRAFT_4.2".</summary>
     public string Version { get; }
+
+    /// <summary>The claimed identity - the host name the requester says they are.</summary>
     public string Host { get; }
+
+    /// <summary>The claim's timestamp, as Unix seconds.</summary>
     public long Now { get; }
+
+    /// <summary>A fresh, random, base-64 value unique to this request, preventing replay of a captured verification hash.</summary>
     public string Unus { get; }
+
+    /// <summary>The URL where this request's verification hash is (or will be) published.</summary>
     public Uri Verify { get; }
+
+    /// <summary>The raw UTF-8 bytes of the JSON claim, exactly as sent or received - what actually gets hashed and signed, as opposed to a re-serialized copy.</summary>
     public IReadOnlyList<byte> JsonAsBytes { get; }
 
     /// <summary>The BASE-64 encoded JSON block, ready for use in an "Authorization: HashBack" header.</summary>
@@ -31,7 +42,7 @@ public class HashBackRequest
 
     /// <summary>The Now property, converted to a UTC DateTime.</summary>
     public DateTime NowAsDateTime
-        => DateTime.UnixEpoch.AddSeconds(Now);
+        => Helpers.UnixEpoch.AddSeconds(Now);
 
     private HashBackRequest(string version, string host, long now, string unus, Uri verify, byte[] jsonAsBytes)
     {
@@ -67,8 +78,9 @@ public class HashBackRequest
             /* Successfully decoded base-64. Convert to string. */
             json = Encoding.UTF8.GetString(jsonAsBytes);
         }
-        /* Could this be an unencoded JSON string instead? */
-        else if (authHeader.StartsWith('{') && authHeader.EndsWith('}'))
+        /* Could this be an unencoded JSON string instead? (The char-argument overloads of
+         * StartsWith/EndsWith aren't available on netstandard2.0, hence the indexing.) */
+        else if (authHeader.Length > 0 && authHeader[0] == '{' && authHeader[authHeader.Length - 1] == '}')
         {
             /* Use it directly. The JSON-Validate farther down will reject if not.
              * (We will still need bytes for hashing later so save those.) */
@@ -213,9 +225,11 @@ public class HashBackRequest
     public static HashBackRequest Create(string host, DateTime now, Uri verify)
         => Create(host, now, Helpers.GenerateUnus(), verify);
 
+    /// <summary>Builds a new request for the supplied time and Unus value, useful for testing.</summary>
     public static HashBackRequest Create(string host, DateTime now, string unus, Uri verify)
         => Create(host, now.ToUnixTimeSeconds(), unus, verify);
 
+    /// <summary>Builds a new request for the supplied Unix-seconds time and Unus value, useful for testing.</summary>
     public static HashBackRequest Create(string host, long now, string unus, Uri verify)
         => Create(Helpers.VersionString42, host, now, unus, verify);
 
