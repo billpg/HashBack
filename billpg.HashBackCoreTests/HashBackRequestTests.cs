@@ -5,7 +5,7 @@ using System;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace HashBackCoreTests
+namespace billpg.HashBackCoreTests
 {
     [TestClass]
     public class HashBackRequestTests

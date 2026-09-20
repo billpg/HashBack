@@ -1,6 +1,6 @@
 ﻿# HashBackCore
 
-**HashBackCore** is a C# reference implementation of the HashBack authentication protocol, public draft version 4.1. It provides core logic for building and parsing HashBack Authorization headers and verifying those payloads - without handling HTTP requests directly. The only dependencies are dot-net itself and NewtonSoft's JSON library.
+**HashBackCore** is a C# reference implementation of the HashBack authentication protocol, supporting public draft versions 4.1 and 4.2 (4.2 is the current default). It provides core logic for building and parsing HashBack Authorization headers and verifying those payloads - without handling HTTP requests directly. It targets netstandard2.0, so it works from .NET Framework 4.6.2 upward as well as modern .NET; its only dependency is `System.Text.Json`.
 
 HashBackCore is designed to be lightweight, testable and protocol-faithful. It supports both client-side and server-side operations, making it suitable for a variety of applications. The library is focused on the essential tasks of header construction and parsing. To make it flexible and unit-testable, almost all of the external interfaces are in the form of `Func` and `Action` delegates. If you don't like `DateTime.UtcNow`, you can use your own.
 
@@ -17,14 +17,9 @@ HashBackCore is designed to be lightweight, testable and protocol-faithful. It s
 - 🧪 **Unit Tested** - Comprehensive unit tests to ensure reliability and correctness.
 
 ## 📦 Installation
-HashBackCore is not yet published to NuGet. To use it in your project, clone the repository and include the project in your solution.
 ```bash
-git clone https://github.com/billpg/HashBack
-cd HashBack/HashBackCore
+dotnet add package billpg.HashBackCore
 ```
-Then, add a reference to HashBackCore in your project file (.csproj):
-
-> 🦔 "If you're wondering why it's not on NuGet yet, it's because trust can't be packaged. Also, Bill hasn't signed up yet. Stupid owl."
 
 ## 📚 Quick Start
 ### Client-Side Example
@@ -133,6 +128,6 @@ If authentication is rejected for whatever reason, the function will throw an `A
 
 ## In closing...
 
-> 🦔 "We hope you find this useful. If you have feedback, please raise a ticket on out github."
+> 🦔 "We hope you find this useful. If you have feedback, please raise a ticket on our github."
 
 ## 🦉 [billpg.com](https://billpg.com) 

@@ -1,0 +1,46 @@
+name: Publish billpg.HashBackCore to NuGet
+
+# Triggered by publishing a GitHub Release, not by pushing a tag directly --
+# the version to publish is the <Version> already set in
+# billpg.HashBackCore.csproj, so bump that (in a PR) before cutting the
+# release. dotnet nuget push --skip-duplicate makes this safe to re-run.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write # required for NuGet trusted publishing (OIDC)
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore billpg.HashBackCore/billpg.HashBackCore.sln
+
+      - name: Build
+        run: dotnet build billpg.HashBackCore/billpg.HashBackCore.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test billpg.HashBackCore/billpg.HashBackCore.sln --configuration Release --no-build
+
+      - name: Pack
+        run: dotnet pack billpg.HashBackCore/billpg.HashBackCore.csproj --configuration Release --no-build --output artifacts
+
+      - name: NuGet login (OIDC -> temporary API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: billpg # nuget.org profile name -- update if yours differs
+
+      - name: Push to NuGet.org
+        run: dotnet nuget push artifacts/*.nupkg --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate

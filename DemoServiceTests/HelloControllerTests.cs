@@ -274,7 +274,7 @@ public sealed class HelloControllerTests
     public async Task Get_WrongHost_ThrowsWithWrongHostReason()
     {
         // Proves HelloController's actual RequireHost(data.ConfigServiceHost) wiring,
-        // as opposed to HashBackCoreTests' coverage of host-checking in the abstract.
+        // as opposed to billpg.HashBackCoreTests' coverage of host-checking in the abstract.
         var serviceData = GetServiceData();
         var hashBackRequest = HashBackRequest.Create(
             "not-" + serviceData.ConfigServiceHost, new Uri("https://client.example/verify"));
