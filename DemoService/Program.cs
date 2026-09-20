@@ -32,12 +32,10 @@ builder.Services.AddSingleton<ServiceData>();
 // Register IP filter.
 builder.Services.AddSingleton<IIpFilter, IpFilter>();
 
-// The real engine behind every SpartanRequest this service builds directly (currently
-// just CallPermissionChecker's own well-known fetch). Tests substitute a fake
-// ISpartanEngine instead of talking real HTTP.
-builder.Services.AddSingleton<ISpartanEngine, SpartanEngine>();
-
-// Singleton so its in-memory permission cache actually persists across requests.
+// Singleton so its in-memory permission cache actually persists across requests. Its
+// Func<Uri, SpartanRequest> constructor parameter defaults to real HTTP (see
+// CallPermissionChecker's constructor); tests substitute one that calls WithRunner
+// instead.
 builder.Services.AddSingleton<ICallPermissionChecker, CallPermissionChecker>();
 
 // The /hash store, backed by PostgreSQL. The connection string (including its password)

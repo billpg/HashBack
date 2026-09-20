@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DemoService.Data;
 
@@ -30,6 +32,7 @@ public class HashStore : IHashStore
 {
     private readonly HashDbContext db;
     private readonly Func<DateTime> utcNow;
+    private readonly ILogger<HashStore> logger;
 
     /// <summary>How long a hash stays retrievable via GET after being stored.</summary>
     public static readonly TimeSpan RetrievalWindow = TimeSpan.FromHours(1);
@@ -46,14 +49,17 @@ public class HashStore : IHashStore
     /// </summary>
     public static readonly TimeSpan ReuseBlockWindow = TimeSpan.FromDays(1);
 
-    public HashStore(HashDbContext db, Func<DateTime>? utcNow = null)
+    public HashStore(HashDbContext db, Func<DateTime>? utcNow = null, ILogger<HashStore>? logger = null)
     {
         this.db = db;
         this.utcNow = utcNow ?? (() => DateTime.UtcNow);
+        this.logger = logger ?? NullLogger<HashStore>.Instance;
     }
 
     public async Task<bool> TryAddHashAsync(Guid id, byte[] hash, IPAddress addedBy)
     {
+        logger.LogInformation("Database: storing hash {Id} (added by {AddedBy}).", id, addedBy);
+
         /* Don't allow any reuse of IDs if the record is still on the DB. */
         var existing = await db.StoredHashes.FirstOrDefaultAsync(h => h.Id == id);
         if (existing != null)
@@ -67,7 +73,7 @@ public class HashStore : IHashStore
             AddedAt = utcNow(),
             AddedBy = addedBy,
             GetCount = 0
-        });        
+        });
         try
         {
             await db.SaveChangesAsync();
@@ -83,6 +89,8 @@ public class HashStore : IHashStore
 
     public async Task<StoredHashRecord?> TryGetHashAsync(Guid id, IPAddress gotBy, string requestHeaders)
     {
+        logger.LogInformation("Database: retrieving hash {Id} (requested by {GotBy}).", id, gotBy);
+
         /* Atomically claim a GET, in a single statement, so two concurrent requests can't
          * both slip through when only one slot is left under MaxGetCount. This is where the
          * decision to allow the GET or not is made. Return NULL to indicate refusal. */
@@ -109,9 +117,12 @@ public class HashStore : IHashStore
     }
 
     public async Task<IReadOnlyList<HashGetEventRecord>> ListGetHashEventsAsync(Guid id)
-        => await db.HashGetEvents
+    {
+        logger.LogInformation("Database: listing GET events for hash {Id}.", id);
+        return await db.HashGetEvents
             .AsNoTracking()
             .Where(e => e.HashId == id)
             .OrderBy(e => e.GotAt)
             .ToListAsync();
+    }
 }

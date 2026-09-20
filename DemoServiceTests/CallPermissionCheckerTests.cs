@@ -18,17 +18,19 @@ public sealed class CallPermissionCheckerTests
     private static ServiceData GetServiceData()
         => new ServiceData { ConfigServiceHost = $"{Guid.NewGuid()}.example" };
 
-    /// <summary>A fake ISpartanEngine that counts calls and can be told to throw or return
-    /// a canned response, for testing CallPermissionChecker's fetch/cache/failure handling
-    /// without any real network access.</summary>
-    private sealed class CountingSpartanEngine : ISpartanEngine
+    /// <summary>A fake Func&lt;Uri, SpartanRequest&gt; source that counts calls and can be
+    /// told to throw or return a canned response, for testing CallPermissionChecker's
+    /// fetch/cache/failure handling without any real network access. Uses
+    /// billpg.SpartanHttpClient's own recommended testing seam: WithRunner on the request
+    /// it builds, rather than a fake engine object.</summary>
+    private sealed class CountingRequestFactory
     {
         public int CallCount { get; private set; }
         public Uri? LastUrl { get; private set; }
         public SpartanResponse? Response { get; set; }
         public Exception? ThrowOnGet { get; set; }
 
-        public SpartanRequest Request(Uri url)
+        public SpartanRequest NewRequest(Uri url)
             => new SpartanRequest(url).WithRunner((request, cancellationToken) =>
             {
                 CallCount++;
@@ -60,8 +62,8 @@ public sealed class CallPermissionCheckerTests
     }
 
     private static CallPermissionChecker BuildChecker(
-        ServiceData serviceData, ISpartanEngine engine, IOutboundGetLog? outboundGetLog = null, Func<DateTime>? utcNow = null)
-        => new(serviceData, engine, BuildScopeFactory(outboundGetLog), utcNow);
+        ServiceData serviceData, Func<Uri, SpartanRequest> newRequest, IOutboundGetLog? outboundGetLog = null, Func<DateTime>? utcNow = null)
+        => new(serviceData, BuildScopeFactory(outboundGetLog), newRequest, utcNow);
 
     /// <summary>Builds a checker with a grant pre-seeded directly into its cache - bypassing
     /// any fetch entirely - for tests that only care about the cached-decision logic, not
@@ -71,7 +73,7 @@ public sealed class CallPermissionCheckerTests
         string populateForTarget, bool grantPermission = true, Action<PermitGrant>? configureGrant = null, IOutboundGetLog? outboundGetLog = null)
     {
         var serviceData = GetServiceData();
-        var checker = BuildChecker(serviceData, new CountingSpartanEngine(), outboundGetLog);
+        var checker = BuildChecker(serviceData, new CountingRequestFactory().NewRequest, outboundGetLog);
         var grant = new PermitGrant { GetPermissionGrantedTo = serviceData.ConfigServiceHost };
         configureGrant?.Invoke(grant);
         checker.PopulateGrantCache(populateForTarget, grantPermission ? grant : null);
@@ -95,8 +97,8 @@ public sealed class CallPermissionCheckerTests
     [TestMethod]
     public async Task IsCallPermitted_NoFileAt404_ReturnsFalse()
     {
-        var engine = new CountingSpartanEngine { Response = new SpartanResponse().WithStatusCode(404) };
-        var checker = BuildChecker(GetServiceData(), engine);
+        var engine = new CountingRequestFactory { Response = new SpartanResponse().WithStatusCode(404) };
+        var checker = BuildChecker(GetServiceData(), engine.NewRequest);
 
         Assert.IsFalse(await checker.IsCallPermittedAsync(new Uri("https://swede.example/xyz"), DefaultCallerIp));
     }
@@ -104,11 +106,11 @@ public sealed class CallPermissionCheckerTests
     [TestMethod]
     public async Task IsCallPermitted_MalformedJson_ReturnsFalse()
     {
-        var engine = new CountingSpartanEngine
+        var engine = new CountingRequestFactory
         {
             Response = new SpartanResponse().WithStatusCode(200).WithBody("this is not JSON")
         };
-        var checker = BuildChecker(GetServiceData(), engine);
+        var checker = BuildChecker(GetServiceData(), engine.NewRequest);
 
         Assert.IsFalse(await checker.IsCallPermittedAsync(new Uri("https://rutabaga.example/xyz"), DefaultCallerIp));
     }
@@ -118,12 +120,12 @@ public sealed class CallPermissionCheckerTests
     {
         /* A grant that parses fine but names some other host as the grantee - proves the
          * GetPermissionGrantedTo check applies on a fresh fetch, not just a cached one. */
-        var engine = new CountingSpartanEngine
+        var engine = new CountingRequestFactory
         {
             Response = new SpartanResponse().WithStatusCode(200)
                 .WithBody("{\"GetPermissionGrantedTo\": \"someone-else.example\"}")
         };
-        var checker = BuildChecker(GetServiceData(), engine);
+        var checker = BuildChecker(GetServiceData(), engine.NewRequest);
 
         Assert.IsFalse(await checker.IsCallPermittedAsync(new Uri("https://rutabaga.example/xyz"), DefaultCallerIp));
     }
@@ -131,8 +133,8 @@ public sealed class CallPermissionCheckerTests
     [TestMethod]
     public async Task IsCallPermitted_FetchThrows_ReturnsFalse()
     {
-        var engine = new CountingSpartanEngine { ThrowOnGet = new BadRequestException("External URL not available.", "boom") };
-        var checker = BuildChecker(GetServiceData(), engine);
+        var engine = new CountingRequestFactory { ThrowOnGet = new BadRequestException("External URL not available.", "boom") };
+        var checker = BuildChecker(GetServiceData(), engine.NewRequest);
 
         Assert.IsFalse(await checker.IsCallPermittedAsync(new Uri("https://rutabaga.example/xyz"), DefaultCallerIp));
     }
@@ -141,12 +143,12 @@ public sealed class CallPermissionCheckerTests
     public async Task IsCallPermitted_FetchesTheWellKnownPathOnTheTargetsOwnHost()
     {
         var serviceData = GetServiceData();
-        var engine = new CountingSpartanEngine
+        var engine = new CountingRequestFactory
         {
             Response = new SpartanResponse().WithStatusCode(200)
                 .WithBody($"{{\"GetPermissionGrantedTo\": \"{serviceData.ConfigServiceHost}\"}}")
         };
-        var checker = BuildChecker(serviceData, engine);
+        var checker = BuildChecker(serviceData, engine.NewRequest);
 
         await checker.IsCallPermittedAsync(new Uri("https://rutabaga.example/some/path?query=1"), DefaultCallerIp);
 
@@ -161,12 +163,12 @@ public sealed class CallPermissionCheckerTests
     {
         var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var serviceData = GetServiceData();
-        var engine = new CountingSpartanEngine
+        var engine = new CountingRequestFactory
         {
             Response = new SpartanResponse().WithStatusCode(200)
                 .WithBody($"{{\"GetPermissionGrantedTo\": \"{serviceData.ConfigServiceHost}\"}}")
         };
-        var checker = BuildChecker(serviceData, engine, utcNow: () => now);
+        var checker = BuildChecker(serviceData, engine.NewRequest, utcNow: () => now);
         var target = new Uri("https://rutabaga.example/xyz");
 
         Assert.IsTrue(await checker.IsCallPermittedAsync(target, DefaultCallerIp));
@@ -179,12 +181,12 @@ public sealed class CallPermissionCheckerTests
     {
         var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var serviceData = GetServiceData();
-        var engine = new CountingSpartanEngine
+        var engine = new CountingRequestFactory
         {
             Response = new SpartanResponse().WithStatusCode(200)
                 .WithBody($"{{\"GetPermissionGrantedTo\": \"{serviceData.ConfigServiceHost}\"}}")
         };
-        var checker = BuildChecker(serviceData, engine, utcNow: () => now);
+        var checker = BuildChecker(serviceData, engine.NewRequest, utcNow: () => now);
         var target = new Uri("https://rutabaga.example/xyz");
 
         await checker.IsCallPermittedAsync(target, DefaultCallerIp);
@@ -198,8 +200,8 @@ public sealed class CallPermissionCheckerTests
     public async Task IsCallPermitted_ARefusalCachesForTheShorterNegativeDuration()
     {
         var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        var engine = new CountingSpartanEngine { Response = new SpartanResponse().WithStatusCode(404) };
-        var checker = BuildChecker(GetServiceData(), engine, utcNow: () => now);
+        var engine = new CountingRequestFactory { Response = new SpartanResponse().WithStatusCode(404) };
+        var checker = BuildChecker(GetServiceData(), engine.NewRequest, utcNow: () => now);
         var target = new Uri("https://rutabaga.example/xyz");
 
         await checker.IsCallPermittedAsync(target, DefaultCallerIp);

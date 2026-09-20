@@ -7,6 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using billpg.SpartanHttpClient;
 using DemoService.Data;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DemoService.Services;
 
@@ -46,6 +48,7 @@ public class HttpGetter : IHttpGetter
     private readonly TimeSpan timeout;
     private readonly Func<string, CancellationToken, Task<IPAddress[]>> dnsLookup;
     private readonly IsCertificateAcceptableDelegate isCertificateAcceptable;
+    private readonly ILogger<HttpGetter> logger;
 
     /// <summary>
     /// Constructs a new HttpGetter. The optional timeout bounds the entire fetch - DNS
@@ -65,7 +68,8 @@ public class HttpGetter : IHttpGetter
         IOutboundGetLog outboundGetLog,
         TimeSpan? timeout = null,
         Func<string, CancellationToken, Task<IPAddress[]>>? dnsLookup = null,
-        IsCertificateAcceptableDelegate? isCertificateAcceptable = null)
+        IsCertificateAcceptableDelegate? isCertificateAcceptable = null,
+        ILogger<HttpGetter>? logger = null)
     {
         this.ipFilter = ipFilter;
         this.dnsLookup = dnsLookup ?? Dns.GetHostAddressesAsync;
@@ -73,6 +77,7 @@ public class HttpGetter : IHttpGetter
         this.outboundGetLog = outboundGetLog;
         this.timeout = timeout ?? TimeSpan.FromSeconds(10);
         this.isCertificateAcceptable = isCertificateAcceptable ?? DefaultIsCertificateAcceptable;
+        this.logger = logger ?? NullLogger<HttpGetter>.Instance;
     }
 
     private static bool DefaultIsCertificateAcceptable(
@@ -110,6 +115,7 @@ public class HttpGetter : IHttpGetter
 
         /* Log the attempt regardless of whether the fetch itself goes on to succeed. */
         await outboundGetLog.LogAsync(effectiveCallerIp, source, url);
+        logger.LogInformation("Outbound GET to {Url} (source: {Source}, caller: {CallerIp}).", url, source, effectiveCallerIp);
 
         /* Make the GET request. */
         var spartanRequest = new SpartanRequest(url)

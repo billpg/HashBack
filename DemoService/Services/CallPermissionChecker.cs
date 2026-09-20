@@ -63,7 +63,7 @@ internal sealed class PermitGrant
 public class CallPermissionChecker : ICallPermissionChecker
 {
     private readonly ServiceData data;
-    private readonly ISpartanEngine engine;
+    private readonly Func<Uri, SpartanRequest> newRequest;
     private readonly IServiceScopeFactory scopeFactory;
     private readonly Func<DateTime> utcNow;
 
@@ -99,13 +99,15 @@ public class CallPermissionChecker : ICallPermissionChecker
     /// to check a grant's GetsPerHour quota - the cache above is what genuinely needs to
     /// be Singleton (surviving across requests), but that count has to be read fresh on
     /// every call, since caching a permit/deny decision for a day would make an hourly
-    /// quota meaningless.
+    /// quota meaningless. newRequest defaults to a plain SpartanRequest, going out over
+    /// real HTTP; tests substitute one that calls WithRunner on the request it builds
+    /// instead, per billpg.SpartanHttpClient's own recommended testing seam.
     /// </summary>
-    public CallPermissionChecker(ServiceData data, ISpartanEngine engine, IServiceScopeFactory scopeFactory, Func<DateTime>? utcNow = null)
+    public CallPermissionChecker(ServiceData data, IServiceScopeFactory scopeFactory, Func<Uri, SpartanRequest>? newRequest = null, Func<DateTime>? utcNow = null)
     {
         this.data = data;
-        this.engine = engine;
         this.scopeFactory = scopeFactory;
+        this.newRequest = newRequest ?? (url => new SpartanRequest(url));
         this.utcNow = utcNow ?? (() => DateTime.UtcNow);
     }
 
@@ -193,7 +195,7 @@ public class CallPermissionChecker : ICallPermissionChecker
         try
         {
             var wellKnownUrl = new Uri($"https://{host}/.well-known/demo-hashback-dev.json");
-            var req = engine.Request(wellKnownUrl)
+            var req = newRequest(wellKnownUrl)
                 .WithTimeout(TimeSpan.FromSeconds(5))
                 .WithHeader("User-Agent", "demo.hashback.dev")
                 .WithHeader("Accept", "application/json");

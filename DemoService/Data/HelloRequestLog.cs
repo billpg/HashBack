@@ -104,6 +104,7 @@ public class HelloRequestLog : IHelloRequestLog
          * DB hiccup - a missed block is far cheaper than an outage. */
         try
         {
+            logger.LogInformation("Database: checking recent failure count for caller {CallerIp}.", callerIp);
             var since = utcNow().Subtract(FailureLookbackWindow);
             int failureCount = await db.HelloRequestLogs
                 .Where(e => e.CallerIp == callerIp
@@ -146,6 +147,7 @@ public class HelloRequestLog : IHelloRequestLog
                 Detail = detail
             });
             await db.SaveChangesAsync();
+            logger.LogInformation("Database: recorded a /hello attempt from {CallerIp} ({Outcome}).", callerIp, outcome);
         }
         catch (Exception ex)
         {

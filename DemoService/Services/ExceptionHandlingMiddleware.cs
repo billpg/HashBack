@@ -36,11 +36,15 @@ public sealed class ExceptionHandlingMiddleware
 
             if (ex is AuthorizationParseException apex)
             {
+                /* Expected, client-driven outcome - a one-line note, not a stack trace. */
+                _logger.LogWarning("Rejected request: invalid Authorization header. {Detail}", apex.Message);
                 await RespondProblemDetails(400, "Invalid Authorization Header", apex.Message);
                 return;
             }
             if (ex is BadRequestException brex)
             {
+                /* Expected, client-driven outcome - a one-line note, not a stack trace. */
+                _logger.LogWarning("Rejected request: {Title} {Detail}", brex.Title, brex.Message);
                 await RespondProblemDetails(400, brex.Title, brex.Message);
                 return;
             }

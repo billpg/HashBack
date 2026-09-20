@@ -72,6 +72,7 @@ public class OutboundGetLog : IOutboundGetLog
                 TargetPathAndQuery = target.PathAndQuery
             });
             await db.SaveChangesAsync();
+            logger.LogInformation("Database: recorded outbound GET to {TargetHost} (source: {Source}).", target.Host, source);
         }
         catch (Exception ex)
         {
@@ -80,5 +81,8 @@ public class OutboundGetLog : IOutboundGetLog
     }
 
     public async Task<int> CountRecentGetsAsync(string targetHost, DateTime since)
-        => await db.OutboundGetLogs.CountAsync(e => e.TargetHost == targetHost && e.RequestedAt >= since);
+    {
+        logger.LogInformation("Database: counting recent GETs for {TargetHost}.", targetHost);
+        return await db.OutboundGetLogs.CountAsync(e => e.TargetHost == targetHost && e.RequestedAt >= since);
+    }
 }
