@@ -17,11 +17,36 @@ namespace DemoService.Data.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.4");
 
-            modelBuilder.Entity("DemoService.Data.HashGetEventRecord", b =>
+            modelBuilder.Entity("DemoService.Data.Hash", b =>
                 {
-                    b.Property<long>("RecordId")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AddedBy")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("GetCount")
                         .HasColumnType("INTEGER");
+
+                    b.Property<byte[]>("HashBytes")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Hash", (string)null);
+                });
+
+            modelBuilder.Entity("DemoService.Data.HashGetEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("GotAt")
                         .HasColumnType("TEXT");
@@ -37,18 +62,18 @@ namespace DemoService.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.HasKey("RecordId");
+                    b.HasKey("Id");
 
                     b.HasIndex("HashId");
 
-                    b.ToTable("HashGetEvents");
+                    b.ToTable("HashGetEvent", (string)null);
                 });
 
-            modelBuilder.Entity("DemoService.Data.HelloRequestLogRecord", b =>
+            modelBuilder.Entity("DemoService.Data.HelloRequest", b =>
                 {
-                    b.Property<long>("RecordId")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("CallerIp")
                         .IsRequired()
@@ -82,20 +107,20 @@ namespace DemoService.Data.Migrations
                     b.Property<string>("VerificationIp")
                         .HasColumnType("TEXT");
 
-                    b.HasKey("RecordId");
+                    b.HasKey("Id");
 
                     b.HasIndex("CallerIp");
 
                     b.HasIndex("RequestedAt");
 
-                    b.ToTable("HelloRequestLogs");
+                    b.ToTable("HelloRequest", (string)null);
                 });
 
-            modelBuilder.Entity("DemoService.Data.OutboundGetLogRecord", b =>
+            modelBuilder.Entity("DemoService.Data.OutboundGet", b =>
                 {
-                    b.Property<long>("RecordId")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("CallerIp")
                         .IsRequired()
@@ -116,41 +141,16 @@ namespace DemoService.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.HasKey("RecordId");
+                    b.HasKey("Id");
 
                     b.HasIndex("TargetHost", "RequestedAt");
 
-                    b.ToTable("OutboundGetLogs");
+                    b.ToTable("OutboundGet", (string)null);
                 });
 
-            modelBuilder.Entity("DemoService.Data.StoredHashRecord", b =>
+            modelBuilder.Entity("DemoService.Data.HashGetEvent", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("AddedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("AddedBy")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("GetCount")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<byte[]>("Hash")
-                        .IsRequired()
-                        .HasColumnType("BLOB");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("StoredHashes");
-                });
-
-            modelBuilder.Entity("DemoService.Data.HashGetEventRecord", b =>
-                {
-                    b.HasOne("DemoService.Data.StoredHashRecord", null)
+                    b.HasOne("DemoService.Data.Hash", null)
                         .WithMany()
                         .HasForeignKey("HashId")
                         .OnDelete(DeleteBehavior.Cascade)

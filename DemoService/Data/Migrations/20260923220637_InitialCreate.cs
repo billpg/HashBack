@@ -12,11 +12,25 @@ namespace DemoService.Data.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "HelloRequestLogs",
+                name: "Hash",
                 columns: table => new
                 {
-                    RecordId = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    HashBytes = table.Column<byte[]>(type: "BLOB", nullable: false),
+                    AddedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    AddedBy = table.Column<string>(type: "TEXT", nullable: false),
+                    GetCount = table.Column<int>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Hash", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "HelloRequest",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
                     RequestedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
                     CallerIp = table.Column<string>(type: "TEXT", nullable: false),
                     ClaimVersion = table.Column<string>(type: "TEXT", nullable: true),
@@ -30,15 +44,14 @@ namespace DemoService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_HelloRequestLogs", x => x.RecordId);
+                    table.PrimaryKey("PK_HelloRequest", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
-                name: "OutboundGetLogs",
+                name: "OutboundGet",
                 columns: table => new
                 {
-                    RecordId = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
                     RequestedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
                     CallerIp = table.Column<string>(type: "TEXT", nullable: false),
                     Source = table.Column<string>(type: "TEXT", nullable: false),
@@ -47,30 +60,14 @@ namespace DemoService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_OutboundGetLogs", x => x.RecordId);
+                    table.PrimaryKey("PK_OutboundGet", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
-                name: "StoredHashes",
+                name: "HashGetEvent",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
-                    Hash = table.Column<byte[]>(type: "BLOB", nullable: false),
-                    AddedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    AddedBy = table.Column<string>(type: "TEXT", nullable: false),
-                    GetCount = table.Column<int>(type: "INTEGER", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_StoredHashes", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "HashGetEvents",
-                columns: table => new
-                {
-                    RecordId = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
                     HashId = table.Column<Guid>(type: "TEXT", nullable: false),
                     GotAt = table.Column<DateTime>(type: "TEXT", nullable: false),
                     GotBy = table.Column<string>(type: "TEXT", nullable: false),
@@ -78,33 +75,33 @@ namespace DemoService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_HashGetEvents", x => x.RecordId);
+                    table.PrimaryKey("PK_HashGetEvent", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_HashGetEvents_StoredHashes_HashId",
+                        name: "FK_HashGetEvent_Hash_HashId",
                         column: x => x.HashId,
-                        principalTable: "StoredHashes",
+                        principalTable: "Hash",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_HashGetEvents_HashId",
-                table: "HashGetEvents",
+                name: "IX_HashGetEvent_HashId",
+                table: "HashGetEvent",
                 column: "HashId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_HelloRequestLogs_CallerIp",
-                table: "HelloRequestLogs",
+                name: "IX_HelloRequest_CallerIp",
+                table: "HelloRequest",
                 column: "CallerIp");
 
             migrationBuilder.CreateIndex(
-                name: "IX_HelloRequestLogs_RequestedAt",
-                table: "HelloRequestLogs",
+                name: "IX_HelloRequest_RequestedAt",
+                table: "HelloRequest",
                 column: "RequestedAt");
 
             migrationBuilder.CreateIndex(
-                name: "IX_OutboundGetLogs_TargetHost_RequestedAt",
-                table: "OutboundGetLogs",
+                name: "IX_OutboundGet_TargetHost_RequestedAt",
+                table: "OutboundGet",
                 columns: new[] { "TargetHost", "RequestedAt" });
         }
 
@@ -112,16 +109,16 @@ namespace DemoService.Data.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "HashGetEvents");
+                name: "HashGetEvent");
 
             migrationBuilder.DropTable(
-                name: "HelloRequestLogs");
+                name: "HelloRequest");
 
             migrationBuilder.DropTable(
-                name: "OutboundGetLogs");
+                name: "OutboundGet");
 
             migrationBuilder.DropTable(
-                name: "StoredHashes");
+                name: "Hash");
         }
     }
 }

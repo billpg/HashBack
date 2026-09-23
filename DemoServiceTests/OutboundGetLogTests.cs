@@ -25,7 +25,7 @@ public sealed class OutboundGetLogTests
             OutboundGetSource.Call,
             new Uri("https://rutabaga.example/api/hashback/xyz?foo=1"));
 
-        var entry = testDb.Db.OutboundGetLogs.Single();
+        var entry = testDb.Db.OutboundGets.Single();
         Assert.AreEqual(IPAddress.Parse("203.0.113.9"), entry.CallerIp);
         Assert.AreEqual(OutboundGetSource.Call, entry.Source);
         Assert.AreEqual("rutabaga.example", entry.TargetHost);
@@ -46,7 +46,7 @@ public sealed class OutboundGetLogTests
         await log.LogAsync(caller, OutboundGetSource.Call, new Uri("https://rutabaga.example/b"));
         await log.LogAsync(caller, OutboundGetSource.Call, new Uri("https://parsnip.example/c"));
 
-        var count = testDb.Db.OutboundGetLogs.Count(e => e.TargetHost == "rutabaga.example");
+        var count = testDb.Db.OutboundGets.Count(e => e.TargetHost == "rutabaga.example");
         Assert.AreEqual(2, count);
     }
 
@@ -80,7 +80,7 @@ public sealed class OutboundGetLogTests
             await getter.GetAsync(url, null, callerIp, OutboundGetSource.Hello);
             await Task.WhenAny(serverTask, Task.Delay(TimeSpan.FromSeconds(2)));
 
-            var entry = testDb.Db.OutboundGetLogs.Single();
+            var entry = testDb.Db.OutboundGets.Single();
             Assert.AreEqual(callerIp, entry.CallerIp);
             Assert.AreEqual(OutboundGetSource.Hello, entry.Source);
             Assert.AreEqual("localhost", entry.TargetHost);

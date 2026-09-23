@@ -42,7 +42,7 @@ public sealed class HelloRequestLogTests
         var result = await controller.Get();
         Assert.IsInstanceOfType(result, typeof(ContentResult), "Expected the request to succeed.");
 
-        var entry = testDb.Db.HelloRequestLogs.Single();
+        var entry = testDb.Db.HelloRequests.Single();
         Assert.AreEqual(HelloRequestOutcome.Success, entry.Outcome);
         Assert.AreEqual(IPAddress.Parse("203.0.113.9"), entry.CallerIp);
         Assert.AreEqual(hashBackRequest.Version, entry.ClaimVersion);
@@ -70,7 +70,7 @@ public sealed class HelloRequestLogTests
 
         await Assert.ThrowsExceptionAsync<AuthorizationParseException>(async () => await controller.Get());
 
-        var entry = testDb.Db.HelloRequestLogs.Single();
+        var entry = testDb.Db.HelloRequests.Single();
         Assert.AreEqual(HelloRequestOutcome.WrongHost, entry.Outcome);
         Assert.AreEqual(hashBackRequest.Host, entry.ClaimHost, "Claim fields should still be captured - Parse succeeded.");
         Assert.IsNull(entry.VerificationIp, "GetHash never runs when the host check fails first.");
@@ -90,7 +90,7 @@ public sealed class HelloRequestLogTests
 
         await Assert.ThrowsExceptionAsync<AuthorizationParseException>(async () => await controller.Get());
 
-        var entry = testDb.Db.HelloRequestLogs.Single();
+        var entry = testDb.Db.HelloRequests.Single();
         Assert.AreEqual(HelloRequestOutcome.BadHeader, entry.Outcome);
         Assert.IsNull(entry.ClaimHost, "Parse itself failed, so there's no claim to capture fields from.");
         Assert.IsNull(entry.ClaimVerify);
@@ -122,7 +122,7 @@ public sealed class HelloRequestLogTests
              * (resp.RemoteAddress) rather than an onResolved callback fired at DNS-resolve
              * time - so a connection that never gets that far (refused, here) can't report
              * an IP at all. Narrower than the old callback-based capture, but simpler. */
-            var entry = testDb.Db.HelloRequestLogs.Single();
+            var entry = testDb.Db.HelloRequests.Single();
             Assert.AreEqual(HelloRequestOutcome.VerificationFetchFailed, entry.Outcome);
             Assert.IsNull(entry.VerificationIp,
                 "A connection that was refused never produced a SpartanResponse, so there's no RemoteAddress to log.");
@@ -161,7 +161,7 @@ public sealed class HelloRequestLogTests
 
     /// <summary>Directly inserts a fabricated log row, bypassing LogAsync's own clock, for setting up block-threshold scenarios.</summary>
     private static void SeedFailure(TestHashDb testDb, IPAddress callerIp, DateTime requestedAt, HelloRequestOutcome outcome)
-        => testDb.Db.HelloRequestLogs.Add(new HelloRequestLogRecord
+        => testDb.Db.HelloRequests.Add(new HelloRequest
         {
             RequestedAt = requestedAt,
             CallerIp = callerIp,
