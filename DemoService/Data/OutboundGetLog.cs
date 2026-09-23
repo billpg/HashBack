@@ -20,9 +20,9 @@ public enum OutboundGetSource
 /// CallPermissionChecker.PermitGrant) can eventually be checked with a plain count grouped
 /// by host and time, without parsing URLs back out of a stored string.
 /// </summary>
-public class OutboundGetLogRecord
+public class OutboundGet
 {
-    public long RecordId { get; set; }
+    public Guid Id { get; set; } = Guid.CreateVersion7();
     public DateTime RequestedAt { get; set; }
     public IPAddress CallerIp { get; set; } = IPAddress.None;
     public OutboundGetSource Source { get; set; }
@@ -63,7 +63,7 @@ public class OutboundGetLog : IOutboundGetLog
          * our own visibility) rather than propagated. */
         try
         {
-            db.OutboundGetLogs.Add(new OutboundGetLogRecord
+            db.OutboundGets.Add(new OutboundGet
             {
                 RequestedAt = utcNow(),
                 CallerIp = callerIp,
@@ -83,6 +83,6 @@ public class OutboundGetLog : IOutboundGetLog
     public async Task<int> CountRecentGetsAsync(string targetHost, DateTime since)
     {
         logger.LogInformation("Database: counting recent GETs for {TargetHost}.", targetHost);
-        return await db.OutboundGetLogs.CountAsync(e => e.TargetHost == targetHost && e.RequestedAt >= since);
+        return await db.OutboundGets.CountAsync(e => e.TargetHost == targetHost && e.RequestedAt >= since);
     }
 }

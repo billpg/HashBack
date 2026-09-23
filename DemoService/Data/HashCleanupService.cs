@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace DemoService.Data;
 
 /// <summary>
-/// Periodically deletes StoredHashRecords once they're past HashStore.ReuseBlockWindow.
+/// Periodically deletes Hash rows once they're past HashStore.ReuseBlockWindow.
 /// Most ids are used exactly once and never revisited, so nothing else would ever trigger
 /// their cleanup - HashStore.TryAddHashAsync only clears an old row when that same id gets
 /// reused, which is the uncommon case.
@@ -59,7 +59,7 @@ public class HashCleanupService : BackgroundService
         var db = scope.ServiceProvider.GetRequiredService<HashDbContext>();
 
         var cutoff = DateTime.UtcNow.Subtract(HashStore.ReuseBlockWindow);
-        int deleted = await db.StoredHashes
+        int deleted = await db.Hashes
             .Where(h => h.AddedAt < cutoff)
             .ExecuteDeleteAsync(cancellationToken);
 

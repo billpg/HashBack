@@ -22,10 +22,10 @@ public interface IHashStore
     /// retrieval window and GET-count cap. Returns null otherwise - including for an id
     /// that exists but is only being kept around to block reuse.
     /// </summary>
-    Task<StoredHashRecord?> TryGetHashAsync(Guid id, IPAddress gotBy, string requestHeaders);
+    Task<Hash?> TryGetHashAsync(Guid id, IPAddress gotBy, string requestHeaders);
 
     /// <summary>All logged GET events for a given id, for the /call report.</summary>
-    Task<IReadOnlyList<HashGetEventRecord>> ListGetHashEventsAsync(Guid id);
+    Task<IReadOnlyList<HashGetEvent>> ListGetHashEventsAsync(Guid id);
 }
 
 public class HashStore : IHashStore
@@ -61,15 +61,15 @@ public class HashStore : IHashStore
         logger.LogInformation("Database: storing hash {Id} (added by {AddedBy}).", id, addedBy);
 
         /* Don't allow any reuse of IDs if the record is still on the DB. */
-        var existing = await db.StoredHashes.FirstOrDefaultAsync(h => h.Id == id);
+        var existing = await db.Hashes.FirstOrDefaultAsync(h => h.Id == id);
         if (existing != null)
             return false;
 
         /* Attempt to add the new hash on the DB. */
-        db.StoredHashes.Add(new StoredHashRecord
+        db.Hashes.Add(new Hash
         {
             Id = id,
-            Hash = hash,
+            HashBytes = hash,
             AddedAt = utcNow(),
             AddedBy = addedBy,
             GetCount = 0
@@ -87,7 +87,7 @@ public class HashStore : IHashStore
         }
     }
 
-    public async Task<StoredHashRecord?> TryGetHashAsync(Guid id, IPAddress gotBy, string requestHeaders)
+    public async Task<Hash?> TryGetHashAsync(Guid id, IPAddress gotBy, string requestHeaders)
     {
         logger.LogInformation("Database: retrieving hash {Id} (requested by {GotBy}).", id, gotBy);
 
@@ -96,14 +96,14 @@ public class HashStore : IHashStore
          * decision to allow the GET or not is made. Return NULL to indicate refusal. */
         var now = utcNow();
         var retrievalCutoff = now.Subtract(RetrievalWindow);
-        int rowsUpdated = await db.StoredHashes
+        int rowsUpdated = await db.Hashes
             .Where(h => h.Id == id && h.AddedAt > retrievalCutoff && h.GetCount < MaxGetCount)
             .ExecuteUpdateAsync(setters => setters.SetProperty(h => h.GetCount, h => h.GetCount + 1));
         if (rowsUpdated == 0)
             return null;
 
         /* Log the GET event. */
-        db.HashGetEvents.Add(new HashGetEventRecord
+        db.HashGetEvents.Add(new HashGetEvent
         {
             HashId = id,
             GotAt = now,
@@ -113,10 +113,10 @@ public class HashStore : IHashStore
         await db.SaveChangesAsync();
 
         /* Return the now-updated hash record. */
-        return await db.StoredHashes.AsNoTracking().FirstOrDefaultAsync(h => h.Id == id);
+        return await db.Hashes.AsNoTracking().FirstOrDefaultAsync(h => h.Id == id);
     }
 
-    public async Task<IReadOnlyList<HashGetEventRecord>> ListGetHashEventsAsync(Guid id)
+    public async Task<IReadOnlyList<HashGetEvent>> ListGetHashEventsAsync(Guid id)
     {
         logger.LogInformation("Database: listing GET events for hash {Id}.", id);
         return await db.HashGetEvents

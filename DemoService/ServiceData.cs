@@ -7,6 +7,11 @@ public class ServiceData
     public string ConfigServiceHost { get; set; } = "demo.hashback.dev"; // "localhost:9001";
     public static bool AllowGetLocalhost { get; internal set; } = false;
 
+    /// <summary>Path to the SQLite database file backing the /hash store. Edit this
+    /// directly (and redeploy) to move it - there's deliberately no separate config layer
+    /// for a single-file setting only the operator of this specific instance would change.</summary>
+    public const string DbFilePath = "hashback.db";
+
     private readonly ConcurrentDictionary<string, DateTime> seenUnusUntil = new();
 
     /// <summary>

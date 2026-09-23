@@ -34,9 +34,9 @@ public enum HelloRequestOutcome
 }
 
 /// <summary>A single logged attempt to authenticate at /hello via an Authorization: HashBack header.</summary>
-public class HelloRequestLogRecord
+public class HelloRequest
 {
-    public long RecordId { get; set; }
+    public Guid Id { get; set; } = Guid.CreateVersion7();
     public DateTime RequestedAt { get; set; }
     public IPAddress CallerIp { get; set; } = IPAddress.None;
 
@@ -106,7 +106,7 @@ public class HelloRequestLog : IHelloRequestLog
         {
             logger.LogInformation("Database: checking recent failure count for caller {CallerIp}.", callerIp);
             var since = utcNow().Subtract(FailureLookbackWindow);
-            int failureCount = await db.HelloRequestLogs
+            int failureCount = await db.HelloRequests
                 .Where(e => e.CallerIp == callerIp
                     && e.RequestedAt >= since
                     && e.Outcome != HelloRequestOutcome.Success
@@ -133,7 +133,7 @@ public class HelloRequestLog : IHelloRequestLog
          * for our own visibility) rather than propagated. */
         try
         {
-            db.HelloRequestLogs.Add(new HelloRequestLogRecord
+            db.HelloRequests.Add(new HelloRequest
             {
                 RequestedAt = utcNow(),
                 CallerIp = callerIp,
