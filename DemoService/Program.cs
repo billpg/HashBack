@@ -3,7 +3,6 @@ using DemoService.Data;
 using DemoService.Services;
 using billpg.SpartanHttpClient;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -38,18 +37,9 @@ builder.Services.AddSingleton<IIpFilter, IpFilter>();
 // instead.
 builder.Services.AddSingleton<ICallPermissionChecker, CallPermissionChecker>();
 
-// The /hash store, backed by PostgreSQL. The connection string (including its password)
-// is deliberately never checked into source: set it via
-//   dotnet user-secrets set "ConnectionStrings:HashDb" "Host=...;Database=...;Username=...;Password=..." --project DemoService
-// for local development, or the ConnectionStrings__HashDb environment variable in production.
-// HashController and CallController both depend on this, so it's a hard requirement now -
-// fail fast at startup rather than serve requests that can only ever fail.
-var hashDbConnectionString = builder.Configuration.GetConnectionString("HashDb")
-    ?? throw new InvalidOperationException(
-        "Missing ConnectionStrings:HashDb configuration. Set it via 'dotnet user-secrets set " +
-        "\"ConnectionStrings:HashDb\" \"Host=...;Database=...;Username=...;Password=...\"' for " +
-        "local development, or the ConnectionStrings__HashDb environment variable in production.");
-builder.Services.AddDbContext<HashDbContext>(options => options.UseNpgsql(hashDbConnectionString));
+// The /hash store, backed by SQLite. See ServiceData.DbFilePath to change where the file
+// lives.
+builder.Services.AddDbContext<HashDbContext>(options => options.UseSqlite($"Data Source={ServiceData.DbFilePath}"));
 builder.Services.AddScoped<IHashStore, HashStore>();
 builder.Services.AddScoped<IHelloRequestLog, HelloRequestLog>();
 builder.Services.AddScoped<IOutboundGetLog, OutboundGetLog>();

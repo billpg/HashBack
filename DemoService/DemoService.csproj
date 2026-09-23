@@ -5,7 +5,6 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <UserSecretsId>e1da85aa-ce26-4716-8846-74ef6cd6c0a6</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -54,9 +53,12 @@
     <PackageReference Include="billpg.SpartanHttpClient" Version="0.1.0" />
   </ItemGroup>
 
-  <!-- EF Core with the PostgreSQL provider for the hash store -->
+  <!-- EF Core with the SQLite provider for the hash store. The explicit SQLitePCLRaw
+       reference overrides the vulnerable 2.1.11 that Microsoft.EntityFrameworkCore.Sqlite
+       would otherwise pull in transitively - see GHSA-2m69-gcr7-jv3q. -->
   <ItemGroup>
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.4" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

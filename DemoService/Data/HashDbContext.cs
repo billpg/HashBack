@@ -6,10 +6,10 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DemoService.Data;
 
 /// <summary>
-/// EF Core context for the /hash endpoint's persistent store, backed by PostgreSQL. This
-/// exists specifically so the state of a running instance can be inspected (and, for
-/// abuse response, edited - e.g. block-lists) from a separate connection without
-/// interrupting the service itself, which an in-memory store can't offer.
+/// EF Core context for the /hash endpoint's persistent store, backed by a SQLite file (see
+/// ServiceData.DbFilePath). This exists specifically so the state of a running instance can
+/// be inspected from a separate connection without interrupting the service itself, which
+/// an in-memory store can't offer.
 /// </summary>
 public class HashDbContext : DbContext
 {
@@ -74,25 +74,18 @@ public class HashDbContext : DbContext
             entity.HasIndex(e => new { e.TargetHost, e.RequestedAt });
         });
 
-        /* SQLite (used for fast, dependency-free tests) has no native IP address type, so
-         * store it as text there. PostgreSQL's own native "inet" type is used everywhere
-         * else, without needing any conversion - checking the provider name by string
-         * avoids the main app needing a reference to the SQLite provider package just for
-         * this test-only branch. */
-        if (Database.ProviderName?.Contains("Sqlite", StringComparison.OrdinalIgnoreCase) == true)
-        {
-            var ipConverter = new ValueConverter<IPAddress, string>(
-                ip => ip.ToString(),
-                s => IPAddress.Parse(s));
-            var nullableIpConverter = new ValueConverter<IPAddress?, string?>(
-                ip => ip == null ? null : ip.ToString(),
-                s => s == null ? null : IPAddress.Parse(s));
-            modelBuilder.Entity<StoredHashRecord>().Property(h => h.AddedBy).HasConversion(ipConverter);
-            modelBuilder.Entity<HashGetEventRecord>().Property(e => e.GotBy).HasConversion(ipConverter);
-            modelBuilder.Entity<HelloRequestLogRecord>().Property(e => e.CallerIp).HasConversion(ipConverter);
-            modelBuilder.Entity<HelloRequestLogRecord>().Property(e => e.VerificationIp).HasConversion(nullableIpConverter);
-            modelBuilder.Entity<OutboundGetLogRecord>().Property(e => e.CallerIp).HasConversion(ipConverter);
-        }
+        /* SQLite has no native IP address type, so every IPAddress column is stored as text. */
+        var ipConverter = new ValueConverter<IPAddress, string>(
+            ip => ip.ToString(),
+            s => IPAddress.Parse(s));
+        var nullableIpConverter = new ValueConverter<IPAddress?, string?>(
+            ip => ip == null ? null : ip.ToString(),
+            s => s == null ? null : IPAddress.Parse(s));
+        modelBuilder.Entity<StoredHashRecord>().Property(h => h.AddedBy).HasConversion(ipConverter);
+        modelBuilder.Entity<HashGetEventRecord>().Property(e => e.GotBy).HasConversion(ipConverter);
+        modelBuilder.Entity<HelloRequestLogRecord>().Property(e => e.CallerIp).HasConversion(ipConverter);
+        modelBuilder.Entity<HelloRequestLogRecord>().Property(e => e.VerificationIp).HasConversion(nullableIpConverter);
+        modelBuilder.Entity<OutboundGetLogRecord>().Property(e => e.CallerIp).HasConversion(ipConverter);
     }
 }
 
