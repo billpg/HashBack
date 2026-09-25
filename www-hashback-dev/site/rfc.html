@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>HashBack | Becoming an RFC</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <nav class="topbar">
+        <a href=".">🦔 HashBack Authentication</a>
+        <a href="https://github.com/billpg/HashBack" target="_blank">🔨 GitHub</a>
+        <a href="https://billpg.com/" target="_blank">🦉 billpg.com</a>
+      </nav>
+      <section class="hero">
+        <div>
+          <h1>Becoming an RFC</h1>
+          <div class="panel introduction">
+            <p>A draft protocol is a nice thing to have, but it isn't a <em>standard</em>. A large goal of this
+project is to see HashBack published as a proper IETF RFC, with the <code>HashBack</code> scheme
+listed in IANA's HTTP Authentication Scheme registry alongside <code>Basic</code>, <code>Bearer</code> and
+<code>Digest</code>. That's the point at which it stops being "a thing Bill wrote" and starts being
+something any library or browser could recognize by name.</p>
+          </div>
+        </div>
+        <img class="badge" src="HashBack-Badge-Logo.png" alt="HashBack Logo" />
+      </section>
+      <section class="panel">
+        <h2 id="read-the-draft">Read the draft</h2>
+        <p>There's already a starting point: an early Internet-Draft, written in the IETF's own
+<code>xml2rfc</code> format, sitting in the
+<a href="https://github.com/billpg/HashBack/tree/main/rfc"><code>rfc</code></a> folder of this project. It's
+ported from the protocol description in the main README, but it is genuinely a first
+draft - unsubmitted, unreviewed by anyone who's actually done this before, and not yet
+adopted by any working group.</p>
+        <p class="hashbert">
+          <strong>🦔 Hashbert says:</strong> “Writing the protocol was the easy part. Writing it the way the IETF wants it written is a different kind of spiky.”</p>
+      </section>
+      <section class="panel">
+        <h2 id="can-you-help">Can you help?</h2>
+        <p>Specifically, I'm looking for anyone who's been through the RFC editing process before -
+someone who can look at the Security Considerations and IANA Considerations sections with
+an experienced eye before this goes anywhere near a real submission, and who can tell me
+what I've got structurally wrong before I find out the hard way from the IETF itself.</p>
+        <p>If that's you, the <a href="https://github.com/billpg/HashBack">project's GitHub</a> is the place to
+start a conversation.</p>
+        <p class="hashbert">
+          <strong>🦔 Hashbert says:</strong> “Every standard was once somebody's draft. I'd just rather not make all the mistakes myself.”</p>
+      </section>
+      <section class="panel">
+        <div class="btn-row">
+          <a class="btn btn-primary" href="help.html">Next: Can you help?</a>
+          <a class="btn btn-secondary" href=".">Home</a>
+          <a class="btn btn-secondary" href="example.html">Example Walk-Through</a>
+          <a class="btn btn-secondary" href="acme.html">Isn't that ACME?</a>
+          <a class="btn btn-secondary" href="demo.html">Play with the demo service.</a>
+        </div>
+      </section>
+      <p class="footer">
+        <span>HashBack was engineered and © William Godfrey, 2026.</span>
+        <span>
+          <a href="https://billpg.com" target="_blank">🦉 billpg industries</a>.</span>
+        <span>Hosted by <a href="https://statichost.uk" target="_blank">statichost.uk</a>.</span>
+        <span>May your rutabagas be tasty.</span>
+      </p>
+    </main>
+  </body>
+</html>

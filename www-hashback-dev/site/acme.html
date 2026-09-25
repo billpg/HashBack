@@ -16,13 +16,18 @@
       <section class="hero">
         <div>
           <h1>Isn't that like ACME?</h1>
-          <div class="panel introduction">Yes, HashBack has a lot in common with ACME, in particular the "call me back" verification idea at its core. The important difference is the problem each of the two serves.</div>
+          <div class="panel introduction">
+            <p>Yes, HashBack has a lot in common with ACME, in particular the "call me back" verification
+idea at its core. The important difference is the problem each of the two serves.</p>
+          </div>
         </div>
         <img class="badge" src="HashBack-Badge-Logo.png" alt="HashBack Logo" />
       </section>
       <section class="panel">
-        <h2>Two related ideas, different jobs</h2>
-        <p>ACME, the protocol behind <b>Let's Encrypt</b>, is designed to <i>establish</i> TLS certificates. HashBack, in contrast, is simpler in operation because both sides <i>already have TLS</i>  working.</p>
+        <h2 id="two-related-ideas-different-jobs">Two related ideas, different jobs</h2>
+        <p>ACME, the protocol behind <strong>Let's Encrypt</strong>, is designed to <em>establish</em> TLS certificates.
+HashBack, in contrast, is simpler in operation because both sides <em>already have TLS</em>
+working.</p>
         <table class="comparison">
           <thead>
             <tr>
@@ -58,9 +63,13 @@
           <strong>🦔 Hashbert says:</strong> “ACME helps put the lock on the door. HashBack uses the lock. Both jobs matter, but they are not the same job. Also, I strongly recommend the lock.”</p>
       </section>
       <section class="panel">
-        <h2>HashBack needs TLS first</h2>
-        <p>HashBack relies on TLS to reassure the server that the verification hash came from the site the client controls. Without valid TLS on both sides, the protocol cannot provide its intended identity check.</p>
-        <p>In that sense, HashBack only works because <b>ACME</b> and <b>Let's Encrypt</b> made it possible. HashBack only works because TLS protection is now widespread and automated, giving it the trustworthy channel it needs to build on.</p>
+        <h2 id="hashback-needs-tls-first">HashBack needs TLS first</h2>
+        <p>HashBack relies on TLS to reassure the server that the verification hash came from the
+site the client controls. Without valid TLS on both sides, the protocol cannot provide its
+intended identity check.</p>
+        <p>In that sense, HashBack only works because <strong>ACME</strong> and <strong>Let's Encrypt</strong> made it
+possible. HashBack only works because TLS protection is now widespread and automated,
+giving it the trustworthy channel it needs to build on.</p>
         <p>Thank you ACME!</p>
         <p class="hashbert">
           <strong>🦔 Hashbert says:</strong> “HashBack is just like ACME, only fewer coyotes are maimed.”</p>
@@ -70,6 +79,7 @@
           <a class="btn btn-primary" href="demo.html">Next: Do you have a demo service?</a>
           <a class="btn btn-secondary" href=".">Home</a>
           <a class="btn btn-secondary" href="example.html">Example Walk-Through</a>
+          <a class="btn btn-secondary" href="rfc.html">Becoming an RFC</a>
           <a class="btn btn-secondary" href="help.html">Can you Help?</a>
         </div>
       </section>
