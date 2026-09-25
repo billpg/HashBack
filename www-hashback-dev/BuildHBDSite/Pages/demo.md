@@ -1,7 +1,7 @@
 ---
 title: HashBack | Demo Service
-next: help.html
-next-text: Next: Can you help?
+next: rfc.html
+next-text: Next: Publishing this as an RFC
 ---
 # Try the Demo Service
 

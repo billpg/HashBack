@@ -20,6 +20,7 @@ var buttons = new Dictionary<string, string>
     { "example.html", "Example Walk-Through" },
     { "acme.html", "Isn't that ACME?" },
     { "demo.html", "Play with the demo service." },
+    { "rfc.html", "Becoming an RFC" },
     { "help.html", "Can you Help?" }
 };
 
@@ -31,6 +32,7 @@ var pages = new Dictionary<string, string>
     { "example", "example.html" },
     { "acme", "acme.html" },
     { "demo", "demo.html" },
+    { "rfc", "rfc.html" },
     { "help", "help.html" }
 };
 
