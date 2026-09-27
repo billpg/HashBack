@@ -74,6 +74,20 @@ internal static class SiteBuilder
             currentSection.Add(elem);
         }
 
+        /* Look for <section class="hero"> */
+        var sectionHero = doc.Descendants("section").SingleOrDefault(h => h.Attribute("class")?.Value == "hero");
+        if (sectionHero != null)
+        {
+            /* Look for <section class="cards" */
+            var sectionCards =  doc.Descendants("section").SingleOrDefault(h => h.Attribute("class")?.Value == "cards");
+            if (sectionCards != null)
+            {
+                /* Move the cards to after the "hero". */
+                sectionCards.Remove();
+                sectionHero.AddAfterSelf(sectionCards);                
+            }
+        }
+
         if (frontMatter.NextHref != null)
             footer.AddBeforeSelf(new XElement("section", new XAttribute("class", "panel"),
                 BuildButtonRow(buttons, selfHref, frontMatter.NextHref, frontMatter.NextText!)));
