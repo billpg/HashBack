@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi;
@@ -73,10 +74,14 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 
-// Configure Kestrel to listen on localhost:9001 (HTTP only, loopback)
+// Configure Kestrel to listen on loopback only (HTTP, not HTTPS - Cloudflare Tunnel
+// terminates TLS). Port defaults to 9001, matching what the Cloudflare Tunnel config on
+// the production box expects, but can be overridden with e.g. --Port=9002 so a debug
+// instance can run alongside the real one without a port clash.
+var port = builder.Configuration.GetValue<int?>("Port") ?? 9001;
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.ListenLocalhost(9001); // HTTP only on loopback
+    options.ListenLocalhost(port);
 });
 
 var app = builder.Build();
