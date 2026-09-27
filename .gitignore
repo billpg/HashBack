@@ -22,3 +22,7 @@ __pycache__
 *.db-shm
 *.db-wal
 
+# Generated xml2rfc output (see rfc/README.md)
+rfc/*.txt
+rfc/*.html
+

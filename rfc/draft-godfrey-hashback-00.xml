@@ -3,13 +3,12 @@
 <!ENTITY nbsp "&#160;">
 ]>
 <rfc xmlns:xi="http://www.w3.org/2001/XInclude"
-     category="std"
+     category="info"
      docName="draft-godfrey-hashback-00"
      ipr="trust200902"
      submissionType="independent"
      xml:lang="en"
-     version="3"
-     consensus="false">
+     version="3">
 
   <front>
     <title abbrev="HashBack">HashBack: Server-to-Server Authentication by Published Hash</title>
@@ -22,7 +21,7 @@
       </address>
     </author>
 
-    <date year="2026" month="August" day="28"/>
+    <date/>
 
     <area>Security</area>
 
@@ -193,7 +192,7 @@
         under that same prefix.
       </t>
       <t>Examples of acceptable and unacceptable declarations:</t>
-      <table anchor="table-verify-examples">
+      <table anchor="verify-examples">
         <name>Verify URL range examples</name>
         <thead>
           <tr><th>Pattern</th><th>Acceptable?</th><th>Reason</th></tr>
@@ -241,7 +240,8 @@ Authorization = "HashBack" 1*SP token68
       <t>
         where <tt>token68</tt> is as defined by
         <xref target="RFC9110" section="11.3"/>. The token68 value
-        <bcp14>MUST</bcp14> be the standard Base64 encoding (including
+        <bcp14>MUST</bcp14> be the standard Base64 encoding
+        (<xref target="RFC4648" section="4"/>, including
         padding, and without line breaks) of a JSON object, encoded as
         UTF-8, described below. (Line breaks shown in examples in this
         document are for presentation only and are not part of the header
@@ -338,9 +338,10 @@ Authorization = "HashBack" 1*SP token68
         </t>
         <sourcecode type="http-message"><![CDATA[
 Authorization: HashBack
- eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMiIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBsZSIsIk5v
- dyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYzVuTURxMTRMT3BzL2hZUT09IiwiVmVyaWZ5Ijoi
- aHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9hcGkvaGFzaGJhY2s/aWQ9NTAyNTQyODg2In0=
+ eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMiIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBs
+ ZSIsIk5vdyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYzVuTURxMTRMT3BzL2hZUT09
+ IiwiVmVyaWZ5IjoiaHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9hcGkvaGFzaGJhY2s/aWQ9
+ NTAyNTQyODg2In0=
 ]]></sourcecode>
       </section>
     </section>
@@ -358,7 +359,10 @@ Authorization: HashBack
           Concatenate the 32-byte Fixed Salt below with the UTF-8 bytes of
           the JSON object, salt first.
         </li>
-        <li>Compute the SHA-256 digest of the concatenated bytes.</li>
+        <li>
+          Compute the SHA-256 digest
+          (<xref target="RFC6234"/>) of the concatenated bytes.
+        </li>
         <li>
           Base64-encode the 32-byte digest, including any trailing
           "<tt>=</tt>" padding.
@@ -378,7 +382,7 @@ Authorization: HashBack
         <tt>306AEF3D8DBC7A7547F259A49A592C2F142A22F5FAE68B1E38F028A823B85CFC</tt>.
       </t>
       <t>
-        The Fixed Salt is <bcp14>NOT</bcp14> a secret. Its only purpose is
+        The Fixed Salt is NOT a secret. Its only purpose is
         to ensure a HashBack verification hash cannot be confused with, or
         produced by, an unrelated general-purpose hashing service, since
         that service would not have prepended this same value. It was
@@ -652,7 +656,7 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
         "Hypertext Transfer Protocol (HTTP) Authentication Scheme
         Registry" defined by <xref target="RFC9110" section="16.4"/>:
       </t>
-      <table anchor="table-iana-authscheme">
+      <table anchor="iana-authscheme">
         <name>HTTP Authentication Scheme Registration</name>
         <thead>
           <tr><th>Field</th><th>Value</th></tr>
