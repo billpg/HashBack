@@ -102,7 +102,8 @@ public class CallController : ControllerBase
         report.AppendLine($"- Response Status: {resp.StatusCode}");
         report.AppendLine($"- Response Headers:");
         foreach (var header in resp.Headers)
-            report.AppendLine($"  - `{header.Key}`: `{header.Value}`");
+            if (!Helpers.IsCloudflareHeader(header.Key))
+                report.AppendLine($"  - `{header.Key}`: `{header.Value}`");
         report.AppendLine("- Response Body:");
         foreach (var line in Helpers.StringToLines(resp.Body))
             report.AppendLine($"  - `{line}`");
