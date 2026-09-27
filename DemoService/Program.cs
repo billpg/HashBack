@@ -25,8 +25,16 @@ var builder = WebApplication.CreateBuilder(args);
 // Add controllers and OpenAPI/Swagger generator
 builder.Services.AddControllers();
 
-// Persist ServiceData as a singleton service so state is kept across requests
-builder.Services.AddSingleton<ServiceData>();
+// Persist ServiceData as a singleton service so state is kept across requests. The
+// hostname this instance identifies itself as (in its User-Agent, Auth-Realm, and
+// self-referential URLs) defaults to the real production name, but can be overridden with
+// e.g. --Host=mydebug.example.com - only the real deployed instance should ever claim
+// "demo.hashback.dev", so a debug/Cloudflare-tunnelled run alongside it needs a different
+// name to avoid the two colliding.
+builder.Services.AddSingleton(new ServiceData
+{
+    ConfigServiceHost = builder.Configuration["Host"] ?? "demo.hashback.dev"
+});
 
 // Register IP filter.
 builder.Services.AddSingleton<IIpFilter, IpFilter>();

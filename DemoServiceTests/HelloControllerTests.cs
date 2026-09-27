@@ -36,7 +36,8 @@ public sealed class HelloControllerTests
     public async Task Get_NoCookieNoHeader_Returns401AndWwwAuthenticateHeader()
     {
         // Arrange
-        var controller = new HelloController(GetServiceData(), new MockHttpGetter(), NoOpRequestLog);
+        var serviceData = GetServiceData();
+        var controller = new HelloController(serviceData, new MockHttpGetter(), NoOpRequestLog);
         var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
@@ -53,7 +54,7 @@ public sealed class HelloControllerTests
         var www = response.Headers["WWW-Authenticate"].ToString();
         // realm and set-cookie are valid RFC 9110 tokens, so billpg.WWWAuthenticateTools
         // correctly leaves them unquoted; version contains a comma, so it must be quoted.
-        StringAssert.Contains(www, "HashBack realm=demo.hashback.dev", "WWW-Authenticate header should indicate HashBack realm.");
+        StringAssert.Contains(www, $"HashBack realm={serviceData.ConfigServiceHost}", "WWW-Authenticate header should indicate HashBack realm.");
         StringAssert.Contains(www, "version=\"BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1\"", "WWW-Authenticate header should list supported versions.");
 
         var contentResult = actionResult as ContentResult;
@@ -337,7 +338,7 @@ public sealed class HelloControllerTests
             Assert.AreEqual("Hello localhost! (HashBack validated.)", content.Content);
             Assert.IsTrue(osl.Called, "The verification URL should actually have been fetched.");
             Assert.AreEqual(verifyUrl, osl.ReqUrl);
-            Assert.AreEqual("demo.hashback.dev on behalf of 127.0.0.1", osl.ReqHeaders!["User-Agent"]);
+            Assert.AreEqual($"{serviceData.ConfigServiceHost} on behalf of 127.0.0.1", osl.ReqHeaders!["User-Agent"]);
         }
         finally
         {

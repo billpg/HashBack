@@ -197,7 +197,7 @@ public class CallPermissionChecker : ICallPermissionChecker
             var wellKnownUrl = new Uri($"https://{host}/.well-known/demo-hashback-dev.json");
             var req = newRequest(wellKnownUrl)
                 .WithTimeout(TimeSpan.FromSeconds(5))
-                .WithHeader("User-Agent", "demo.hashback.dev")
+                .WithHeader("User-Agent", data.ConfigServiceHost)
                 .WithHeader("Accept", "application/json");
             var resp = await req.Run();
             if (resp.StatusCode != 200)

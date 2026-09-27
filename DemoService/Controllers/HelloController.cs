@@ -70,7 +70,7 @@ public class HelloController : ControllerBase
                 Expires = DateTimeOffset.UtcNow.Add(JWT.Lifetime)
             };
             options.Extensions.Add("Auth-Scheme=HashBack");
-            options.Extensions.Add("Auth-Realm=demo.hashback.dev");
+            options.Extensions.Add($"Auth-Realm={data.ConfigServiceHost}");
             Response.Cookies.Append(HashBackCookieName, JWT.Create(authDomain), options);
         }
 
@@ -81,10 +81,10 @@ public class HelloController : ControllerBase
         /* Failed authentication, return a 401 with some text. */
         var wwwAuthHeader = new AuthHeaders()
             .WithScheme("HashBack")
-            .WithParam("realm", "demo.hashback.dev")
+            .WithParam("realm", data.ConfigServiceHost)
             .WithParam("version", "BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1")
             .WithScheme("Cookie")
-            .WithParam("realm", "demo.hashback.dev")
+            .WithParam("realm", data.ConfigServiceHost)
             .WithParam("name", HashBackCookieName);
         Response.Headers["WWW-Authenticate"] = wwwAuthHeader.ToSingleHeaderValue();
         Response.StatusCode = 401;
