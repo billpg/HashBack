@@ -14,11 +14,14 @@ something any library or browser could recognize by name.
 ## Read the draft
 
 There's already a starting point: an early Internet-Draft, written in the IETF's own
-`xml2rfc` format, sitting in the
-[`rfc`](https://github.com/billpg/HashBack/tree/main/rfc) folder of this project. It's
-ported from the protocol description in the main README, but it is genuinely a first
-draft - unsubmitted, unreviewed by anyone who's actually done this before, and not yet
-adopted by any working group.
+`xml2rfc` format. It's ported from the protocol description in the main README, but it
+is genuinely a first draft - unsubmitted, unreviewed by anyone who's actually done this
+before, and not yet adopted by any working group.
+
+<div><a class="btn btn-primary btn-big-center" href="draft-godfrey-hashback-00.html" target="_blank">Read draft-godfrey-hashback-00</a></div>
+
+The XML source, along with notes on rendering it yourself, is in the
+[`rfc`](https://github.com/billpg/HashBack/tree/main/rfc) folder of this project.
 
 <p class="hashbert"><strong>🦔 Hashbert says:</strong> “Writing the protocol was the easy part. Writing it the way the IETF wants it written is a different kind of spiky.”</p>
 
