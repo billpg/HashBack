@@ -159,4 +159,13 @@ public static class Helpers
         while ((line = reader.ReadLine()) != null)
             yield return line;
     }
+
+    /// <summary>True for any header Cloudflare itself adds (Cf-Connecting-Ip, Cf-Ray,
+    /// Cf-Warp-Tag-Id, and so on) - these describe Cloudflare's own infrastructure and the
+    /// caller's connection to it, not this service, and some (like Cf-Warp-Tag-Id) are a
+    /// persistent per-device identifier. Nobody outside this service has any business
+    /// seeing them, so they're filtered out wherever caller headers get captured, before
+    /// they're ever stored or shown in a /call report.</summary>
+    internal static bool IsCloudflareHeader(string headerName)
+        => headerName.StartsWith("cf-", StringComparison.OrdinalIgnoreCase);
 }

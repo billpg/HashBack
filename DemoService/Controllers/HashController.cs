@@ -36,11 +36,15 @@ public class HashController : ControllerBase
     [SwaggerResponse(StatusCodes.Status404NotFound, "No entry found for the given id")]
     public async Task<ActionResult> GetById(Guid id)
     {
-        /* Collect the GET'ers headers for the /call report. */
+        /* Collect the GET'ers headers for the /call report. Cloudflare's own Cf-* headers
+         * are skipped - they describe Cloudflare's infrastructure and the caller's
+         * connection to it, not anything about this service, and are nobody else's
+         * business (one of them, Cf-Warp-Tag-Id, is a persistent per-device identifier). */
         var requestHeaders = new StringBuilder();
         foreach (var h in Request.Headers)
-            foreach (var sh in h.Value)            
-                requestHeaders.AppendLine($"{h.Key}: {sh}");
+            if (!Helpers.IsCloudflareHeader(h.Key))
+                foreach (var sh in h.Value)
+                    requestHeaders.AppendLine($"{h.Key}: {sh}");
 
         /* Get the hash as a base-64 string from the store and log the request. 
          * 404 if not such ID or the id has expired. */
