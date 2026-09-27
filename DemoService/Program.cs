@@ -16,12 +16,12 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 
-// Read the command line for a "Allow Get Localhost" flag.
-ServiceData.AllowGetLocalhost
-    = Environment.GetCommandLineArgs().Contains("GetLocalhost");
-
 // Web Service core handler.
 var builder = WebApplication.CreateBuilder(args);
+
+// Allows outbound GETs to localhost, for local/debug testing against a target running on
+// this same machine. Off by default; pass --GetLocalhost=true to enable it.
+ServiceData.AllowGetLocalhost = builder.Configuration.GetValue<bool>("GetLocalhost");
 
 // Add controllers and OpenAPI/Swagger generator
 builder.Services.AddControllers();
