@@ -22,6 +22,7 @@ public class HashDbContext : DbContext
     public DbSet<HashGetEvent> HashGetEvents => Set<HashGetEvent>();
     public DbSet<HelloRequest> HelloRequests => Set<HelloRequest>();
     public DbSet<OutboundGet> OutboundGets => Set<OutboundGet>();
+    public DbSet<JwtSigningKey> JwtSigningKeys => Set<JwtSigningKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -75,6 +76,12 @@ public class HashDbContext : DbContext
             entity.HasIndex(e => new { e.TargetHost, e.RequestedAt });
         });
 
+        modelBuilder.Entity<JwtSigningKey>(entity =>
+        {
+            entity.ToTable("JwtSigningKey");
+            entity.HasKey(k => k.Id);
+        });
+
         /* SQLite has no native IP address type, so every IPAddress column is stored as text. */
         var ipConverter = new ValueConverter<IPAddress, string>(
             ip => ip.ToString(),
@@ -115,4 +122,14 @@ public class HashGetEvent
     public DateTime GotAt { get; set; }
     public IPAddress GotBy { get; set; } = IPAddress.None;
     public string RequestHeaders { get; set; } = "";
+}
+
+/// <summary>The HMAC-SHA256 key used to sign and verify this service's own JWT cookies,
+/// persisted so a process restart doesn't invalidate every cookie already issued. A
+/// singleton table - only the first row found is ever used; see JWT.Initialize.</summary>
+public class JwtSigningKey
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public byte[] KeyBytes { get; set; } = [];
+    public DateTime CreatedAt { get; set; }
 }
