@@ -64,13 +64,21 @@ public static class Helpers
 
     public static IPAddress RequestIP(this HttpRequest req)
     {
-        /* The TLS proxy wrapper will add an X-Forwarded-For header. Return this. */
+        /* Prefer CF-Connecting-Ip: Cloudflare always overwrites it with the connection it
+         * actually saw, regardless of what a client sends, whereas Cloudflare only ever
+         * appends to X-Forwarded-For rather than replacing it - a client can prepend any
+         * IP it likes there and that value survives to this service unless something else
+         * strips it first. See
+         * https://developers.cloudflare.com/fundamentals/reference/http-request-headers/ */
+        var cfConnectingIp = req.Headers["CF-Connecting-Ip"].FirstOrDefault();
+        if (IPAddress.TryParse(cfConnectingIp?.Trim(), out var cfIp))
+            return cfIp;
+
+        /* Not behind Cloudflare (e.g. local/debug testing) - fall back to
+         * X-Forwarded-For, taking the first (i.e. original client) address. */
         var xff = req.Headers["X-Forwarded-For"].FirstOrDefault();
         if (string.IsNullOrEmpty(xff))
             return IPAddress.Loopback;
-
-        /* Parse the first IP address in the X-Forwarded-For header. 
-         * This is the original client IP. */
         var firstIp = xff.Split(',').FirstOrDefault()?.Trim();
         if (IPAddress.TryParse(firstIp, out var ip))
             return ip;

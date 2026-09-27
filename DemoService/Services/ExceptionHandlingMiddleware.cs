@@ -107,11 +107,22 @@ public sealed class ExceptionHandlingMiddleware
     private static async Task WriteProblemDetailsResponseAsync(HttpContext context, Exception ex)
     {
         int status = MapStatusCode(ex);
+
+        /* For a genuinely unexpected (500) exception, ex.Message was never written with a
+         * public caller in mind - it might describe internal state (a file path, a DB
+         * error) that's nobody outside's business. The mapped 4xx/501 cases above are
+         * deliberately distinguished by exception type, so their message is safe - and
+         * meant - to reach the caller. The real message still reaches the server log via
+         * _logger.LogError below. */
+        var detail = status == StatusCodes.Status500InternalServerError
+            ? "An unexpected error occurred while processing the request."
+            : ex.Message;
+
         var pd = new ProblemDetails
         {
             Status = status,
             Title = MapTitle(ex, status),
-            Detail = ex.Message,
+            Detail = detail,
             Instance = context.Request.Path
         };
 
