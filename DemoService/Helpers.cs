@@ -168,4 +168,46 @@ public static class Helpers
     /// they're ever stored or shown in a /call report.</summary>
     internal static bool IsCloudflareHeader(string headerName)
         => headerName.StartsWith("cf-", StringComparison.OrdinalIgnoreCase);
+
+
+    /// <summary>Renders "Name: Value" as two separate Markdown code spans - "`Name`: `Value`" -
+    /// so a value can't visually run into its own header name. Falls back to a single code
+    /// span if there's no colon to split on.</summary>
+    internal static string MarkdownQuoteHeader(string header)
+    {
+        int colonIndex = header.IndexOf(':');
+        if (colonIndex < 0)
+            return MarkdownQuoteCode(header);
+        return MarkdownQuoteCode(header[..colonIndex])
+            + ": "
+            + MarkdownQuoteCode(header[(colonIndex + 1)..].Trim());
+    }
+
+    /// <summary>
+    /// Wraps arbitrary text - which may itself contain backticks, since this exists
+    /// specifically for values this service doesn't control, like a target server's
+    /// response headers - in a Markdown code span that actually renders as intended.
+    /// Doubling every backtick in the content (an earlier version of this method) doesn't
+    /// work: CommonMark closes a code span on the next run of backticks of the *same
+    /// length* as the opening one, so doubled backticks either show up literally doubled in
+    /// the rendered output, or - with a longer run already in the content - let the span
+    /// close early and leak the rest of the content as raw, unescaped text. The correct
+    /// approach is a fence longer than any run of backticks already in the content, per the
+    /// CommonMark spec, with a padding space if the content starts or ends with a backtick
+    /// (or is empty) so the fence can't visually merge with it.
+    /// </summary>
+    internal static string MarkdownQuoteCode(string code)
+    {
+        int longestRun = 0, currentRun = 0;
+        foreach (char c in code)
+        {
+            currentRun = c == '`' ? currentRun + 1 : 0;
+            longestRun = Math.Max(longestRun, currentRun);
+        }
+        string fence = new string('`', longestRun + 1);
+
+        bool needsPadding = code.Length == 0 || code[0] == '`' || code[^1] == '`';
+        return needsPadding ? $"{fence} {code} {fence}" : fence + code + fence;
+    }
+
 }
