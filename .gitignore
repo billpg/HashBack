@@ -18,7 +18,7 @@ packages/
 __pycache__
 
 # DemoService's local SQLite database (see ServiceData.DbFilePath)
-DemoService/*.db
-DemoService/*.db-shm
-DemoService/*.db-wal
+*.db
+*.db-shm
+*.db-wal
 

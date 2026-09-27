@@ -337,7 +337,7 @@ public sealed class HelloControllerTests
             Assert.AreEqual("Hello localhost! (HashBack validated.)", content.Content);
             Assert.IsTrue(osl.Called, "The verification URL should actually have been fetched.");
             Assert.AreEqual(verifyUrl, osl.ReqUrl);
-            Assert.AreEqual("demo.hashback.dev", osl.ReqHeaders!["User-Agent"]);
+            Assert.AreEqual("demo.hashback.dev on behalf of 127.0.0.1", osl.ReqHeaders!["User-Agent"]);
         }
         finally
         {

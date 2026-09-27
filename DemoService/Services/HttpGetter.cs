@@ -122,10 +122,9 @@ public class HttpGetter : IHttpGetter
             .WithTimeout(timeout)
             .WithMaxResponseBytes(1000)
             .WithHeader("Authorization", authorizationHeader)
-            .WithHeader("User-Agent", "demo.hashback.dev")
+            .WithHeader("User-Agent", $"demo.hashback.dev on behalf of {effectiveCallerIp}")
             .WithIpLookupHandler(ResolveDomainToSingleIp)
             .WithCertificateValidator(MyIsCertificateAcceptable);
-
         try
         {
             return await spartanRequest.Run();
