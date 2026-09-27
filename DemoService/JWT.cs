@@ -12,10 +12,32 @@ namespace DemoService;
 
 internal static class JWT
 {
+    private static byte[]? explicitKey;
+
+    /// <summary>Thread-safe fallback for tests (run with MSTest's method-level
+    /// parallelism) that never call Initialize - Lazy&lt;T&gt; guarantees the factory runs
+    /// exactly once even if multiple tests race to touch HMACSHA256Key simultaneously,
+    /// unlike a plain "field ??= GenerateRandomKey()" which isn't atomic. The original
+    /// "static readonly" field this replaced got that guarantee for free from the CLR's own
+    /// type initializer; losing it silently was a real, if narrow, bug.</summary>
+    private static readonly Lazy<byte[]> fallbackKey = new(GenerateRandomKey);
+
     /// <summary>
-    /// JWT key that's good for this run of the demo service only.
+    /// Sets the signing key used for every JWT created or validated for the rest of this
+    /// process's lifetime. Call once at startup, before any request arrives, with a key
+    /// loaded from (or freshly generated and saved to) the database, so cookies issued
+    /// before a restart stay valid afterward. If this is never called - as in most unit
+    /// tests - a fresh random key is generated on first use instead (see fallbackKey),
+    /// which is fine for the lifetime of a single test run but is never persisted anywhere.
     /// </summary>
-    private static readonly byte[] HMACSHA256Key = RandomBytes(256/8);
+    internal static void Initialize(byte[] key) => explicitKey = key;
+
+    private static byte[] HMACSHA256Key => explicitKey ?? fallbackKey.Value;
+
+    /// <summary>Generates a fresh, cryptographically random 256-bit key suitable for
+    /// Initialize - exposed so Program.cs can create one the first time this service ever
+    /// starts, without duplicating the RNG logic here.</summary>
+    internal static byte[] GenerateRandomKey() => RandomBytes(256 / 8);
 
     /// <summary>
     /// How long a token remains valid after being issued. The Set-Cookie header's own

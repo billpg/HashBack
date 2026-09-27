@@ -79,6 +79,18 @@ using (var startupScope = app.Services.CreateScope())
 {
     var hashDb = startupScope.ServiceProvider.GetRequiredService<HashDbContext>();
     hashDb.Database.Migrate();
+
+    // Load the JWT signing key persisted from a previous run, or - on the very first run -
+    // generate and save a fresh one. Either way, cookies issued before a restart stay
+    // valid afterward, since the same key is always used to check them.
+    var signingKey = await hashDb.JwtSigningKeys.OrderBy(k => k.CreatedAt).FirstOrDefaultAsync();
+    if (signingKey == null)
+    {
+        signingKey = new JwtSigningKey { KeyBytes = JWT.GenerateRandomKey(), CreatedAt = DateTime.UtcNow };
+        hashDb.JwtSigningKeys.Add(signingKey);
+        await hashDb.SaveChangesAsync();
+    }
+    JWT.Initialize(signingKey.KeyBytes);
 }
 
 // Log every request - first in the pipeline so it captures everything, even a request a
