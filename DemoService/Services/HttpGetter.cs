@@ -42,6 +42,7 @@ public delegate bool IsCertificateAcceptableDelegate(
 /// </summary>
 public class HttpGetter : IHttpGetter
 {
+    private readonly ServiceData data;
     private readonly IIpFilter ipFilter;
     private readonly ICallPermissionChecker permissionChecker;
     private readonly IOutboundGetLog outboundGetLog;
@@ -71,6 +72,7 @@ public class HttpGetter : IHttpGetter
         IsCertificateAcceptableDelegate? isCertificateAcceptable = null,
         ILogger<HttpGetter>? logger = null)
     {
+        this.data = data;
         this.ipFilter = ipFilter;
         this.dnsLookup = dnsLookup ?? Dns.GetHostAddressesAsync;
         this.permissionChecker = permissionChecker;
@@ -111,7 +113,7 @@ public class HttpGetter : IHttpGetter
                 "Target not opted in.",
                 "This service will only call targets that have explicitly granted permission via " +
                 $"<https://{url.Host}/.well-known/demo-hashback-dev.json>. " +
-                "See https://demo.hashback.dev/permit for details.");
+                $"See https://{data.ConfigServiceHost}/permit for details.");
 
         /* Log the attempt regardless of whether the fetch itself goes on to succeed. */
         await outboundGetLog.LogAsync(effectiveCallerIp, source, url);
@@ -122,7 +124,7 @@ public class HttpGetter : IHttpGetter
             .WithTimeout(timeout)
             .WithMaxResponseBytes(1000)
             .WithHeader("Authorization", authorizationHeader)
-            .WithHeader("User-Agent", $"demo.hashback.dev on behalf of {effectiveCallerIp}")
+            .WithHeader("User-Agent", $"{data.ConfigServiceHost} on behalf of {effectiveCallerIp}")
             .WithIpLookupHandler(ResolveDomainToSingleIp)
             .WithCertificateValidator(MyIsCertificateAcceptable);
         try

@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/DemoService/bin/Debug/net10.0/DemoService.dll",
             "cwd": "${workspaceFolder}/DemoService",
-            "args": ["GetLocalhost"],
+            "args": ["--GetLocalhost=true"],
             "env": {
                 "ASPNETCORE_ENVIRONMENT": "Development"
             },

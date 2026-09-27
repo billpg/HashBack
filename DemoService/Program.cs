@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi;
@@ -15,18 +16,26 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 
-// Read the command line for a "Allow Get Localhost" flag.
-ServiceData.AllowGetLocalhost
-    = Environment.GetCommandLineArgs().Contains("GetLocalhost");
-
 // Web Service core handler.
 var builder = WebApplication.CreateBuilder(args);
+
+// Allows outbound GETs to localhost, for local/debug testing against a target running on
+// this same machine. Off by default; pass --GetLocalhost=true to enable it.
+ServiceData.AllowGetLocalhost = builder.Configuration.GetValue<bool>("GetLocalhost");
 
 // Add controllers and OpenAPI/Swagger generator
 builder.Services.AddControllers();
 
-// Persist ServiceData as a singleton service so state is kept across requests
-builder.Services.AddSingleton<ServiceData>();
+// Persist ServiceData as a singleton service so state is kept across requests. The
+// hostname this instance identifies itself as (in its User-Agent, Auth-Realm, and
+// self-referential URLs) defaults to the real production name, but can be overridden with
+// e.g. --Host=mydebug.example.com - only the real deployed instance should ever claim
+// "demo.hashback.dev", so a debug/Cloudflare-tunnelled run alongside it needs a different
+// name to avoid the two colliding.
+builder.Services.AddSingleton(new ServiceData
+{
+    ConfigServiceHost = builder.Configuration["Host"] ?? "demo.hashback.dev"
+});
 
 // Register IP filter.
 builder.Services.AddSingleton<IIpFilter, IpFilter>();
@@ -65,10 +74,14 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 
-// Configure Kestrel to listen on localhost:9001 (HTTP only, loopback)
+// Configure Kestrel to listen on loopback only (HTTP, not HTTPS - Cloudflare Tunnel
+// terminates TLS). Port defaults to 9001, matching what the Cloudflare Tunnel config on
+// the production box expects, but can be overridden with e.g. --Port=9002 so a debug
+// instance can run alongside the real one without a port clash.
+var port = builder.Configuration.GetValue<int?>("Port") ?? 9001;
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.ListenLocalhost(9001); // HTTP only on loopback
+    options.ListenLocalhost(port);
 });
 
 var app = builder.Build();

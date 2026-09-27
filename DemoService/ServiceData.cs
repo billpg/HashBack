@@ -4,7 +4,10 @@ using System.Collections.Concurrent;
 namespace DemoService;
 public class ServiceData
 {
-    public string ConfigServiceHost { get; set; } = "demo.hashback.dev"; // "localhost:9001";
+    /// <summary>The hostname this instance identifies itself as - in its User-Agent,
+    /// Auth-Realm, and self-referential URLs - and the value <see cref="Controllers.HelloController"/>
+    /// requires the Host header to match. Overridable on the command line; see Program.cs.</summary>
+    public string ConfigServiceHost { get; set; } = "demo.hashback.dev";
     public static bool AllowGetLocalhost { get; internal set; } = false;
 
     /// <summary>Path to the SQLite database file backing the /hash store. Edit this
