@@ -1,0 +1,46 @@
+[Unit]
+Description=HashBack Demo Service (demo.hashback.dev)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/dotnet /opt/hashback/DemoService.dll --Host=demo.hashback.dev
+Restart=on-failure
+RestartSec=5
+Environment=ASPNETCORE_ENVIRONMENT=Production
+
+# A DynamicUser has no entry in /etc/passwd and so no resolvable home directory -
+# $HOME is unset by default. .NET's X509Chain building on Linux caches downloaded
+# intermediate certificates under $HOME (used when validating the TLS certificate of an
+# outbound HTTPS GET), and throws "The home directory of the current user could not be
+# determined" without it. Point it at the one directory this user can actually write to.
+Environment=HOME=/var/lib/hashback
+
+# No persistent system account for this service - systemd creates and owns a throwaway
+# UID/GID for the lifetime of the unit. Combined with the sandboxing DynamicUser implies
+# (NoNewPrivileges, ProtectSystem=strict, ProtectHome, RestrictSUIDSGID, etc.), the process
+# can't write anywhere on disk except the directories explicitly granted below.
+DynamicUser=yes
+
+# Gives the service a private, correctly-owned /var/lib/hashback - the only place it can
+# write. DemoService.ServiceData.DbFilePath is the relative path "hashback.db", so
+# WorkingDirectory must be this same directory for that to resolve here rather than
+# wherever dotnet happened to be launched from.
+StateDirectory=hashback
+WorkingDirectory=/var/lib/hashback
+
+# Belt-and-braces hardening beyond what DynamicUser already implies. This service makes
+# outbound HTTPS GETs to caller-supplied URLs (see HttpGetter/IpFilter for the SSRF
+# guarding on the application side) but needs no raw sockets, kernel access, or elevated
+# capabilities of its own.
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target
