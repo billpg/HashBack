@@ -38,6 +38,12 @@ internal class HtmlPages
         return MarkdownToHtml(md);
     }
 
+    /// <summary>Renders arbitrary Markdown through the same site template (nav, stylesheet,
+    /// footer, "panel" sections per H2) as the embedded doc pages above - for pages whose
+    /// content is built at request time rather than a fixed resource, such as /wallboard.</summary>
+    internal static string FromMarkdown(string md)
+        => MarkdownToHtml(md);
+
     private static string MarkdownToHtml(string md)
     {
         /* Convert markdown to HTML, then pull out the various HTML elements. */
