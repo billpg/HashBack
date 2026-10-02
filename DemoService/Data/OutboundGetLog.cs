@@ -10,7 +10,12 @@ namespace DemoService.Data;
 public enum OutboundGetSource
 {
     Hello,
-    Call
+    Call,
+
+    /// <summary>Fetching a target's own /.well-known/demo-hashback-dev.json permission
+    /// grant, ahead of a Hello or Call fetch against that same target - see
+    /// CallPermissionChecker.FetchPermissionAsync.</summary>
+    Permission
 }
 
 /// <summary>

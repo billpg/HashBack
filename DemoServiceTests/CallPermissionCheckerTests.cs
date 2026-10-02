@@ -51,6 +51,19 @@ public sealed class CallPermissionCheckerTests
         public Task<int> CountRecentGetsAsync(string targetHost, DateTime since) => Task.FromResult(count);
     }
 
+    /// <summary>A fake IOutboundGetLog that records every LogAsync call, for testing that
+    /// FetchPermissionAsync logs its own well-known-JSON fetch.</summary>
+    private sealed class RecordingOutboundGetLog : IOutboundGetLog
+    {
+        public List<(IPAddress CallerIp, OutboundGetSource Source, Uri Target)> Logged { get; } = new();
+        public Task LogAsync(IPAddress callerIp, OutboundGetSource source, Uri target)
+        {
+            Logged.Add((callerIp, source, target));
+            return Task.CompletedTask;
+        }
+        public Task<int> CountRecentGetsAsync(string targetHost, DateTime since) => Task.FromResult(0);
+    }
+
     /// <summary>Builds a real (but otherwise empty) DI container exposing just the given
     /// IOutboundGetLog, so CallPermissionChecker's IServiceScopeFactory dependency has
     /// something genuine to resolve from.</summary>
@@ -92,6 +105,41 @@ public sealed class CallPermissionCheckerTests
     {
         var (checker, _) = BuildTestPermissionChecker("parsnip.example", grantPermission: false);
         Assert.IsFalse(await checker.IsCallPermittedAsync(new Uri("https://parsnip.example/xyz"), DefaultCallerIp));
+    }
+
+    [TestMethod]
+    public async Task IsCallPermitted_FreshFetch_LogsThePermissionJsonGetItself()
+    {
+        /* The well-known-JSON fetch is a real outbound GET in its own right, distinct from
+         * the Hello/Call fetch that follows a granted permission - the wallboard's outbound
+         * GET count should reflect it too. */
+        var engine = new CountingRequestFactory
+        {
+            Response = new SpartanResponse().WithStatusCode(200)
+                .WithBody("{\"GetPermissionGrantedTo\": \"someone-else.example\"}")
+        };
+        var recordingLog = new RecordingOutboundGetLog();
+        var checker = BuildChecker(GetServiceData(), engine.NewRequest, recordingLog);
+
+        await checker.IsCallPermittedAsync(new Uri("https://rutabaga.example/xyz"), DefaultCallerIp);
+
+        var entry = recordingLog.Logged.Single();
+        Assert.AreEqual(DefaultCallerIp, entry.CallerIp);
+        Assert.AreEqual(OutboundGetSource.Permission, entry.Source);
+        Assert.AreEqual(new Uri("https://rutabaga.example/.well-known/demo-hashback-dev.json"), entry.Target);
+    }
+
+    [TestMethod]
+    public async Task IsCallPermitted_CachedGrant_DoesNotLogAnotherPermissionJsonGet()
+    {
+        /* A cached decision makes no new HTTP request at all, so it shouldn't log one
+         * either - only a genuine fetch (the test above) should. */
+        var recordingLog = new RecordingOutboundGetLog();
+        var (checker, _) = BuildTestPermissionChecker("rutabaga.example", outboundGetLog: recordingLog);
+
+        await checker.IsCallPermittedAsync(new Uri("https://rutabaga.example/xyz"), DefaultCallerIp);
+
+        Assert.AreEqual(0, recordingLog.Logged.Count);
     }
 
     [TestMethod]

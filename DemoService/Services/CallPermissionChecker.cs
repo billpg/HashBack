@@ -135,7 +135,7 @@ public class CallPermissionChecker : ICallPermissionChecker
             return await IsGrantValidAsync(cachedGrant, target, callerIp);
 
         /* Load the permission file for this host. */
-        var fetchedGrant = await FetchPermissionAsync(target.Host);
+        var fetchedGrant = await FetchPermissionAsync(target.Host, callerIp);
         PopulateGrantCache(target.Host, fetchedGrant);
         return await IsGrantValidAsync(fetchedGrant, target, callerIp);
     }
@@ -187,7 +187,7 @@ public class CallPermissionChecker : ICallPermissionChecker
             ? IPNetwork.TryParse(range, out var net) && net.Contains(callerIp)
             : IPAddress.TryParse(range, out var single) && single.Equals(callerIp);
 
-    private async Task<PermitGrant?> FetchPermissionAsync(string host)
+    private async Task<PermitGrant?> FetchPermissionAsync(string host, IPAddress callerIp)
     {
         /* Any failure at all - unreachable, a 404, malformed JSON, an explicit refusal -
          * means "not permitted". This is a permission check, not a diagnostic one: it
@@ -195,6 +195,26 @@ public class CallPermissionChecker : ICallPermissionChecker
         try
         {
             var wellKnownUrl = new Uri($"https://{host}/.well-known/demo-hashback-dev.json");
+
+            /* Logged the same way HttpGetter logs a Hello/Call fetch: before the request
+             * runs, regardless of whether it goes on to succeed, so the wallboard's
+             * outbound-GET count reflects every real HTTP request this service makes - not
+             * just the Hello/Call fetches that follow a successful permission check. Uses
+             * scopeFactory (see the constructor's remarks) since this Singleton can't take
+             * a Scoped IOutboundGetLog directly. */
+            try
+            {
+                using var scope = scopeFactory.CreateScope();
+                var outboundGetLog = scope.ServiceProvider.GetRequiredService<IOutboundGetLog>();
+                await outboundGetLog.LogAsync(callerIp, OutboundGetSource.Permission, wellKnownUrl);
+            }
+            catch
+            {
+                /* Best-effort, like every other OutboundGetLog.LogAsync call site - a
+                 * logging hiccup shouldn't turn an otherwise-valid permission check into a
+                 * failure. */
+            }
+
             var req = newRequest(wellKnownUrl)
                 .WithTimeout(TimeSpan.FromSeconds(5))
                 .WithHeader("User-Agent", data.ConfigServiceHost)
