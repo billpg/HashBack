@@ -131,10 +131,16 @@ public class WallboardController : ControllerBase
         md.AppendLine();
         md.AppendLine($"**{hashTotal}** stored &middot; **{hashRetrieved}** retrieved at least once");
         md.AppendLine();
-        md.AppendLine("<table><tr><th>Caller IP</th><th>Via</th><th>Count</th></tr>");
-        string? prevCallerIp = null;
+        md.AppendLine("<table><tr><th>Caller IP</th><th>Count</th></tr>");
         foreach (var row in hashesByCallerAndSource)
-            md.AppendLine($"<tr><td>{FirstOccurrenceOnly(row.CallerIp, ref prevCallerIp)}</td><td>{row.Source}</td><td>{row.Count}</td></tr>");
+        {
+            /* Grouped by (AddedBy, Source), so a given caller IP appears on at most one
+             * Put row - no need for FirstOccurrenceOnly's blanking here, unlike the
+             * Outbound GETs table above, where the same Source genuinely does repeat
+             * across different TargetHost rows. */
+            string displayCallerIp = row.Source == "Put" ? row.CallerIp : $"<i>(via {row.Source})</i>";
+            md.AppendLine($"<tr><td>{displayCallerIp}</td><td>{row.Count}</td></tr>");
+        }
         md.AppendLine("</table>");
         md.AppendLine();
 
