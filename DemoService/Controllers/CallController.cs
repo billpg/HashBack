@@ -75,7 +75,7 @@ public class CallController : ControllerBase
         var verifyUrl = new Uri($"https://{data.ConfigServiceHost}/hash/{id}");
         DateTime now = DateTime.UtcNow;
         var hashBackRequest = HashBackRequest.Create(target.Authority, now, verifyUrl);
-        await hashStore.TryAddHashAsync(id, Convert.FromBase64String(hashBackRequest.VerificationHash), Request.RequestIP());
+        await hashStore.TryAddHashAsync(id, Convert.FromBase64String(hashBackRequest.VerificationHash), Request.RequestIP(), HashSource.Call);
 
         /* Make a GET request to that URL. */
         var resp = await httpGetter.GetAsync(target, "HashBack " + hashBackRequest.AuthToken, Request.RequestIP(), OutboundGetSource.Call);

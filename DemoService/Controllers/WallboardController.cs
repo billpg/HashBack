@@ -64,12 +64,19 @@ public class WallboardController : ControllerBase
 
         var hashTotal = await db.Hashes.CountAsync();
         var hashRetrieved = await db.Hashes.CountAsync(h => h.GetCount > 0);
+        var hashesByCallerAndSource = (await db.Hashes
+            .GroupBy(h => new { h.AddedBy, h.Source })
+            .Select(g => new { g.Key.AddedBy, g.Key.Source, Count = g.Count() })
+            .ToListAsync())
+            .OrderBy(g => g.AddedBy.ToString())
+            .ThenBy(g => g.Source)
+            .Select(g => (g.AddedBy.ToString(), g.Source.ToString(), g.Count));
 
         var md = BuildMarkdown(
             now, data.StartedAt,
             helloTotal, helloSuccess, hello24h, helloByOutcome, recent,
             outboundTotal, outboundBySourceAndHost,
-            hashTotal, hashRetrieved);
+            hashTotal, hashRetrieved, hashesByCallerAndSource);
         return Content(HtmlPages.FromMarkdown(md), "text/html", Encoding.UTF8);
     }
 
@@ -78,7 +85,8 @@ public class WallboardController : ControllerBase
         int helloTotal, int helloSuccess, int hello24h,
         IEnumerable<(string Outcome, int Count)> helloByOutcome, IEnumerable<HelloRequest> recent,
         int outboundTotal, IEnumerable<(string Source, string TargetHost, int Count)> outboundBySourceAndHost,
-        int hashTotal, int hashRetrieved)
+        int hashTotal, int hashRetrieved,
+        IEnumerable<(string CallerIp, string Source, int Count)> hashesByCallerAndSource)
     {
         var uptime = now - startedAt;
         var successRate = helloTotal == 0 ? 0 : (100.0 * helloSuccess / helloTotal);
@@ -113,14 +121,21 @@ public class WallboardController : ControllerBase
         md.AppendLine($"**{outboundTotal}** total");
         md.AppendLine();
         md.AppendLine("<table><tr><th>Source</th><th>Target Domain</th><th>Count</th></tr>");
+        string? prevSource = null;
         foreach (var row in outboundBySourceAndHost)
-            md.AppendLine($"<tr><td>{row.Source}</td><td>{row.TargetHost}</td><td>{row.Count}</td></tr>");
+            md.AppendLine($"<tr><td>{FirstOccurrenceOnly(row.Source, ref prevSource)}</td><td>{row.TargetHost}</td><td>{row.Count}</td></tr>");
         md.AppendLine("</table>");
         md.AppendLine();
 
         md.AppendLine("## 🔑 Hash Store");
         md.AppendLine();
         md.AppendLine($"**{hashTotal}** stored &middot; **{hashRetrieved}** retrieved at least once");
+        md.AppendLine();
+        md.AppendLine("<table><tr><th>Caller IP</th><th>Via</th><th>Count</th></tr>");
+        string? prevCallerIp = null;
+        foreach (var row in hashesByCallerAndSource)
+            md.AppendLine($"<tr><td>{FirstOccurrenceOnly(row.CallerIp, ref prevCallerIp)}</td><td>{row.Source}</td><td>{row.Count}</td></tr>");
+        md.AppendLine("</table>");
         md.AppendLine();
 
         md.AppendLine("## 🕒 Recent Hello Activity");
@@ -131,6 +146,17 @@ public class WallboardController : ControllerBase
         md.AppendLine("</table>");
 
         return md.ToString();
+    }
+
+    /// <summary>For a table whose rows are already sorted by some leading column (e.g.
+    /// Source, or Caller IP) - gives that column a sectional feel by only naming each value
+    /// on its first row, substituting a blank (non-breaking space, so the cell doesn't
+    /// collapse) on every row that repeats it.</summary>
+    private static string FirstOccurrenceOnly(string current, ref string? previous)
+    {
+        string display = current == previous ? "&#160;" : current;
+        previous = current;
+        return display;
     }
 
     private static string FormatUptime(TimeSpan uptime)

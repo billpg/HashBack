@@ -13,9 +13,10 @@ public interface IHashStore
     /// <summary>
     /// Stores a hash at the given id. Returns false - a conflict - if that id was already
     /// used within the reuse-block window, whether or not the earlier hash is still
-    /// retrievable via GetHashAsync.
+    /// retrievable via GetHashAsync. Source defaults to Put, the normal case of an external
+    /// caller publishing directly - CallController passes Call explicitly.
     /// </summary>
-    Task<bool> TryAddHashAsync(Guid id, byte[] hash, IPAddress addedBy);
+    Task<bool> TryAddHashAsync(Guid id, byte[] hash, IPAddress addedBy, HashSource source = HashSource.Put);
 
     /// <summary>
     /// Retrieves a hash by id, logging the request, if it exists and is still within its
@@ -56,9 +57,9 @@ public class HashStore : IHashStore
         this.logger = logger ?? NullLogger<HashStore>.Instance;
     }
 
-    public async Task<bool> TryAddHashAsync(Guid id, byte[] hash, IPAddress addedBy)
+    public async Task<bool> TryAddHashAsync(Guid id, byte[] hash, IPAddress addedBy, HashSource source = HashSource.Put)
     {
-        logger.LogInformation("Database: storing hash {Id} (added by {AddedBy}).", id, addedBy);
+        logger.LogInformation("Database: storing hash {Id} (added by {AddedBy}, via {Source}).", id, addedBy, source);
 
         /* Don't allow any reuse of IDs if the record is still on the DB. */
         var existing = await db.Hashes.FirstOrDefaultAsync(h => h.Id == id);
@@ -72,6 +73,7 @@ public class HashStore : IHashStore
             HashBytes = hash,
             AddedAt = utcNow(),
             AddedBy = addedBy,
+            Source = source,
             GetCount = 0
         });
         try

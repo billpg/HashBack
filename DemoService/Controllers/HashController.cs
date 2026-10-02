@@ -76,7 +76,7 @@ public class HashController : ControllerBase
             return BadRequest($"Hash must be a valid base64-encoded block of {256/8} bytes.");
 
         /* Store the hash in the DB. Will return false if the id already exists. */
-        var added = await hashStore.TryAddHashAsync(id, hashAsBytes, Request.RequestIP());
+        var added = await hashStore.TryAddHashAsync(id, hashAsBytes, Request.RequestIP(), HashSource.Put);
 
         /* Return success or otherwise. */
         if (added)
