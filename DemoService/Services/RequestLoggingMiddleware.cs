@@ -25,10 +25,29 @@ public class RequestLoggingMiddleware
     {
         logger.LogInformation("{Timestamp:O} {CallerIp} {Method} {Url}",
             DateTime.UtcNow,
-            context.Request.RequestIP(),
+            TryGetRequestIp(context.Request),
             context.Request.Method,
             context.Request.GetEncodedPathAndQuery());
 
         await next(context);
+    }
+
+    /// <summary>RequestIP() throws for a malformed caller-IP header, but this middleware is
+    /// deliberately placed ahead of ExceptionHandlingMiddleware specifically so it can log
+    /// every request, including ones a later middleware goes on to reject - so it can't let
+    /// that exception escape its own log line uncaught. Falls back to a placeholder here;
+    /// the same malformed header makes RequestIP() throw again further downstream (the
+    /// first real caller - e.g. IpRateLimitMiddleware or a controller), where
+    /// ExceptionHandlingMiddleware is in place to turn it into the proper 400 response.</summary>
+    private static object TryGetRequestIp(HttpRequest request)
+    {
+        try
+        {
+            return request.RequestIP();
+        }
+        catch (BadRequestException)
+        {
+            return "(invalid)";
+        }
     }
 }

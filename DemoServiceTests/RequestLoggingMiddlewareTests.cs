@@ -61,4 +61,32 @@ public sealed class RequestLoggingMiddlewareTests
         Assert.IsTrue(loggedTimestamp >= before.AddSeconds(-1) && loggedTimestamp <= after.AddSeconds(1),
             $"Logged timestamp {loggedTimestamp:O} should fall within the call, between {before:O} and {after:O}.");
     }
+
+    [TestMethod]
+    public async Task InvokeAsync_MalformedCallerIpHeader_LogsAPlaceholderThenStillCallsNext()
+    {
+        /* This middleware is deliberately placed ahead of ExceptionHandlingMiddleware so it
+         * logs every request, including ones a later middleware goes on to reject - so
+         * RequestIP() throwing for a malformed header must not escape this log line
+         * uncaught. The real rejection still happens: next(context) runs regardless, and
+         * whichever downstream code calls RequestIP() next throws the same exception again,
+         * this time with ExceptionHandlingMiddleware in place to catch it. */
+        var logger = new CapturingLogger<RequestLoggingMiddleware>();
+        bool nextCalled = false;
+        var middleware = new RequestLoggingMiddleware(ctx =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        }, logger);
+
+        var context = new DefaultHttpContext();
+        context.Request.Headers["CF-Connecting-Ip"] = "not-an-ip";
+
+        await middleware.InvokeAsync(context);
+
+        Assert.IsTrue(nextCalled, "Should still call the next middleware, even with an unloggable caller IP.");
+        Assert.IsNotNull(logger.LastMessage);
+        StringAssert.DoesNotMatch(logger.LastMessage, new System.Text.RegularExpressions.Regex("not-an-ip"),
+            "Should not echo the raw malformed header value into the log line.");
+    }
 }
