@@ -15,6 +15,30 @@ namespace DemoServiceTests;
 public class HttpGetterTests
 {
     [TestMethod]
+    [DataRow("rutabaga.zip")]
+    [DataRow("rutabaga.ru")]
+    [DataRow("rutabaga.su")]
+    [DataRow("rutabaga.cu")]
+    [DataRow("rutabaga.ir")]
+    [DataRow("rutabaga.kp")]
+    [DataRow("rutabaga.ps")]
+    [DataRow("RUTABAGA.ZIP")]
+    public async Task GetAsync_BlockedTld_ThrowsUrlNotAcceptable(string host)
+    {
+        /* AlwaysAllowCallPermissionChecker proves this rejection comes from
+         * ValidateUrlOrThrow, not the permission check - a target that would otherwise be
+         * permitted is still refused outright for a blocked TLD. */
+        var getter = new HttpGetter(new ServiceData(), new IpFilter(), new AlwaysAllowCallPermissionChecker(), new NoOpOutboundGetLog());
+        var url = new Uri($"https://{host}/xyz");
+
+        var ex = await Assert.ThrowsExceptionAsync<BadRequestException>(
+            async () => await getter.GetAsync(url, null, IPAddress.Loopback, OutboundGetSource.Call));
+
+        Assert.AreEqual("URL not acceptable.", ex.Title);
+        StringAssert.Contains(ex.Message, "TLD is not accepted");
+    }
+
+    [TestMethod]
     public async Task GetAsync_ServerAcceptsButNeverResponds_TimesOutPromptly()
     {
         /* A raw TCP listener that accepts the connection but never writes a byte back,
