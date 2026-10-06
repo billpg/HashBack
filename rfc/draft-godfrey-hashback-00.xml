@@ -592,24 +592,6 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
         </t>
       </section>
 
-      <section anchor="why-hash" numbered="true" toc="default">
-        <name>Rationale for Publishing a Hash Rather Than a Token</name>
-        <t>
-          An earlier design considered simply publishing a random value and
-          including that same value directly in the request, without
-          hashing. This does not work: it recreates the relay attack
-          described in <xref target="relay-attack"/> without the
-          <tt>Host</tt> binding being sufficient to stop it, since a
-          malicious intermediate Recipient could republish an unmodified
-          copy of the random value itself. Requiring the published value to
-          be a hash of the entire request - including the intended
-          Recipient's <tt>Host</tt> - ties the published proof to one
-          specific request. Changing or reusing any part of that request
-          changes the expected hash, and the forwarded copy will not
-          satisfy an unrelated Recipient's own check.
-        </t>
-      </section>
-
       <section anchor="ssrf" numbered="true" toc="default">
         <name>Server-Side Request Forgery Considerations</name>
         <t>
@@ -679,8 +661,7 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
         The author thanks Danny Wilson for feedback and for developing an
         independent implementation of this exchange; multiple independent
         implementations are valuable when establishing a new standard.
-        The author also thanks Ollie Hayman for bringing ACME to his
-        attention, and "buzer" of Hacker News for raising the
+        The author also thanks "buzer" of Hacker News for raising the
         slow-verification-URL denial-of-service concern discussed in
         <xref target="dos"/>.
       </t>
