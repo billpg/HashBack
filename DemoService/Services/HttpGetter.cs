@@ -168,6 +168,26 @@ public class HttpGetter : IHttpGetter
         return sslPolicyErrors == SslPolicyErrors.None || isCertificateAcceptable(url, certificate, chain, sslPolicyErrors);
     }
 
+    /// <summary>TLDs this service refuses to GET outright, regardless of what a target's
+    /// own permission grant says - checked before CallPermissionChecker even runs, so a
+    /// blocked TLD can't be opted back in by a target publishing a grant. A few unrelated
+    /// reasons bundled into one list since they're checked the same way:
+    /// - "zip" and "su": both frequently used for phishing/malware - "zip" because it's
+    ///   visually indistinguishable from a filename in a URL, "su" (Soviet Union, still
+    ///   live and lightly regulated) for similar abuse-friendliness reasons.
+    /// - "ru", plus the US State Department's State Sponsors of Terrorism list as of
+    ///   2026-10 - Cuba (cu), Iran (ir), North Korea (kp). That list changes over time
+    ///   (Syria was removed 2026-08-24, after 47 years on it) - verify against
+    ///   https://www.state.gov/state-sponsors-of-terrorism before trusting this blindly.
+    /// - "ps" (Palestinian Territory, Occupied - IANA/ISO 3166-1), Bill's own addition.
+    /// </summary>
+    private static readonly HashSet<string> BlockedTlds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "zip", "ru", "su",
+        "ps",
+        "cu", "ir", "kp"
+    };
+
     private static void ValidateUrlOrThrow(Uri url)
     {
         /* Allow HTTP for localhost only, and only when allowed. */
@@ -206,6 +226,11 @@ public class HttpGetter : IHttpGetter
         /* If the host is a single undotted string, reject it. */
         if (!url.Host.Contains('.'))
             throw Ex("URL must be for a domain with dots.");
+
+        /* Reject a small set of blocked TLDs outright - see BlockedTlds. */
+        var tld = url.Host[(url.Host.LastIndexOf('.') + 1)..];
+        if (BlockedTlds.Contains(tld))
+            throw Ex($"The .{tld} TLD is not accepted.");
 
         /* Anything else is considered secure. */
         return;
