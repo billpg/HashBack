@@ -1232,11 +1232,11 @@ li > p:last-of-type:only-child {
 <thead><tr>
 <td class="left">Internet-Draft</td>
 <td class="center">HashBack</td>
-<td class="right">September 2026</td>
+<td class="right">October 2026</td>
 </tr></thead>
 <tfoot><tr>
 <td class="left">Godfrey</td>
-<td class="center">Expires 31 March 2027</td>
+<td class="center">Expires 10 April 2027</td>
 <td class="right">[Page]</td>
 </tr></tfoot>
 </table>
@@ -1247,12 +1247,12 @@ li > p:last-of-type:only-child {
 <dd class="workgroup">Network Working Group</dd>
 <dt class="label-published">Published:</dt>
 <dd class="published">
-<time datetime="2026-09-27" class="published">27 September 2026</time>
+<time datetime="2026-10-07" class="published">7 October 2026</time>
     </dd>
 <dt class="label-intended-status">Intended Status:</dt>
 <dd class="intended-status">Informational</dd>
 <dt class="label-expires">Expires:</dt>
-<dd class="expires"><time datetime="2027-03-31">31 March 2027</time></dd>
+<dd class="expires"><time datetime="2027-04-10">10 April 2027</time></dd>
 <dt class="label-authors">Author:</dt>
 <dd class="authors">
 <div class="author">
@@ -1297,7 +1297,7 @@ li > p:last-of-type:only-child {
         time. It is inappropriate to use Internet-Drafts as reference
         material or to cite them other than as "work in progress."<a href="#section-boilerplate.1-3" class="pilcrow">¶</a></p>
 <p id="section-boilerplate.1-4">
-        This Internet-Draft will expire on 31 March 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
+        This Internet-Draft will expire on 10 April 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="copyright">
@@ -1368,13 +1368,10 @@ li > p:last-of-type:only-child {
                 <p id="section-toc.1-1.10.2.3.1"><a href="#section-10.3" class="auto internal xref">10.3</a>.  <a href="#name-predictability-of-request-c" class="internal xref">Predictability of Request Contents</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10.2.4">
-                <p id="section-toc.1-1.10.2.4.1"><a href="#section-10.4" class="auto internal xref">10.4</a>.  <a href="#name-rationale-for-publishing-a-" class="internal xref">Rationale for Publishing a Hash Rather Than a Token</a></p>
+                <p id="section-toc.1-1.10.2.4.1"><a href="#section-10.4" class="auto internal xref">10.4</a>.  <a href="#name-server-side-request-forgery" class="internal xref">Server-Side Request Forgery Considerations</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10.2.5">
-                <p id="section-toc.1-1.10.2.5.1"><a href="#section-10.5" class="auto internal xref">10.5</a>.  <a href="#name-server-side-request-forgery" class="internal xref">Server-Side Request Forgery Considerations</a></p>
-</li>
-              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10.2.6">
-                <p id="section-toc.1-1.10.2.6.1"><a href="#section-10.6" class="auto internal xref">10.6</a>.  <a href="#name-denial-of-service-considera" class="internal xref">Denial of Service Considerations</a></p>
+                <p id="section-toc.1-1.10.2.5.1"><a href="#section-10.5" class="auto internal xref">10.5</a>.  <a href="#name-denial-of-service-considera" class="internal xref">Denial of Service Considerations</a></p>
 </li>
             </ul>
 </li>
@@ -1999,32 +1996,12 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
           generator, and <span class="bcp14">MUST NOT</span> reuse a value.<a href="#section-10.3-1" class="pilcrow">¶</a></p>
 </section>
 </div>
-<div id="why-hash">
+<div id="ssrf">
 <section id="section-10.4">
-        <h3 id="name-rationale-for-publishing-a-">
-<a href="#section-10.4" class="section-number selfRef">10.4. </a><a href="#name-rationale-for-publishing-a-" class="section-name selfRef">Rationale for Publishing a Hash Rather Than a Token</a>
+        <h3 id="name-server-side-request-forgery">
+<a href="#section-10.4" class="section-number selfRef">10.4. </a><a href="#name-server-side-request-forgery" class="section-name selfRef">Server-Side Request Forgery Considerations</a>
         </h3>
 <p id="section-10.4-1">
-          An earlier design considered simply publishing a random value and
-          including that same value directly in the request, without
-          hashing. This does not work: it recreates the relay attack
-          described in <a href="#relay-attack" class="auto internal xref">Section 10.2</a> without the
-          <code>Host</code> binding being sufficient to stop it, since a
-          malicious intermediate Recipient could republish an unmodified
-          copy of the random value itself. Requiring the published value to
-          be a hash of the entire request - including the intended
-          Recipient's <code>Host</code> - ties the published proof to one
-          specific request. Changing or reusing any part of that request
-          changes the expected hash, and the forwarded copy will not
-          satisfy an unrelated Recipient's own check.<a href="#section-10.4-1" class="pilcrow">¶</a></p>
-</section>
-</div>
-<div id="ssrf">
-<section id="section-10.5">
-        <h3 id="name-server-side-request-forgery">
-<a href="#section-10.5" class="section-number selfRef">10.5. </a><a href="#name-server-side-request-forgery" class="section-name selfRef">Server-Side Request Forgery Considerations</a>
-        </h3>
-<p id="section-10.5-1">
           Fetching a URL supplied in an incoming request carries the usual
           SSRF risks associated with any user-supplied URL fetch.
           Implementations <span class="bcp14">SHOULD</span> apply the same precautions
@@ -2033,15 +2010,15 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
           connecting, rejecting internal or loopback address ranges unless
           explicitly intended (for example, during local development),
           declining to follow redirects (see <a href="#hashing" class="auto internal xref">Section 6</a>), and
-          applying a request timeout.<a href="#section-10.5-1" class="pilcrow">¶</a></p>
+          applying a request timeout.<a href="#section-10.4-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="dos">
-<section id="section-10.6">
+<section id="section-10.5">
         <h3 id="name-denial-of-service-considera">
-<a href="#section-10.6" class="section-number selfRef">10.6. </a><a href="#name-denial-of-service-considera" class="section-name selfRef">Denial of Service Considerations</a>
+<a href="#section-10.5" class="section-number selfRef">10.5. </a><a href="#name-denial-of-service-considera" class="section-name selfRef">Denial of Service Considerations</a>
         </h3>
-<p id="section-10.6-1">
+<p id="section-10.5-1">
           Because every incoming request with a HashBack header causes the
           Recipient to make a further outbound HTTPS request, a flood of
           fabricated <code>Authorization</code> headers could be used to
@@ -2050,14 +2027,14 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
           Implementations <span class="bcp14">SHOULD</span> apply a short connection
           and response timeout to the Verify URL fetch, and
           <span class="bcp14">MAY</span> track and rate-limit sources of requests that
-          repeatedly fail verification.<a href="#section-10.6-1" class="pilcrow">¶</a></p>
-<p id="section-10.6-2">
+          repeatedly fail verification.<a href="#section-10.5-1" class="pilcrow">¶</a></p>
+<p id="section-10.5-2">
           A related concern is a malicious Verify URL that accepts the
           connection but never completes the response, tying up a
           connection on the Recipient for as long as it is willing to wait.
           A short, strictly enforced timeout on the Verify URL fetch
           mitigates this; the timeout only needs to be long enough for the
-          expected response to arrive under normal network conditions.<a href="#section-10.6-2" class="pilcrow">¶</a></p>
+          expected response to arrive under normal network conditions.<a href="#section-10.5-2" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -2113,10 +2090,9 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
         The author thanks Danny Wilson for feedback and for developing an
         independent implementation of this exchange; multiple independent
         implementations are valuable when establishing a new standard.
-        The author also thanks Ollie Hayman for bringing ACME to his
-        attention, and "buzer" of Hacker News for raising the
+        The author also thanks "buzer" of Hacker News for raising the
         slow-verification-URL denial-of-service concern discussed in
-        <a href="#dos" class="auto internal xref">Section 10.6</a>.<a href="#section-12-1" class="pilcrow">¶</a></p>
+        <a href="#dos" class="auto internal xref">Section 10.5</a>.<a href="#section-12-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 <section id="section-13">
