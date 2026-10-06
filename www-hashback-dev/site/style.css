@@ -237,6 +237,26 @@ h2 { line-height: 1.2; margin-top: 0; }
   color: var(--accent);
 }
 
+/* Generic tables (e.g. the demo service's /wallboard stats tables) - plain, unclassed
+   <table> elements get no styling at all otherwise, since .comparison below only applies
+   to the one explicitly-classed table on the sales site. */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.25rem 0;
+}
+
+th, td {
+  padding: .5rem .7rem;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  text-align: left;
+}
+
+th:last-child, td:last-child {
+  border-right: none;
+}
+
 /* Comparison Table */
 .comparison {
   width: 100%;
@@ -248,6 +268,7 @@ h2 { line-height: 1.2; margin-top: 0; }
 .comparison td {
   padding: .85rem .7rem;
   border-bottom: 1px solid var(--border);
+  border-right: none;
   text-align: left;
   vertical-align: top;
 }

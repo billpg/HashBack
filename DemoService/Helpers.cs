@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using DemoService.Services;
+using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -70,25 +71,38 @@ public static class Helpers
          * IP it likes there and that value survives to this service unless something else
          * strips it first. See
          * https://developers.cloudflare.com/fundamentals/reference/http-request-headers/ */
-        var cfConnectingIp = req.Headers["CF-Connecting-Ip"].FirstOrDefault();
-        if (IPAddress.TryParse(cfConnectingIp?.Trim(), out var cfIp))
+        var ipAsString = ExtractIpHeader();
+        string? ExtractIpHeader()
+        {
+            /* Prefer this header above the others. */
+            var cfConnectingIp = req.Headers["CF-Connecting-Ip"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(cfConnectingIp))
+                return cfConnectingIp;
+
+            /* Not behind Cloudflare (e.g. local/debug testing) - fall back to
+            * X-Forwarded-For, taking the first (i.e. original client) address. */
+            var xff = req.Headers["X-Forwarded-For"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(xff))
+                return xff.Split(',').FirstOrDefault()?.Trim();
+            
+            /* No header found, return null. */
+            return null;
+        }
+
+        /* If no header, return as localhost. */
+        if (ipAsString == null)
+            return IPAddress.Loopback;
+
+        /* Attempt to parse as an IP address and check it is valid. */
+        if (IPAddress.TryParse(ipAsString.Trim(), out var cfIp) && cfIp.IsInternet())
             return cfIp;
 
-        /* Not behind Cloudflare (e.g. local/debug testing) - fall back to
-         * X-Forwarded-For, taking the first (i.e. original client) address. */
-        var xff = req.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (string.IsNullOrEmpty(xff))
-            return IPAddress.Loopback;
-        var firstIp = xff.Split(',').FirstOrDefault()?.Trim();
-        if (IPAddress.TryParse(firstIp, out var ip))
-            return ip;
-
-        /* No valid IP address found, return loopback. */
-        return IPAddress.Loopback;
+        /* Not valid and not localhost, throw an exception. Probably a hacker. */
+        throw new BadRequestException("Invalid request IP", "Invalid request IP address in request headers.");
     }
 
-
-
+    public static bool IsInternet(this IPAddress ip)
+        => ip.IsIPv4() || ip.IsIPv6();
     public static bool IsIPv4(this IPAddress ip)
         => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork;
     public static bool IsIPv6(this IPAddress ip)

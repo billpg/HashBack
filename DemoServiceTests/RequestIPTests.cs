@@ -52,9 +52,12 @@ public class RequestIPTests
     }
 
     [TestMethod]
-    public void RequestIP_MalformedCfConnectingIp_FallsBackToXForwardedFor()
+    public void RequestIP_MalformedCfConnectingIp_ThrowsException()
     {
-        var ctx = ContextWithHeaders(cfConnectingIp: "not-an-ip", xff: "203.0.113.9");
-        Assert.AreEqual(IPAddress.Parse("203.0.113.9"), ctx.Request.RequestIP());
+        Assert.ThrowsException<DemoService.Services.BadRequestException>(() =>
+        {
+            var ctx = ContextWithHeaders(cfConnectingIp: "not-an-ip");
+            ctx.Request.RequestIP();
+        });
     }
 }

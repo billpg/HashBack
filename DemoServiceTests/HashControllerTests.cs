@@ -135,6 +135,10 @@ public sealed class HashControllerTests
         var fetched = await store.TryGetHashAsync(id, IPAddress.Loopback, "");
         Assert.IsNotNull(fetched, "Expected hash to be stored.");
         Assert.AreEqual(base64, fetched!.HashAsString, "Stored hash string did not match input.");
+
+        /* A direct PUT is an external caller publishing their own hash - HashSource.Put,
+         * not HashSource.Call (CallController's own self-call feature). */
+        Assert.AreEqual(HashSource.Put, fetched.Source);
     }
 
     [TestMethod]
