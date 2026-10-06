@@ -48,9 +48,9 @@ public sealed class WallboardControllerTests
         var result = await controller.Get() as ContentResult;
 
         Assert.IsNotNull(result);
-        /* 3 total, 2 success -> 66.7%, matches the "0.#" format used in BuildMarkdown. */
-        StringAssert.Contains(result.Content, "3</strong> total");
-        StringAssert.Contains(result.Content, "2</strong> succeeded (66.7%)");
+        /* 3 total, 2 success -> 66.7%, matches the "0.#" format used in BuildWallboardHtml. */
+        StringAssert.Contains(result.Content, "<span>3</span></strong> total");
+        StringAssert.Contains(result.Content, "<span>2</span></strong> succeeded (<span>66.7</span>%)");
         StringAssert.Contains(result.Content, "WrongHash");
         StringAssert.Contains(result.Content, "203.0.113.3");
 

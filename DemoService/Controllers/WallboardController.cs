@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using DemoService.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -72,15 +73,15 @@ public class WallboardController : ControllerBase
             .ThenBy(g => g.Source)
             .Select(g => (g.AddedBy.ToString(), g.Source.ToString(), g.Count));
 
-        var md = BuildMarkdown(
+        var wallboardHtml = BuildWallboardHtml(
             now, data.StartedAt,
             helloTotal, helloSuccess, hello24h, helloByOutcome, recent,
             outboundTotal, outboundBySourceAndHost,
             hashTotal, hashRetrieved, hashesByCallerAndSource);
-        return Content(HtmlPages.FromMarkdown(md), "text/html", Encoding.UTF8);
+        return Content(wallboardHtml, "text/html", Encoding.UTF8);
     }
 
-    private static string BuildMarkdown(
+    private static string BuildWallboardHtml(
         DateTime now, DateTime startedAt,
         int helloTotal, int helloSuccess, int hello24h,
         IEnumerable<(string Outcome, int Count)> helloByOutcome, IEnumerable<HelloRequest> recent,
@@ -91,76 +92,99 @@ public class WallboardController : ControllerBase
         var uptime = now - startedAt;
         var successRate = helloTotal == 0 ? 0 : (100.0 * helloSuccess / helloTotal);
 
-        var md = new StringBuilder();
-        md.AppendLine("# 🦔 HashBack Wallboard");
-        md.AppendLine();
-        /* No arrow function (=>) here deliberately - HtmlPages' template pipeline
-         * round-trips this HTML through XDocument, and .NET's XML writer always escapes
-         * '>' in text content on the way back out, corrupting "=>" into "=&gt;" and
-         * breaking the script. Plain function syntax has no '>' to mangle. */
-        md.AppendLine("<script>setTimeout(function() { location.reload(); }, 15000);</script>");
-        md.AppendLine();
-        md.AppendLine($"- Refreshed {now:yyyy-MM-dd HH:mm:ss} UTC");
-        md.AppendLine($"- Up since {startedAt:yyyy-MM-dd HH:mm:ss} UTC ({FormatUptime(uptime)})");
-        md.AppendLine("- Auto-refreshes every 15s");
-        md.AppendLine();
-
-        md.AppendLine("## 📈 Hello Requests");
-        md.AppendLine();
-        md.AppendLine($"**{helloTotal}** total &middot; **{helloSuccess}** succeeded ({successRate:0.#}%) " +
-            $"&middot; **{hello24h}** in the last 24h");
-        md.AppendLine();
-        md.AppendLine("<table><tr><th>Outcome</th><th>Count</th></tr>");
-        foreach (var row in helloByOutcome)
-            md.AppendLine($"<tr><td>{row.Outcome}</td><td>{row.Count}</td></tr>");
-        md.AppendLine("</table>");
-        md.AppendLine();
-
-        md.AppendLine("## 🫱 Outbound GETs");
-        md.AppendLine();
-        md.AppendLine($"**{outboundTotal}** total");
-        md.AppendLine();
-        md.AppendLine("<table><tr><th>Source</th><th>Target Domain</th><th>Count</th></tr>");
+        var md = HtmlPages.GetResourceAsString("DemoService.Docs.WallboardTemplate.md");
+        var html = HtmlPages.MarkdownToXElement(md);
+        ReplaceElementText(html, "now", $"{now:yyyy-MM-dd HH:mm:ss}");
+        ReplaceElementText(html, "startedAt", $"{startedAt:yyyy-MM-dd HH:mm:ss}");
+        ReplaceElementText(html, "uptime", FormatUptime(uptime));
+        ReplaceElementText(html, "helloTotal", helloTotal.ToString());
+        ReplaceElementText(html, "helloSuccess", helloSuccess.ToString());
+        ReplaceElementText(html, "successRate", $"{successRate:0.#}");       
+        ReplaceElementText(html, "hello24h", hello24h.ToString());
+        ReplaceElementLoop(html, "helloByOutcome", helloByOutcome, (elem, row) =>
+        {
+            ReplaceElementText(elem, "helloByOutcome.Outcome", row.Outcome);
+            ReplaceElementText(elem, "helloByOutcome.Count", row.Count.ToString());
+        });
+        ReplaceElementText(html, "outboundTotal", outboundTotal.ToString());
         string? prevSource = null;
-        foreach (var row in outboundBySourceAndHost)
-            md.AppendLine($"<tr><td>{FirstOccurrenceOnly(row.Source, ref prevSource)}</td><td>{row.TargetHost}</td><td>{row.Count}</td></tr>");
-        md.AppendLine("</table>");
-        md.AppendLine();
-
-        md.AppendLine("## 🔑 Hash Store");
-        md.AppendLine();
-        md.AppendLine($"**{hashTotal}** stored &middot; **{hashRetrieved}** retrieved at least once");
-        md.AppendLine();
-        md.AppendLine("<table><tr><th>Caller IP</th><th>Count</th></tr>");
-        foreach (var row in hashesByCallerAndSource)
+        ReplaceElementLoop(html, "outboundBySourceAndHost", outboundBySourceAndHost, (elem, row) =>
+        {
+            ReplaceElementText(elem, "outboundBySourceAndHost.Source", FirstOccurrenceOnly(row.Source, ref prevSource));
+            ReplaceElementText(elem, "outboundBySourceAndHost.TargetHost", row.TargetHost);
+            ReplaceElementText(elem, "outboundBySourceAndHost.Count", row.Count.ToString());
+        });
+        ReplaceElementText(html, "hashTotal", hashTotal.ToString());
+        ReplaceElementText(html, "hashRetrieved", hashRetrieved.ToString());
+        ReplaceElementLoop(html, "hashesByCallerAndSource", hashesByCallerAndSource, (elem, row) =>
         {
             /* Grouped by (AddedBy, Source), so a given caller IP appears on at most one
              * Put row - no need for FirstOccurrenceOnly's blanking here, unlike the
              * Outbound GETs table above, where the same Source genuinely does repeat
-             * across different TargetHost rows. */
-            string displayCallerIp = row.Source == "Put" ? row.CallerIp : $"<i>(via {row.Source})</i>";
-            md.AppendLine($"<tr><td>{displayCallerIp}</td><td>{row.Count}</td></tr>");
+             * across different TargetHost rows. The template has no separate Source
+             * column - it's folded into this cell instead, either the caller IP itself
+             * (Put) or a "(via ...)" annotation (anything else). The annotation needs an
+             * actual <i> element, not text containing "<i>" - ReplaceElementText's .Value
+             * assignment would render that literally rather than as markup. */
+            if (row.Source == "Put")
+                ReplaceElementText(elem, "hashesByCallerAndSource.CallerIp", row.CallerIp);
+            else
+                ReplaceElementContent(elem, "hashesByCallerAndSource.CallerIp", new XElement("i", $"(via {row.Source})"));
+            ReplaceElementText(elem, "hashesByCallerAndSource.Count", row.Count.ToString());
+        });
+        ReplaceElementLoop(html, "recent", recent, (elem, row) =>
+        {
+            ReplaceElementText(elem, "r.RequestedAt", $"{row.RequestedAt:yyyy-MM-dd HH:mm:ss}");
+            ReplaceElementText(elem, "r.CallerIp", $"{row.CallerIp}");
+            ReplaceElementText(elem, "r.Outcome", row.Outcome.ToString());
+        });
+        return HtmlPages.FinalizeHtml(html);
+    }
+
+    private static void ReplaceElementLoop<T>(XElement html, string repeatId, IEnumerable<T> items, Action<XElement, T> setItem)
+    {
+        var template = html.Descendants().Single(e => (string?)e.Attribute("id") == repeatId);
+        template.Attribute("id")!.Remove();
+        var parent = template.Parent!;
+        template.Remove();
+        foreach (var item in items)
+        {
+            var elem = new XElement(template);
+            setItem(elem, item);
+            parent.Add(elem);
         }
-        md.AppendLine("</table>");
-        md.AppendLine();
+    }
 
-        md.AppendLine("## 🕒 Recent Hello Activity");
-        md.AppendLine();
-        md.AppendLine("<table><tr><th>Time (UTC)</th><th>Caller</th><th>Outcome</th></tr>");
-        foreach (var r in recent)
-            md.AppendLine($"<tr><td>{r.RequestedAt:yyyy-MM-dd HH:mm:ss}</td><td>{r.CallerIp}</td><td>{r.Outcome}</td></tr>");
-        md.AppendLine("</table>");
+    private static void ReplaceElementText(XElement html, string elementId, string newText)
+    {
+        var elem = html.Descendants().Single(e => (string?)e.Attribute("id") == elementId);
+        elem.Value = newText;
+        elem.Attribute("id")!.Remove();
+    }
 
-        return md.ToString();
+    /// <summary>Like ReplaceElementText, but for the rare case where the replacement is
+    /// meant to be real markup (e.g. an &lt;i&gt; element) rather than literal text -
+    /// ReplaceElementText's .Value assignment would render markup-looking text literally,
+    /// which is the whole point of using it everywhere else. Only ever called with
+    /// content built from a closed, fixed vocabulary (not arbitrary/external text), so
+    /// there's nothing here that needs the same escaping ReplaceElementText provides.</summary>
+    private static void ReplaceElementContent(XElement html, string elementId, params object[] content)
+    {
+        var elem = html.Descendants().Single(e => (string?)e.Attribute("id") == elementId);
+        elem.RemoveNodes();
+        elem.Add(content);
+        elem.Attribute("id")!.Remove();
     }
 
     /// <summary>For a table whose rows are already sorted by some leading column (e.g.
     /// Source, or Caller IP) - gives that column a sectional feel by only naming each value
     /// on its first row, substituting a blank (non-breaking space, so the cell doesn't
-    /// collapse) on every row that repeats it.</summary>
+    /// collapse) on every row that repeats it. The literal character, not the "&amp;#160;"
+    /// entity - this goes straight into an XElement's .Value now rather than through
+    /// Markdig, which is what used to decode the entity into this same character.</summary>
     private static string FirstOccurrenceOnly(string current, ref string? previous)
     {
-        string display = current == previous ? "&#160;" : current;
+        string display = current == previous ? " " : current;
         previous = current;
         return display;
     }
