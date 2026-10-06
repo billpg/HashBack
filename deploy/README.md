@@ -55,11 +55,35 @@ the service's dynamic UID, and that's where `hashback.db` (see
 `ServiceData.DbFilePath`) ends up - `WorkingDirectory` in the unit file
 points there for exactly that reason.
 
+## 🔄 Updating an existing deployment
+
+```bash
+# From a machine with the SDK, on current main:
+dotnet publish DemoService -c Release -r linux-x64 --self-contained false -o ./publish
+
+# On the VM: stop the service *before* copying - see note below.
+ssh hugo.vs.mythic-beasts.com "sudo systemctl stop demoservice"
+scp -r ./publish/* hugo.vs.mythic-beasts.com:/opt/hashback/
+ssh hugo.vs.mythic-beasts.com "sudo systemctl start demoservice"
+ssh hugo.vs.mythic-beasts.com "journalctl -u demoservice -f"  # watch the migration apply cleanly
+```
+
+Stop first, copy second - not the other way round. Copying the new files
+over a *running* process's own binaries (even one already mid-shutdown from
+a `systemctl restart`) can make it see a different assembly on disk than
+what it loaded into memory, which showed up live as an `Unhandled exception:
+System.BadImageFormatException: Index not found` during the old process's
+shutdown sequence on 2026-10-06. Harmless in that instance (it was already
+on its way out, and the new process started cleanly a second later -
+`NRestarts` stayed at 0, nothing actually failed), but stop-then-copy avoids
+the noise entirely.
+
+Any pending EF Core migration runs automatically on the next startup,
+against whatever's actually in `hashback.db` at that point - no manual DB
+step needed, but worth watching the log for it regardless.
+
 ## 🚧 Open items
 
-- **NAT64/IPv4 on the VM**: pending confirmation of how the VM's networking
-  actually works - may need a small change to how outbound DNS resolution is
-  handled once that's known. Nothing to do here yet.
 - **`MemoryDenyWriteExecute=yes`**: deliberately left out of the unit file.
   Modern .NET's JIT is generally compatible with it (it toggles a mapping's
   permissions rather than requesting write+execute simultaneously), but this
