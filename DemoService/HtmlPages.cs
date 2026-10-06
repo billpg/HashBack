@@ -31,20 +31,33 @@ internal class HtmlPages
     {
         /* Get the embedded stream and convert to HTML. If anything is missing a null
          * exception will fall, resulting in a 500 error. This is intentional. */
+        var md = GetResourceAsString(resourceName);
+        return MarkdownToHtml(md);
+    }
+
+    internal static string GetResourceAsString(string resourceName)
+    {
         var asm = typeof(HashController).Assembly;
         using var stream = asm.GetManifestResourceStream(resourceName);
         using var reader = new StreamReader(stream!, Encoding.UTF8);
-        var md = reader.ReadToEnd();
-        return MarkdownToHtml(md);
+        return reader.ReadToEnd();
     }
 
     /// <summary>Renders arbitrary Markdown through the same site template (nav, stylesheet,
     /// footer, "panel" sections per H2) as the embedded doc pages above - for pages whose
     /// content is built at request time rather than a fixed resource, such as /wallboard.</summary>
-    internal static string FromMarkdown(string md)
-        => MarkdownToHtml(md);
+    internal static string MarkdownToHtml(string md)
+        => FinalizeHtml(MarkdownToXElement(md));
 
-    private static string MarkdownToHtml(string md)
+    /// <summary>Serializes a finished page's XElement tree into the HTML sent to the
+    /// client - the doctype every page needs, and DisableFormatting so XDocument's default
+    /// pretty-printer doesn't insert whitespace into the document (notably corrupting
+    /// &lt;pre&gt; content - the reason it's used everywhere this codebase serializes HTML
+    /// from an XElement, not just here).</summary>
+    internal static string FinalizeHtml(XElement htmlOut)
+        => "<!doctype html>\r\n" + htmlOut.ToString(SaveOptions.DisableFormatting);
+
+    internal static XElement MarkdownToXElement(string md)
     {
         /* Convert markdown to HTML, then pull out the various HTML elements. */
         var body = Markdown.ToHtml(md);
@@ -99,9 +112,7 @@ internal class HtmlPages
                 currSection.Add(elem);
             }
         }
-
-        /* Complete HTML. */
-        return "<!doctype html>\r\n" + htmlOut.ToString(SaveOptions.DisableFormatting);
+        return htmlOut;
     }
 
 
