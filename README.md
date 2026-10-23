@@ -98,14 +98,14 @@ The JSON object is made from the following properties. All are required and the 
 - **`Version`**
   - A string indicating the version of this exchange in use.
   - This version is indicated by the string `"BILLPG_DRAFT_4.2"`.
-  - Note that as this proceeds to a formal standard, this value may change. I anticipate that the IETF drafts will necessitate a new version string, replacing "BILLPG" with "IETF". The final RFC form will likely be "RFC_xxxx" with the RFC number assigned to the final document.
+  - Note that as this proceeds to a formal standard, this value will change. The IETF draft keeps this string for now, as the exchange itself has not changed. The final RFC form will be `RFC_NNNN`, with the RFC number assigned to the final document.
   - See also the section describing the `WWW-Authenticate` header below for how servers may advertise which versions they support.
 - **`Host`**
   - The full domain name of the server being called in this request.
   - Because load balancers and CDN systems might modify the `Host:` header, a copy is included here so there's no doubt exactly which string was used in the verification hash.
   - The recipient service must reject all requests that come with a name that belongs to someone else or generic names such as `localhost`, as this may be an attacker attempting to re-use a request that was made for a different server.
 - **`Now`**
-  - The current UTC time, expressed as an integer of the number of seconds since the start of 1970.
+  - The current UTC time, expressed as an integer of the number of seconds since the start of 1970 (a Unix timestamp, as defined by ["Seconds Since the Epoch"](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_16) in POSIX).
   - The recipient service should reject this request if the timestamp is too far from its current time. This document does not specify a threshold in either direction but instead this is left to the service's configuration.
   - The integer type should be greater than 32 bits to ensure this exchange will continue to work beyond the year 2038.
 - **`Unus`**
@@ -194,7 +194,7 @@ The optional `version` parameter is a comma-separated list of HashBack version i
 For example:
 ```
 HTTP/1.1 401 Authentication Required
-WWW-Authenticate: HashBack realm="My_Wonderful_Realm" version="RFC1234,BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1"
+WWW-Authenticate: HashBack realm="My_Wonderful_Realm" version="RFC_NNNN,BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1"
 ```
 
 Clients may skip that initial transaction if it is already known that the server supports HashBack authentication.
