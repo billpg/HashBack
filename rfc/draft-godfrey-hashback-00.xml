@@ -308,9 +308,13 @@ Authorization = "HashBack" 1*SP token68
           <dt>Now:</dt>
           <dd>
             The current UTC time, expressed as an integer number of seconds
-            since the start of 1970 (a Unix timestamp). Values
-            <bcp14>MUST</bcp14> use an integer type wider than 32 bits, so
-            that this mechanism continues to function beyond the year 2038.
+            since the start of 1970 (a Unix timestamp), as defined by
+            "Seconds Since the Epoch" in
+            <xref target="POSIX.1-2017" section="4.16"
+            relative="basedefs/V1_chap04.html#tag_04_16"/>. Provers and
+            Verifiers <bcp14>MUST</bcp14> use an integer type wider than 32
+            bits when generating or reading this value, so that this
+            mechanism continues to function beyond the year 2038.
             The Verifier <bcp14>SHOULD</bcp14> reject a request if this
             value is too far from its own clock; this document does not
             mandate a specific threshold, leaving that to the Verifier's
@@ -749,6 +753,13 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
           <date year="2011" month="May"/>
         </front>
         <seriesInfo name="RFC" value="6234"/>
+      </reference>
+      <reference anchor="POSIX.1-2017" target="https://pubs.opengroup.org/onlinepubs/9699919799/">
+        <front>
+          <title>The Open Group Base Specifications Issue 7, 2018 edition (IEEE Std 1003.1-2017)</title>
+          <author><organization>IEEE and The Open Group</organization></author>
+          <date year="2018"/>
+        </front>
       </reference>
     </references>
 

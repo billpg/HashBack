@@ -1677,9 +1677,12 @@ Authorization = "HashBack" 1*SP token68
 <dt id="section-5.1-2.5">Now:</dt>
           <dd style="margin-left: 1.5em" id="section-5.1-2.6">
             The current UTC time, expressed as an integer number of seconds
-            since the start of 1970 (a Unix timestamp). Values
-            <span class="bcp14">MUST</span> use an integer type wider than 32 bits, so
-            that this mechanism continues to function beyond the year 2038.
+            since the start of 1970 (a Unix timestamp), as defined by
+            "Seconds Since the Epoch" in
+            <span><a href="https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_16" class="relref">Section 4.16</a> of [<a href="#POSIX.1-2017" class="cite xref">POSIX.1-2017</a>]</span>. Provers and
+            Verifiers <span class="bcp14">MUST</span> use an integer type wider than 32
+            bits when generating or reading this value, so that this
+            mechanism continues to function beyond the year 2038.
             The Verifier <span class="bcp14">SHOULD</span> reject a request if this
             value is too far from its own clock; this document does not
             mandate a specific threshold, leaving that to the Verifier's
@@ -2144,8 +2147,12 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
 <span class="refAuthor">Josefsson, S.</span>, <span class="refTitle">"The Base16, Base32, and Base64 Data Encodings"</span>, <span class="seriesInfo">RFC 4648</span>, <time datetime="2006-10" class="refDate">October 2006</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc4648">https://www.rfc-editor.org/info/rfc4648</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="RFC6234">[RFC6234]</dt>
-    <dd>
+      <dd>
 <span class="refAuthor">Eastlake 3rd, D.</span> and <span class="refAuthor">T. Hansen</span>, <span class="refTitle">"US Secure Hash Algorithms (SHA and SHA-based HMAC and HKDF)"</span>, <span class="seriesInfo">RFC 6234</span>, <time datetime="2011-05" class="refDate">May 2011</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc6234">https://www.rfc-editor.org/info/rfc6234</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="POSIX.1-2017">[POSIX.1-2017]</dt>
+    <dd>
+<span class="refAuthor">IEEE and The Open Group</span>, <span class="refTitle">"The Open Group Base Specifications Issue 7, 2018 edition (IEEE Std 1003.1-2017)"</span>, <time datetime="2018" class="refDate">2018</time>, <span>&lt;<a href="https://pubs.opengroup.org/onlinepubs/9699919799/">https://pubs.opengroup.org/onlinepubs/9699919799/</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 </dl>
 </section>
