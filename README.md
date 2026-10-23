@@ -47,6 +47,8 @@ In a nutshell, a client proves their identity by publishing a short string on th
 
 To add a little more detail, the client builds a claim for authentication in the form of a JSON object. That object's bytes are themselves hashed and the hash result string is published on the client's website. To complete the loop, the server gets that string in its own separate HTTP/TLS transaction. Once the server can confirm that the hash published on the client's website matches its own calculated hash for the supplied JSON object's bytes, the server passes the request.
 
+A note on terminology: this README says "client" and "server" for the two parties, as that is how most readers will picture them. The [IETF draft](https://www.hashback.dev/draft-godfrey-hashback-00.html) calls the same two parties the **Prover** (the client, which publishes the hash and is being authenticated) and the **Verifier** (the server, which checks it). The draft uses those names because the HTTP client and server roles swap in the second transaction - the Verifier is the HTTP client when it fetches the verification hash.
+
 > 🦔 *"It's like we're calling each other to prove who we are."*
 
 ### "Isn't that like ACME?" (Let's Encrypt)
