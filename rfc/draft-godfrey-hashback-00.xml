@@ -45,6 +45,30 @@
         considerations that apply to implementations.
       </t>
     </abstract>
+
+    <note removeInRFC="true">
+      <name>Note to the RFC Editor</name>
+      <t>
+        This document uses "NNNN" as a placeholder for its own RFC number
+        in the Version string "RFC_NNNN" (see the <tt>Version</tt> member in
+        <xref target="json-props"/>, and the example
+        <tt>WWW-Authenticate</tt> header that follows the discovery
+        description). Please replace every occurrence of NNNN with the
+        number assigned to this document, then remove this note.
+      </t>
+      <t>
+        The example <tt>Authorization</tt> header field in
+        <xref target="json-props"/> and the expected verification hash in
+        <xref target="hashing"/> are both computed from the example JSON
+        object, which currently carries the Version value
+        "BILLPG_DRAFT_4.2". If that example is changed to show "RFC_NNNN"
+        instead, those two values must be regenerated rather than
+        text-substituted - replacing NNNN alone would leave them wrong,
+        since they are derived from the exact bytes of the JSON. The
+        authors will supply the regenerated values. (The Fixed Salt does
+        not depend on the Version value and is unaffected.)
+      </t>
+    </note>
   </front>
 
   <middle>
@@ -259,9 +283,10 @@ Authorization = "HashBack" 1*SP token68
           <dd>
             A string identifying the version of this exchange in use. This
             revision of this exchange is identified by the string
-            "<tt>BILLPG_DRAFT_4.2</tt>", for compatibility with the
-            reference implementation published alongside earlier drafts of
-            this document. A future revision of this document, once
+            "<tt>BILLPG_DRAFT_4.2</tt>", the label it already carries in
+            the reference implementation and in the informal, pre-IETF
+            drafts that preceded this document. A future revision of this
+            document, once
             adopted as an IETF work item, is expected to define a new
             version string of the form "<tt>RFC_NNNN</tt>", where NNNN is
             the number ultimately assigned to that RFC.
@@ -507,7 +532,7 @@ Authorization: HashBack
       <sourcecode type="http-message"><![CDATA[
 HTTP/1.1 401 Unauthorized
 WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
- version="RFC1234,BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1"
+ version="RFC_NNNN,BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1"
 ]]></sourcecode>
       <t>
         A Prover that already knows a Verifier supports HashBack

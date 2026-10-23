@@ -1278,6 +1278,30 @@ li > p:last-of-type:only-child {
         <code>Authorization</code> header it defines, and the security
         considerations that apply to implementations.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
 </section>
+<section class="note rfcEditorRemove" id="section-note.1">
+      <h2 id="name-note-to-the-rfc-editor">
+<a href="#name-note-to-the-rfc-editor" class="section-name selfRef">Note to the RFC Editor</a>
+      </h2>
+<p id="section-note.1-1">This note is to be removed before publishing as an RFC.<a href="#section-note.1-1" class="pilcrow">¶</a></p>
+<p id="section-note.1-2">
+        This document uses "NNNN" as a placeholder for its own RFC number
+        in the Version string "RFC_NNNN" (see the <code>Version</code> member in
+        <a href="#json-props" class="auto internal xref">Section 5.1</a>, and the example
+        <code>WWW-Authenticate</code> header that follows the discovery
+        description). Please replace every occurrence of NNNN with the
+        number assigned to this document, then remove this note.<a href="#section-note.1-2" class="pilcrow">¶</a></p>
+<p id="section-note.1-3">
+        The example <code>Authorization</code> header field in
+        <a href="#json-props" class="auto internal xref">Section 5.1</a> and the expected verification hash in
+        <a href="#hashing" class="auto internal xref">Section 6</a> are both computed from the example JSON
+        object, which currently carries the Version value
+        "BILLPG_DRAFT_4.2". If that example is changed to show "RFC_NNNN"
+        instead, those two values must be regenerated rather than
+        text-substituted - replacing NNNN alone would leave them wrong,
+        since they are derived from the exact bytes of the JSON. The
+        authors will supply the regenerated values. (The Fixed Salt does
+        not depend on the Version value and is unaffected.)<a href="#section-note.1-3" class="pilcrow">¶</a></p>
+</section>
 <div id="status-of-memo">
 <section id="section-boilerplate.1">
         <h2 id="name-status-of-this-memo">
@@ -1626,9 +1650,10 @@ Authorization = "HashBack" 1*SP token68
           <dd style="margin-left: 1.5em" id="section-5.1-2.2">
             A string identifying the version of this exchange in use. This
             revision of this exchange is identified by the string
-            "<code>BILLPG_DRAFT_4.2</code>", for compatibility with the
-            reference implementation published alongside earlier drafts of
-            this document. A future revision of this document, once
+            "<code>BILLPG_DRAFT_4.2</code>", the label it already carries in
+            the reference implementation and in the informal, pre-IETF
+            drafts that preceded this document. A future revision of this
+            document, once
             adopted as an IETF work item, is expected to define a new
             version string of the form "<code>RFC_NNNN</code>", where NNNN is
             the number ultimately assigned to that RFC.<a href="#section-5.1-2.2" class="pilcrow">¶</a>
@@ -1902,7 +1927,7 @@ Authorization: HashBack
 <pre>
 HTTP/1.1 401 Unauthorized
 WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
- version="RFC1234,BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1"
+ version="RFC_NNNN,BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1"
 </pre><a href="#section-8-2" class="pilcrow">¶</a>
 </div>
 <p id="section-8-3">
