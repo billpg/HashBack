@@ -105,10 +105,10 @@ The JSON object is made from the following properties. All are required and the 
 - **`Host`**
   - The full domain name of the server being called in this request.
   - Because load balancers and CDN systems might modify the `Host:` header, a copy is included here so there's no doubt exactly which string was used in the verification hash.
-  - The recipient service must reject all requests that come with a name that belongs to someone else or generic names such as `localhost`, as this may be an attacker attempting to re-use a request that was made for a different server.
+  - The server must reject all requests that come with a name that belongs to someone else or generic names such as `localhost`, as this may be an attacker attempting to re-use a request that was made for a different server.
 - **`Now`**
   - The current UTC time, expressed as an integer of the number of seconds since the start of 1970 (a Unix timestamp, as defined by ["Seconds Since the Epoch"](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_16) in POSIX).
-  - The recipient service should reject this request if the timestamp is too far from its current time. This document does not specify a threshold in either direction but instead this is left to the service's configuration.
+  - The server should reject this request if the timestamp is too far from its current time. This document does not specify a threshold in either direction but instead this is left to the service's configuration.
   - The integer type should be greater than 32 bits to ensure this exchange will continue to work beyond the year 2038.
 - **`Unus`**
   - 128 bits of cryptographic-quality randomness, encoded in BASE-64 including trailing `==`.
@@ -165,7 +165,7 @@ For your convenience, here is the 32 byte fixed salt block in a variety of encod
 - Base64: `MGrvPY28enVH8lmkmlksLxQqIvX65oseOPAoqCO4XPw=`<!--FIXED_SALT_B64-->
 - Hex: `306AEF3D8DBC7A7547F259A49A592C2F142A22F5FAE68B1E38F028A823B85CFC`<!--FIXED_SALT_HEX-->
 
-Once the Caller has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The returned string itself must be one line with the BASE-64 encoded hash in ASCII as that only line. It must either have no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence. The response must be `200 OK` and the TLS certificate must be valid.
+Once the client has calculated the verification hash for itself, it then publishes the hash under the URL listed in the JSON with the type `text/plain`. The returned string itself must be one line with the BASE-64 encoded hash in ASCII as that only line. It must either have no end-of-line sequence, or end with either a single CR, LF, or CRLF end-of-line sequence. The response must be `200 OK` and the TLS certificate must be valid.
 
 The verification URL must not be any kind of redirect response. You should know what the final URL is when you're creating the JSON claim and this avoids complicating validation for the server and any possibility of SSRF attacks.
 
@@ -208,11 +208,11 @@ Yes, but also, No.
 
 Yes, each time you make an API request authenticated by HashBack, you need to make a new header and arrange for the new verification hash to be made available. That is an expensive operation and there's no shortcut. Every single time you want to make an API request with HashBack, you need to start entire process over. Even if you have a thousand requests to make.
 
-But because it is expensive, maybe plan for the response to the first successful response to include a `Set-Cookie` header or some form of bearer token. Once the caller has one of those, they can use the cookie for (say) ten minutes until it expires. At that point, perform that hashBack exchange again for a fresh cookie.
+But because it is expensive, maybe plan for the response to the first successful response to include a `Set-Cookie` header or some form of bearer token. Once the client has one of those, they can use the cookie for (say) ten minutes until it expires. At that point, perform that hashBack exchange again for a fresh cookie.
 
 I've avoided specifying that mechanism in this document to keep it focused to the main idea. For earlier drafts, supplying a bearer token was the *only* thing you could do with HashBack, thinking that no-one would ever want to use it in any other mode. I changed my mind when I relaised that someone wanting to make a single request every hour would prefer to skip the bearer token step.
 
-If you are developing the receiving end of a HashBack request, please add a `Set-Cookie` to the response that the caller can use for a little while. If you're developing the requesting end, please have your code check the response for that cookie and use it next time. Or some other mechanism. 
+If you are developing the receiving end of a HashBack request, please add a `Set-Cookie` to the response that the client can use for a little while. If you're developing the requesting end, please have your code check the response for that cookie and use it next time. Or some other mechanism. 
 
 > 🦔 *"Cookies are tasty."*
 
@@ -282,7 +282,7 @@ Having successfully retrieved a verification hash, it must now find the expected
 > 🦔 *"Fetching the hash from Petunia's site."*
 
 ### Checking the verification hash
-The service performs the same hashing operation on the block of BASE64-encoded bytes request that the caller performed earlier. If they match, the request is authenticated and may continue processing it, reassured that the client is actually Petunia. <!--CASE_STUDY_SET_COOKIE-->
+The service performs the same hashing operation on the block of BASE64-encoded bytes request that the client performed earlier. If they match, the request is authenticated and may continue processing it, reassured that the client is actually Petunia. <!--CASE_STUDY_SET_COOKIE-->
 
 ```
 HTTP/1.1 200 OK
@@ -324,7 +324,7 @@ Suppose a user's website also hosts a blog with comments or a wiki, an attacker 
 This is why the user must, ahead of time, affirm to the server exactly which URLs belong to them and are suitable for this exchange. The server must only accept verification hashes from those URLs. Treat the URL as a scoped trust boundary.
 
 ### TLS supports client-side certificates.
-To use client-side certificates, the client side would need access to a private key. This would need secure storage for the key which the caller code has access to. Avoidance of this is the main motivation of this exchange.
+To use client-side certificates, the client side would need access to a private key. This would need secure storage for the key which the client code has access to. Avoidance of this is the main motivation of this exchange.
 
 ### What if an attacker attempts to eavesdrop on either request?
 The attacker can't eavesdrop because TLS is securing the channel.
@@ -340,7 +340,7 @@ Then the attacker has broken TLS itself and we have bigger problems.
 If this is a serious concern, you could keep your own collection of trusted TLS certificates and refuse to recognize any TLS certificates not on your list. You'd effectively be running your own CA if you can't trust the ones built into your HTTP library.
 
 ### What if an attacker sends a fake Authorization header?
-The recipient will attempt to retrieve a verification hash file from the real client's website. As there won't be a verification hash that matches the fake header, the attempt will fail.
+The server will attempt to retrieve a verification hash file from the real client's website. As there won't be a verification hash that matches the fake header, the attempt will fail.
 
 ### What if an attacker can predict the verification hash URL or has a verification hash intended for another server?
 Let them.
@@ -369,7 +369,7 @@ Maybe don't claim that website as one that you have exclusive control over.
 
 At its core, you pass authentication by being someone who was able to demonstrate control of a particular URL. If the group of people who have that control is "anyone" then that's who can pass authentication.
 
-### What if a malicious Caller supplies a verification URL that keeps the request open?
+### What if a malicious client supplies a verification URL that keeps the request open?
 [I am grateful to "buzer" of Hacker News for asking this question.](https://news.ycombinator.com/item?id=38110536)
 
 Suppose an attacker sets themselves up and configures their website to host verification hash files. However, instead of responding with verification hashes, this website keeps the GET request open and never closes it. As a result, the server is left holding two TCP connections open - the original authentication request and the GET request that won't end. If this happens many times it could cause a denial-of-service by the many opened connections being kept alive.
@@ -378,7 +378,7 @@ We're used to web services making calls to databases or file systems and waiting
 
 This can be mitigated by the server configuring a low timeout for the request that fetches the verification hash. The allowed time only needs to be long enough to perform the hash and the usual roundtrip overhead of a request. If the verification hash request takes too long the overall transaction can be abandoned.
 
-Nonetheless, I have a separate proposal that will allow for the POST request to use a 202 "Accepted" response where the underlying connection can be closed and reopened later. Instead of keeping the POST request open, the Issuer can close the request and the Caller may reopen it at a later time.
+Nonetheless, I have a separate proposal that will allow for the POST request to use a 202 "Accepted" response where the underlying connection can be closed and reopened later. Instead of keeping the POST request open, the server can close the request and the client may reopen it at a later time.
 
 ### Why use a hash at all?
 (I am grateful to m'colleague Rob Armitage for asking this question.)
@@ -395,12 +395,12 @@ It is necessary for the file retrieved from the client's website to be a hash (i
 
 From server A's perspective, everything looks fine - it received a single GET request and returned the expected string, but Server B just impersonated Server A!
 
-By requiring the published hash to be a *hash of the actual request*, this kind of "pass-along" attack is prevented. The hash ties the published value to the specific request being made - including the intended recipient (`Host`). If any part of the request is changed or reused, the hash won't match and the authentication fails.
+By requiring the published hash to be a *hash of the actual request*, this kind of "pass-along" attack is prevented. The hash ties the published value to the specific request being made - including the intended server (`Host`). If any part of the request is changed or reused, the hash won't match and the authentication fails.
 
 In short: The hash makes the proof specific, unforeseeable, and bound to the request.
 
 ### Why BASE64 the JSON in the `Authorization` header?
-To ensure there's an unambiguous sequence of bytes to feed into the hash. By transferring the JSON block in an encoded set of bytes, the recipient can simply pass the decoded byte array (with salt prepended) into the SHA-256 function.
+To ensure there's an unambiguous sequence of bytes to feed into the hash. By transferring the JSON block in an encoded set of bytes, the server can simply pass the decoded byte array (with salt prepended) into the SHA-256 function.
 
 ### Shouldn't you have a server challenge like ACME?
 This is something I'd like an expert to confirm, but I don't think we need one. The request is sent over TLS, which prevents an attacker seeing the request itself and also replaying it. The `Host` header prevents "passing along" attacks as described above.
