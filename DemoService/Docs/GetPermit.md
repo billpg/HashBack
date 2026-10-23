@@ -1,10 +1,10 @@
 # Asking Permission
 
-Part of the HashBack protocol is that ahead-of-time, the client (who wants to prove their identity) and the server (who wants to check the caller's authenticity) will need to agree exactly which range of URLs the client has exclusive control over for hosting verification hashes. Because this demo service is designed for the whole world to use, we need to confirm you permit us to send lots of GET requests your way.
+Part of the HashBack protocol is that ahead-of-time, the Prover (who wants to prove their identity) and the Verifier (who wants to check the Prover's authenticity) will need to agree exactly which range of URLs the Prover has exclusive control over for hosting verification hashes. Because this demo service is designed for the whole world to use, we need to confirm you permit us to send lots of GET requests your way.
 
 To be clear, there are two IPs in question:
-- The **Caller** is the IP making the request to the demo service at either the /hello or /call end-point.
-- The **Target** is the IP of the web server that the GET request (either for a verification hash or an authentication request) will be made to.
+- The **Caller** is the IP making the request to the demo service at either the `/hello` or `/call` end-point. Which HashBack role the Caller plays depends on the end-point: at `/hello` the Caller is the **Prover**, being authenticated by the demo service acting as the **Verifier**; at `/call` the roles are reversed - the demo service acts as the Prover, and the Caller is testing a Verifier of their own.
+- The **Target** is the IP of the web server that the GET request will be made to. At `/hello` that is the server hosting the Prover's verification hash; at `/call` it is the Verifier receiving the authentication request.
 - (There's also the IP of this demo service, but you don't control that.)
 
 To do this, before we GET anything from your target server, we'll GET `/.well-known/demo-hashback-dev.json` where we hope to find your permission to make further GET requests to your domain. The JSON should have the following structure:
