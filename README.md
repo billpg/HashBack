@@ -233,13 +233,13 @@ Petunia needs to place a large rutabaga order for an upcoming "Turnip the Volume
     "Host": "RutabagaRepublic.example",
     "Now": 682718520,
     "Unus": "sGhK1rIbEWjW6Sg25s+KPg==",
-    "Verify": "https://Petunia.example/api/hashback?id=901983180"
+    "Verify": "https://petunia.example/api/hashback?id=901983180"
 }
 ```
 
 Note the `Verify` property corresponds to the URL Petunia had registered ahead of time. This is where the trust boundary lies. The URL belongs to the client, not the server.
 
-The system calculates the verification hash from this JSON object (`f2LOcgshQAytGFDcLhk9J0cD3ZPKW4rQTOQxFkeU37g=`) and publishes it on their server at the specified URL, ready for retrieval.<!--CASE_STUDY_HASH-->
+The system calculates the verification hash from this JSON object (`v3qwIrwEmbODe3rEqai6YZ0Ieuvdk3sultnsahPSbKM=`) and publishes it on their server at the specified URL, ready for retrieval.<!--CASE_STUDY_HASH-->
 
 To complete the request, an `Authorization` header is constructed by encoding the JSON with BASE64. The complete request is as follows.<!--CASE_STUDY_AUTH_HEADER-->
 ```
@@ -249,7 +249,7 @@ User-Agent: Petunia's Wonderful Stock Management System.
 Authorization: HashBack
  eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMiIsIkhvc3QiOiJSdXRhYmFnYVJlcHVibGljLmV4
  YW1wbGUiLCJOb3ciOjY4MjcxODUyMCwiVW51cyI6InNHaEsxckliRVdqVzZTZzI1cytLUGc9PSIs
- IlZlcmlmeSI6Imh0dHBzOi8vUGV0dW5pYS5leGFtcGxlL2FwaS9oYXNoYmFjaz9pZD05MDE5ODMx
+ IlZlcmlmeSI6Imh0dHBzOi8vcGV0dW5pYS5leGFtcGxlL2FwaS9oYXNoYmFjaz9pZD05MDE5ODMx
  ODAifQ==
 Accept: application/json
 Content-Type: application/json
