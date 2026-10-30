@@ -170,8 +170,15 @@ internal static class Helpers
         }
     }
 
+    /* The default encoder escapes characters such as "+" (as \u002B) so that the JSON is
+     * safe to embed in HTML, which is not a concern here and would make the Base64 block
+     * differ from the JSON a reader expects to see. Relaxed escaping writes them literally. */
     private static readonly System.Text.Json.JsonSerializerOptions shortJsonOptions
-        = new() { WriteIndented = false };
+        = new()
+        {
+            WriteIndented = false,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        };
 
     public static string ToShortJson(this JsonObject j)
         => j.ToJsonString(shortJsonOptions);
