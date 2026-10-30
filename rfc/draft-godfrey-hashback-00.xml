@@ -480,8 +480,11 @@ Authorization: HashBack
       <t>
         On receiving a request bearing a HashBack
         <tt>Authorization</tt> header, the Verifier
-        <bcp14>MUST</bcp14> perform the following checks, in any order,
-        before treating the request as authenticated:
+        <bcp14>MUST</bcp14> perform the following checks before treating
+        the request as authenticated. They may be performed in any order,
+        except that the check of the <tt>Verify</tt> property
+        <bcp14>MUST</bcp14> be completed before the Verify URL is fetched
+        (see <xref target="ssrf"/>):
       </t>
       <ol type="1">
         <li>
@@ -653,7 +656,17 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
         <name>Server-Side Request Forgery Considerations</name>
         <t>
           Fetching a URL supplied in an incoming request carries the usual
-          SSRF risks associated with any user-supplied URL fetch.
+          SSRF risks associated with any user-supplied URL fetch. The most
+          important protection is the one required by
+          <xref target="prereq"/>: the Verifier fetches only from a Verify
+          URL that it has already associated with an identified Prover. A
+          Verifier <bcp14>MUST</bcp14> complete that check before making
+          any request to the Verify URL, and <bcp14>MUST NOT</bcp14> fetch
+          the hash from an arbitrary location merely because a request
+          names it. A Verifier that did would let any caller make it send
+          requests to any place of the caller's choosing.
+        </t>
+        <t>
           Implementations <bcp14>SHOULD</bcp14> apply the same precautions
           they would to any other outbound fetch of prover-supplied data:
           resolving and validating the destination address before
@@ -661,6 +674,35 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
           explicitly intended (for example, during local development),
           declining to follow redirects (see <xref target="hashing"/>), and
           applying a request timeout.
+        </t>
+        <t>
+          A domain name is not evidence that the address behind it is
+          public. Anyone can publish a DNS record, for a name they control,
+          that points to an address inside the Verifier's own network: a
+          loopback, private-use, link-local, or unique-local address, or
+          an address such as a cloud provider's instance metadata service.
+          A Verify URL inside a declared range is not safe from this either,
+          because a record for it can be changed after the range was
+          declared. A Verifier <bcp14>SHOULD</bcp14> therefore resolve the
+          host name itself and connect only to a resolved address that is
+          not in a special-purpose range, such as those listed in
+          <xref target="IANA-IPv4-Special"/> and
+          <xref target="IANA-IPv6-Special"/>, failing the request if there
+          is no such address. This includes IPv6 addresses that embed an
+          IPv4 address, such as IPv4-mapped and NAT64 addresses. The
+          Verifier <bcp14>SHOULD</bcp14> connect to the address it
+          validated, and not resolve the name a second time, so that a
+          record changed between the check and the connection (DNS
+          rebinding) is not followed. The usual TLS certificate validation
+          against the original host name still applies, but it does not
+          remove the need for these checks, because the connection attempt
+          itself, the time it takes, and the error it produces can reveal
+          what is on the internal network.
+        </t>
+        <t>
+          For the same reason, a Verifier <bcp14>SHOULD NOT</bcp14> include
+          content received from a Verify URL, or detailed connection errors
+          for one, in the error response it sends to the caller.
         </t>
       </section>
 
@@ -805,6 +847,18 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
           <date year="2019" month="March"/>
         </front>
         <seriesInfo name="RFC" value="8555"/>
+      </reference>
+      <reference anchor="IANA-IPv4-Special" target="https://www.iana.org/assignments/iana-ipv4-special-registry/">
+        <front>
+          <title>IANA IPv4 Special-Purpose Address Registry</title>
+          <author><organization>IANA</organization></author>
+        </front>
+      </reference>
+      <reference anchor="IANA-IPv6-Special" target="https://www.iana.org/assignments/iana-ipv6-special-registry/">
+        <front>
+          <title>IANA IPv6 Special-Purpose Address Registry</title>
+          <author><organization>IANA</organization></author>
+        </front>
       </reference>
     </references>
 

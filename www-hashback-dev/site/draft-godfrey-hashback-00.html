@@ -1882,8 +1882,11 @@ Authorization: HashBack
 <p id="section-7-1">
         On receiving a request bearing a HashBack
         <code>Authorization</code> header, the Verifier
-        <span class="bcp14">MUST</span> perform the following checks, in any order,
-        before treating the request as authenticated:<a href="#section-7-1" class="pilcrow">¶</a></p>
+        <span class="bcp14">MUST</span> perform the following checks before treating
+        the request as authenticated. They may be performed in any order,
+        except that the check of the <code>Verify</code> property
+        <span class="bcp14">MUST</span> be completed before the Verify URL is fetched
+        (see <a href="#ssrf" class="auto internal xref">Section 10.5</a>):<a href="#section-7-1" class="pilcrow">¶</a></p>
 <ol start="1" type="1" class="normal type-1" id="section-7-2">
         <li id="section-7-2.1">
           The request arrived over HTTPS, the <code>Authorization</code> header
@@ -2069,14 +2072,50 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
         </h3>
 <p id="section-10.5-1">
           Fetching a URL supplied in an incoming request carries the usual
-          SSRF risks associated with any user-supplied URL fetch.
+          SSRF risks associated with any user-supplied URL fetch. The most
+          important protection is the one required by
+          <a href="#prereq" class="auto internal xref">Section 4</a>: the Verifier fetches only from a Verify
+          URL that it has already associated with an identified Prover. A
+          Verifier <span class="bcp14">MUST</span> complete that check before making
+          any request to the Verify URL, and <span class="bcp14">MUST NOT</span> fetch
+          the hash from an arbitrary location merely because a request
+          names it. A Verifier that did would let any caller make it send
+          requests to any place of the caller's choosing.<a href="#section-10.5-1" class="pilcrow">¶</a></p>
+<p id="section-10.5-2">
           Implementations <span class="bcp14">SHOULD</span> apply the same precautions
           they would to any other outbound fetch of prover-supplied data:
           resolving and validating the destination address before
           connecting, rejecting internal or loopback address ranges unless
           explicitly intended (for example, during local development),
           declining to follow redirects (see <a href="#hashing" class="auto internal xref">Section 6</a>), and
-          applying a request timeout.<a href="#section-10.5-1" class="pilcrow">¶</a></p>
+          applying a request timeout.<a href="#section-10.5-2" class="pilcrow">¶</a></p>
+<p id="section-10.5-3">
+          A domain name is not evidence that the address behind it is
+          public. Anyone can publish a DNS record, for a name they control,
+          that points to an address inside the Verifier's own network: a
+          loopback, private-use, link-local, or unique-local address, or
+          an address such as a cloud provider's instance metadata service.
+          A Verify URL inside a declared range is not safe from this either,
+          because a record for it can be changed after the range was
+          declared. A Verifier <span class="bcp14">SHOULD</span> therefore resolve the
+          host name itself and connect only to a resolved address that is
+          not in a special-purpose range, such as those listed in
+          <span>[<a href="#IANA-IPv4-Special" class="cite xref">IANA-IPv4-Special</a>]</span> and
+          <span>[<a href="#IANA-IPv6-Special" class="cite xref">IANA-IPv6-Special</a>]</span>, failing the request if there
+          is no such address. This includes IPv6 addresses that embed an
+          IPv4 address, such as IPv4-mapped and NAT64 addresses. The
+          Verifier <span class="bcp14">SHOULD</span> connect to the address it
+          validated, and not resolve the name a second time, so that a
+          record changed between the check and the connection (DNS
+          rebinding) is not followed. The usual TLS certificate validation
+          against the original host name still applies, but it does not
+          remove the need for these checks, because the connection attempt
+          itself, the time it takes, and the error it produces can reveal
+          what is on the internal network.<a href="#section-10.5-3" class="pilcrow">¶</a></p>
+<p id="section-10.5-4">
+          For the same reason, a Verifier <span class="bcp14">SHOULD NOT</span> include
+          content received from a Verify URL, or detailed connection errors
+          for one, in the error response it sends to the caller.<a href="#section-10.5-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="dos">
@@ -2202,8 +2241,16 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
       </h2>
 <dl class="references">
 <dt id="RFC8555">[RFC8555]</dt>
-    <dd>
+      <dd>
 <span class="refAuthor">Barnes, R.</span>, <span class="refAuthor">Hoffman-Andrews, J.</span>, <span class="refAuthor">McCarney, D.</span>, and <span class="refAuthor">J. Kasten</span>, <span class="refTitle">"Automatic Certificate Management Environment (ACME)"</span>, <span class="seriesInfo">RFC 8555</span>, <time datetime="2019-03" class="refDate">March 2019</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc8555">https://www.rfc-editor.org/info/rfc8555</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="IANA-IPv4-Special">[IANA-IPv4-Special]</dt>
+      <dd>
+<span class="refAuthor">IANA</span>, <span class="refTitle">"IANA IPv4 Special-Purpose Address Registry"</span>, <span>&lt;<a href="https://www.iana.org/assignments/iana-ipv4-special-registry/">https://www.iana.org/assignments/iana-ipv4-special-registry/</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="IANA-IPv6-Special">[IANA-IPv6-Special]</dt>
+    <dd>
+<span class="refAuthor">IANA</span>, <span class="refTitle">"IANA IPv6 Special-Purpose Address Registry"</span>, <span>&lt;<a href="https://www.iana.org/assignments/iana-ipv6-special-registry/">https://www.iana.org/assignments/iana-ipv6-special-registry/</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 </dl>
 </section>
