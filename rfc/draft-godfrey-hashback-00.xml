@@ -65,8 +65,8 @@
         instead, those two values must be regenerated rather than
         text-substituted - replacing NNNN alone would leave them wrong,
         since they are derived from the exact bytes of the JSON. The
-        authors will supply the regenerated values. (The Fixed Salt does
-        not depend on the Version value and is unaffected.)
+        authors will supply the regenerated values. (The Domain Separation
+        Prefix does not depend on the Version value and is unaffected.)
       </t>
     </note>
   </front>
@@ -149,13 +149,15 @@
         </dd>
         <dt>Verification hash:</dt>
         <dd>
-          The Base64-encoded, salted SHA-256 hash of a request's JSON
-          object, as described in <xref target="hashing"/>.
+          The Base64-encoded SHA-256 hash of a request's JSON object,
+          preceded by the Domain Separation Prefix, as described in <xref target="hashing"/>.
         </dd>
-        <dt>Fixed Salt:</dt>
+        <dt>Domain Separation Prefix:</dt>
         <dd>
           A 32-byte value, fixed by this document and not secret, prepended
-          to a request's bytes before hashing. See <xref target="hashing"/>.
+          to a request's bytes before hashing, so that a HashBack
+          verification hash cannot be confused with a hash computed for any
+          other purpose. See <xref target="hashing"/>.
         </dd>
       </dl>
     </section>
@@ -381,8 +383,8 @@ Authorization: HashBack
       </t>
       <ol type="1">
         <li>
-          Concatenate the 32-byte Fixed Salt below with the UTF-8 bytes of
-          the JSON object, salt first.
+          Concatenate the 32-byte Domain Separation Prefix below with the
+          UTF-8 bytes of the JSON object, prefix first.
         </li>
         <li>
           Compute the SHA-256 digest
@@ -393,7 +395,7 @@ Authorization: HashBack
           "<tt>=</tt>" padding.
         </li>
       </ol>
-      <t>The Fixed Salt is the following 32 bytes:</t>
+      <t>The Domain Separation Prefix is the following 32 bytes:</t>
       <artwork name="" type="" align="left" alt=""><![CDATA[
 48,106,239,61,141,188,122,117,
 71,242,89,164,154,89,44,47,
@@ -407,8 +409,8 @@ Authorization: HashBack
         <tt>306AEF3D8DBC7A7547F259A49A592C2F142A22F5FAE68B1E38F028A823B85CFC</tt>.
       </t>
       <t>
-        The Fixed Salt is NOT a secret. Its only purpose is
-        to ensure a HashBack verification hash cannot be confused with, or
+        The Domain Separation Prefix is NOT a secret. Its only purpose is
+        domain separation: to ensure a HashBack verification hash cannot be confused with, or
         produced by, an unrelated general-purpose hashing service, since
         that service would not have prepended this same value. It was
         generated using PBKDF2 with the following parameters, provided

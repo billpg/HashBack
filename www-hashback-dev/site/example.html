@@ -70,19 +70,19 @@ connotations. I’m hoping the community will adopt this alternative name instea
           <span class="number">Step 3</span>
           <h2 id="hash-the-json-and-publish-the-result">Hash the JSON and publish the result</h2>
         </div>
-        <p>Run a <strong>salted SHA-256 hash over your JSON</strong> and base-64 the result. Publish that string
+        <p>Run a <strong>SHA-256 hash over your JSON</strong> and base-64 the result. Publish that string
 as a one-line text file at the URL you listed in your JSON earlier.</p>
-        <pre class="preprecode">$ cat hashback-salt.bin auth.json \
+        <pre class="preprecode">$ cat hashback-prefix.bin auth.json \
     | sha256sum \
     | cut -d ' ' -f1 \
     | xxd -r -p \
     | base64 &gt; verification-hash.txt
 $ scp verification-hash.txt user@host:/user/client.example/data/hashback/502542886.txt
 </pre>
-        <p>The salt is fixed and exists to make sure that the hashes are only useful for this
-exchange. Because the salt is not sent over the wire, we avoid the possibility of abusing
+        <p>The Domain Separation Prefix is fixed and exists to make sure that the hashes are only useful for this
+exchange. Because the prefix is not sent over the wire, we avoid the possibility of abusing
 public hashing services.</p>
-        <p>The salt itself, along with how it was derived, is on the GitHub site.</p>
+        <p>The prefix itself, along with how it was derived, is on the GitHub site.</p>
         <p class="hashbert">
           <strong>🦔 Hashbert says:</strong> “The hash sits there, waiting to be retrieved, ready to exclaim <b>"That Was Me!"</b>.”</p>
       </article>
@@ -136,14 +136,14 @@ Authorization: HashBack eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMi
             <td>The hash was retrieved over TLS with a known CA.</td>
           </tr>
         </table>
-        <p>With the supplied verification hash in hand, the server may now repeat the salted SHA-256
+        <p>With the supplied verification hash in hand, the server may now repeat the SHA-256
 and check it matches the expected verification hash. If they match, it must have come from
 you!</p>
         <div class="flow">
           <div>
             <strong>1. Decode</strong> Read the JSON claim from the header.</div>
           <div>
-            <strong>2. Recalculate</strong> Hash the claim with the fixed salt.</div>
+            <strong>2. Recalculate</strong> Hash the claim with the Domain Separation Prefix.</div>
           <div>
             <strong>3. Compare</strong> Accept an exact match.</div>
         </div>

@@ -56,11 +56,11 @@ connotations. I’m hoping the community will adopt this alternative name instea
 ::: {.step}
 ## Hash the JSON and publish the result
 
-Run a **salted SHA-256 hash over your JSON** and base-64 the result. Publish that string
+Run a **SHA-256 hash over your JSON** and base-64 the result. Publish that string
 as a one-line text file at the URL you listed in your JSON earlier.
 
 ```bash
-$ cat hashback-salt.bin auth.json \
+$ cat hashback-prefix.bin auth.json \
     | sha256sum \
     | cut -d ' ' -f1 \
     | xxd -r -p \
@@ -68,11 +68,11 @@ $ cat hashback-salt.bin auth.json \
 $ scp verification-hash.txt user@host:/user/client.example/data/hashback/502542886.txt
 ```
 
-The salt is fixed and exists to make sure that the hashes are only useful for this
-exchange. Because the salt is not sent over the wire, we avoid the possibility of abusing
+The Domain Separation Prefix is fixed and exists to make sure that the hashes are only useful for this
+exchange. Because the prefix is not sent over the wire, we avoid the possibility of abusing
 public hashing services.
 
-The salt itself, along with how it was derived, is on the GitHub site.
+The prefix itself, along with how it was derived, is on the GitHub site.
 
 <p class="hashbert"><strong>🦔 Hashbert says:</strong> “The hash sits there, waiting to be retrieved, ready to exclaim <b>"That Was Me!"</b>.”</p>
 :::
@@ -114,13 +114,13 @@ Now the server has your JSON, they can now **check everything is right**.
 <tr><td>&#160;✅&#160;</td><td>The hash was retrieved over TLS with a known CA.</td></tr>
 </table>
 
-With the supplied verification hash in hand, the server may now repeat the salted SHA-256
+With the supplied verification hash in hand, the server may now repeat the SHA-256
 and check it matches the expected verification hash. If they match, it must have come from
 you!
 
 <div class="flow">
 <div><strong>1. Decode</strong> Read the JSON claim from the header.</div>
-<div><strong>2. Recalculate</strong> Hash the claim with the fixed salt.</div>
+<div><strong>2. Recalculate</strong> Hash the claim with the Domain Separation Prefix.</div>
 <div><strong>3. Compare</strong> Accept an exact match.</div>
 </div>
 

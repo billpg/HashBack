@@ -1299,8 +1299,8 @@ li > p:last-of-type:only-child {
         instead, those two values must be regenerated rather than
         text-substituted - replacing NNNN alone would leave them wrong,
         since they are derived from the exact bytes of the JSON. The
-        authors will supply the regenerated values. (The Fixed Salt does
-        not depend on the Version value and is unaffected.)<a href="#section-note.1-3" class="pilcrow">¶</a></p>
+        authors will supply the regenerated values. (The Domain Separation
+        Prefix does not depend on the Version value and is unaffected.)<a href="#section-note.1-3" class="pilcrow">¶</a></p>
 </section>
 <div id="status-of-memo">
 <section id="section-boilerplate.1">
@@ -1500,14 +1500,16 @@ li > p:last-of-type:only-child {
         <dd class="break"></dd>
 <dt id="section-2-3.9">Verification hash:</dt>
         <dd style="margin-left: 1.5em" id="section-2-3.10">
-          The Base64-encoded, salted SHA-256 hash of a request's JSON
-          object, as described in <a href="#hashing" class="auto internal xref">Section 6</a>.<a href="#section-2-3.10" class="pilcrow">¶</a>
+          The Base64-encoded SHA-256 hash of a request's JSON object,
+          preceded by the Domain Separation Prefix, as described in <a href="#hashing" class="auto internal xref">Section 6</a>.<a href="#section-2-3.10" class="pilcrow">¶</a>
 </dd>
         <dd class="break"></dd>
-<dt id="section-2-3.11">Fixed Salt:</dt>
+<dt id="section-2-3.11">Domain Separation Prefix:</dt>
         <dd style="margin-left: 1.5em" id="section-2-3.12">
           A 32-byte value, fixed by this document and not secret, prepended
-          to a request's bytes before hashing. See <a href="#hashing" class="auto internal xref">Section 6</a>.<a href="#section-2-3.12" class="pilcrow">¶</a>
+          to a request's bytes before hashing, so that a HashBack
+          verification hash cannot be confused with a hash computed for any
+          other purpose. See <a href="#hashing" class="auto internal xref">Section 6</a>.<a href="#section-2-3.12" class="pilcrow">¶</a>
 </dd>
       <dd class="break"></dd>
 </dl>
@@ -1761,8 +1763,8 @@ Authorization: HashBack
         header. The hash <span class="bcp14">MUST</span> be computed as follows:<a href="#section-6-1" class="pilcrow">¶</a></p>
 <ol start="1" type="1" class="normal type-1" id="section-6-2">
         <li id="section-6-2.1">
-          Concatenate the 32-byte Fixed Salt below with the UTF-8 bytes of
-          the JSON object, salt first.<a href="#section-6-2.1" class="pilcrow">¶</a>
+          Concatenate the 32-byte Domain Separation Prefix below with the
+          UTF-8 bytes of the JSON object, prefix first.<a href="#section-6-2.1" class="pilcrow">¶</a>
 </li>
         <li id="section-6-2.2">
           Compute the SHA-256 digest
@@ -1773,7 +1775,7 @@ Authorization: HashBack
           "<code>=</code>" padding.<a href="#section-6-2.3" class="pilcrow">¶</a>
 </li>
       </ol>
-<p id="section-6-3">The Fixed Salt is the following 32 bytes:<a href="#section-6-3" class="pilcrow">¶</a></p>
+<p id="section-6-3">The Domain Separation Prefix is the following 32 bytes:<a href="#section-6-3" class="pilcrow">¶</a></p>
 <div class="alignLeft art-text artwork" id="section-6-4">
 <pre>
 48,106,239,61,141,188,122,117,
@@ -1788,8 +1790,8 @@ Authorization: HashBack
         hexadecimal:
         <code>306AEF3D8DBC7A7547F259A49A592C2F142A22F5FAE68B1E38F028A823B85CFC</code>.<a href="#section-6-5" class="pilcrow">¶</a></p>
 <p id="section-6-6">
-        The Fixed Salt is NOT a secret. Its only purpose is
-        to ensure a HashBack verification hash cannot be confused with, or
+        The Domain Separation Prefix is NOT a secret. Its only purpose is
+        domain separation: to ensure a HashBack verification hash cannot be confused with, or
         produced by, an unrelated general-purpose hashing service, since
         that service would not have prepended this same value. It was
         generated using PBKDF2 with the following parameters, provided
