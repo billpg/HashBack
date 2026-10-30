@@ -24,10 +24,10 @@ internal static class Helpers
         => new List<string> { VersionString41, VersionString42 }.AsReadOnly();
 
     /// <summary>
-    /// Fixed salt value used for hashing,
-    /// as specified in HashBack version 4.1.
+    /// Domain Separation Prefix used for hashing (called the "fixed salt" in
+    /// earlier drafts), as specified in HashBack version 4.1.
     /// </summary>
-    private static readonly byte[] FixedSalt41 =
+    private static readonly byte[] DomainSeparationPrefix41 =
     [
         113,218,98,9,6,165,151,157,
         46,28,229,16,66,91,91,72,
@@ -36,10 +36,10 @@ internal static class Helpers
     ];
 
     /// <summary>
-    /// Fixed salt value used for hashing,
-    /// as specified in HashBack version 4.2.
+    /// Domain Separation Prefix used for hashing (called the "fixed salt" in
+    /// earlier drafts), as specified in HashBack version 4.2.
     /// </summary>
-    internal static readonly byte[] FixedSalt42 =
+    internal static readonly byte[] DomainSeparationPrefix42 =
     [
         48,106,239,61,141,188,122,117,
         71,242,89,164,154,89,44,47,
@@ -81,47 +81,47 @@ internal static class Helpers
         /* Compute the verification hash from the above byte array and return. */
         return (
             Convert.ToBase64String(jsonAsBytes),
-            ComputeVerificationHash(FixedSalt42, jsonAsBytes));
+            ComputeVerificationHash(DomainSeparationPrefix42, jsonAsBytes));
     }
 
     /// <summary>
-    /// Computes the salted SHA-256 hash of the input bytes as described in the HashBack README,
-    /// and returns the result as a BASE-64 string (with trailing =).
+    /// Computes the SHA-256 hash of the Domain Separation Prefix followed by the input bytes,
+    /// as described in the HashBack README, and returns the result as a BASE-64 string (with trailing =).
     /// </summary>
     /// <param name="version">The HashBack version string.</param>
     /// <param name="input">The byte array to hash (typically the
     /// decoded BASE-64 Authorization payload).</param>
-    /// <returns>BASE-64 encoded salted SHA-256 hash string.</returns>
+    /// <returns>BASE-64 encoded SHA-256 hash string.</returns>
     internal static string ComputeVerificationHash(string version, byte[] input)
     {
-        /* Select salt based on version and call though to the other
+        /* Select the prefix based on version and call though to the other
          * function that operates on two byte arrays. */
-        byte[] salt =
-            (version == VersionString41) ? FixedSalt41 :
-            (version == VersionString42) ? FixedSalt42 :
+        byte[] prefix =
+            (version == VersionString41) ? DomainSeparationPrefix41 :
+            (version == VersionString42) ? DomainSeparationPrefix42 :
             throw new ArgumentException("Unrecognized version string.", nameof(version));
-        return ComputeVerificationHash(salt, input);
+        return ComputeVerificationHash(prefix, input);
     }
 
     /// <summary>
-    /// Computes the salted SHA-256 hash of the input bytes as described in the HashBack README,
-    /// and returns the result as a BASE-64 string (with trailing =).
+    /// Computes the SHA-256 hash of the Domain Separation Prefix followed by the input bytes,
+    /// as described in the HashBack README, and returns the result as a BASE-64 string (with trailing =).
     /// </summary>
-    /// <param name="salt">Salt bytes.</param>
+    /// <param name="prefix">Domain Separation Prefix bytes.</param>
     /// <param name="input">Payload bytes.</param>
-    /// <returns>Base-64 encoded salted hash string.</returns>
-    internal static string ComputeVerificationHash(byte[] salt, byte[] input)
+    /// <returns>Base-64 encoded hash string.</returns>
+    internal static string ComputeVerificationHash(byte[] prefix, byte[] input)
     {
-        /* Combine salt and input. */
-        byte[] salted = new byte[salt.Length + input.Length];
-        Buffer.BlockCopy(salt, 0, salted, 0, salt.Length);
-        Buffer.BlockCopy(input, 0, salted, salt.Length, input.Length);
+        /* Combine prefix and input. */
+        byte[] prefixed = new byte[prefix.Length + input.Length];
+        Buffer.BlockCopy(prefix, 0, prefixed, 0, prefix.Length);
+        Buffer.BlockCopy(input, 0, prefixed, prefix.Length, input.Length);
 
         /* Hash with SHA-256. (SHA256.HashData is a newer static convenience method not
          * available on netstandard2.0, so this uses the older Create()/ComputeHash
          * pattern instead, which works everywhere.) */
         using var sha256 = SHA256.Create();
-        byte[] hash = sha256.ComputeHash(salted);
+        byte[] hash = sha256.ComputeHash(prefixed);
 
         /* Return BASE-64 string, with trailing equals. */
         return Convert.ToBase64String(hash);

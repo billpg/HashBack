@@ -17,40 +17,40 @@ string readmePath = Path.Combine(Directory.GetParent(coreProjectFolder)!.FullNam
 var readmeLines = File.ReadAllLines(readmePath).ToList();
 var readmeOrigText = string.Join("\r\n", readmeLines);
 
-/* Constants from which the fixed salt bytes will be derived. */
-const string fixed_salt_password = "HashBack is dedicated to my Treacle.";
-const string fixed_salt_salt = "I love you to the moon and back.";
-const int fixed_salt_rounds = 238854 * 2; 
+/* Constants from which the Domain Separation Prefix bytes will be derived. */
+const string prefix_password = "HashBack is dedicated to my Treacle.";
+const string prefix_salt = "I love you to the moon and back.";
+const int prefix_rounds = 238854 * 2; 
 
-/* Find the fixed salt. */
-var fixedSaltBytes = Pbkdf2(
-    password: Encoding.ASCII.GetBytes(fixed_salt_password),
-    salt: Encoding.ASCII.GetBytes(fixed_salt_salt),
-    iterations: fixed_salt_rounds,
+/* Find the Domain Separation Prefix. */
+var prefixBytes = Pbkdf2(
+    password: Encoding.ASCII.GetBytes(prefix_password),
+    salt: Encoding.ASCII.GetBytes(prefix_salt),
+    iterations: prefix_rounds,
     hashAlgorithm: HashAlgorithmName.SHA512,
     outputLength: 32);
 
-/* Look for the fixed salt in the README. */
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_PASSWORD-->", StringSaltParameters("Password", fixed_salt_password));
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_DEDICATION-->", StringSaltParameters("Salt", fixed_salt_salt));
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_ITERATIONS-->", $"- Iterations: {fixed_salt_rounds}");
+/* Look for the Domain Separation Prefix in the README. */
+SetTextByMarker(readmeLines, "<!--DOMAIN_SEPARATION_PREFIX_PASSWORD-->", StringSaltParameters("Password", prefix_password));
+SetTextByMarker(readmeLines, "<!--DOMAIN_SEPARATION_PREFIX_DEDICATION-->", StringSaltParameters("Salt", prefix_salt));
+SetTextByMarker(readmeLines, "<!--DOMAIN_SEPARATION_PREFIX_ITERATIONS-->", $"- Iterations: {prefix_rounds}");
 
-/* Look for the fixed salt byte block, two lines after the marker. */
-InsertByteArrayAsText(readmeLines, "<!--FIXED_SALT-->", "```", "```", fixedSaltBytes);
+/* Look for the Domain Separation Prefix byte block, two lines after the marker. */
+InsertByteArrayAsText(readmeLines, "<!--DOMAIN_SEPARATION_PREFIX-->", "```", "```", prefixBytes);
 
-/* Look for the line with the fixed salt in hex/base64. */
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_HEX-->", $"- Hex: `{BytesToHex(fixedSaltBytes)}`");
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_B64-->", $"- Base64: `{Convert.ToBase64String(fixedSaltBytes)}`");
+/* Look for the line with the prefix in hex/base64. */
+SetTextByMarker(readmeLines, "<!--DOMAIN_SEPARATION_PREFIX_HEX-->", $"- Hex: `{BytesToHex(prefixBytes)}`");
+SetTextByMarker(readmeLines, "<!--DOMAIN_SEPARATION_PREFIX_B64-->", $"- Base64: `{Convert.ToBase64String(prefixBytes)}`");
 
-/* Rewrite the HashBackCore copy of the fixed salt in source. */
+/* Rewrite the HashBackCore copy of the Domain Separation Prefix in source. */
 string helpersPath = Path.Combine(coreProjectFolder, "Helpers.cs");
 var helpersLines = File.ReadAllLines(helpersPath).ToList();
-InsertByteArrayAsText(helpersLines, "FixedSalt42", "[", "]", fixedSaltBytes);
+InsertByteArrayAsText(helpersLines, "DomainSeparationPrefix42", "[", "]", prefixBytes);
 File.WriteAllLines(helpersPath, helpersLines);
 
-/* Pull out the compiled copy of the fixed salt and complain if it is different. */
-if (Convert.ToBase64String(billpg.HashBackCore.Helpers.FixedSalt42) 
-    != Convert.ToBase64String(fixedSaltBytes))
+/* Pull out the compiled copy of the prefix and complain if it is different. */
+if (Convert.ToBase64String(billpg.HashBackCore.Helpers.DomainSeparationPrefix42) 
+    != Convert.ToBase64String(prefixBytes))
 {
     Console.WriteLine("Rebuild and run this app again.");
     return;
@@ -80,24 +80,24 @@ if (readmeOrigText != string.Join("\r\n", readmeLines))
 /* Announce end. */
 Console.WriteLine("Finished helper/readme update.");
 
-/* Run PBKDF2 to generate the fixed salt, refering to a cache if we have it. */
+/* Run PBKDF2 to generate the Domain Separation Prefix, refering to a cache if we have it. */
 byte[] Pbkdf2(byte[] password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
 {
     /* Check if we've done this exact hashing operation before. */
-    string cacheFixedSaltPath =
+    string cachePrefixPath =
         Path.Combine(Path.GetTempPath(),
-        "CacheFixedSaltPath" +
+        "CachePrefixPath" +
         $"_{BytesToHex(password)}" +
         $"_{BytesToHex(salt)}" +
         $"_{iterations}" +
         $"_{hashAlgorithm}" +
         $"_{outputLength}.bin");
-    if (File.Exists(cacheFixedSaltPath))
-        return File.ReadAllBytes(cacheFixedSaltPath);
+    if (File.Exists(cachePrefixPath))
+        return File.ReadAllBytes(cachePrefixPath);
 
     /* If not call through to the actual PBKDF2. */
     var hashTimer = Stopwatch.StartNew();
-    var fixedSaltAsBytes = Rfc2898DeriveBytes.Pbkdf2(
+    var prefixAsBytes = Rfc2898DeriveBytes.Pbkdf2(
         password: password,
         salt: salt,
         iterations: iterations,
@@ -106,10 +106,10 @@ byte[] Pbkdf2(byte[] password, byte[] salt, int iterations, HashAlgorithmName ha
     Console.WriteLine($"PBKDF2 took {hashTimer.Elapsed}");
 
     /* Save to cache. */
-    File.WriteAllBytes(cacheFixedSaltPath, fixedSaltAsBytes);
+    File.WriteAllBytes(cachePrefixPath, prefixAsBytes);
 
     /* Return now cached bytes to caller. */
-    return fixedSaltAsBytes;
+    return prefixAsBytes;
 }
 
 /* Expand the salt parameter strings into a longer entry, clarifying their length and byte sum. */
@@ -284,8 +284,8 @@ string GenerateUnus(int bits, string v)
 
 void SetTextByMarker(List<string> lines, string marker, string line)
 {
-    int fixedSaltIndex = lines.FindIndex(src => src.Contains(marker));
-    lines[fixedSaltIndex] = line + marker;
+    int markerIndex = lines.FindIndex(src => src.Contains(marker));
+    lines[markerIndex] = line + marker;
 }
 
 static void InsertByteArrayAsText(List<string> lines, string beacon, string startMarker, string endMarker, byte[] bytes)
