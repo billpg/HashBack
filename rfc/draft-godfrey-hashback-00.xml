@@ -265,9 +265,7 @@ Authorization = "HashBack" 1*SP token68
         <bcp14>MUST</bcp14> be the standard Base64 encoding
         (<xref target="RFC4648" section="4"/>, including
         padding, and without line breaks) of a JSON object, encoded as
-        UTF-8, described below. (Line breaks shown in examples in this
-        document are for presentation only and are not part of the header
-        value.)
+        UTF-8, described below.
       </t>
 
       <section anchor="json-props" numbered="true" toc="default">
@@ -350,25 +348,25 @@ Authorization = "HashBack" 1*SP token68
           <bcp14>MUST NOT</bcp14> use the ToASCII ("<tt>xn--</tt>") form.
         </t>
         <t>For example, the following JSON object:</t>
-        <sourcecode type="json"><![CDATA[
+        <sourcecode type="json" anchor="example-json"><![CDATA[
 {
     "Version": "BILLPG_DRAFT_4.2",
-    "Host": "server.example",
-    "Now": 529297200,
+    "Host": "verifier.example",
+    "Now": 682718520,
     "Unus": "Rpgt4Fc5nMDq14LOps/hYQ==",
-    "Verify": "https://client.example/api/hashback?id=502542886"
+    "Verify": "https://prover.example/api/hashback?id=502542886"
 }
 ]]></sourcecode>
         <t>
           is Base64-encoded and sent as the following
-          <tt>Authorization</tt> header field:
+          <tt>Authorization</tt> header field, with line breaks added for presentation only:
         </t>
-        <sourcecode type="http-message"><![CDATA[
+        <sourcecode type="http-message" anchor="example-auth-header"><![CDATA[
 Authorization: HashBack
- eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMiIsIkhvc3QiOiJzZXJ2ZXIuZXhhbXBs
- ZSIsIk5vdyI6NTI5Mjk3MjAwLCJVbnVzIjoiUnBndDRGYzVuTURxMTRMT3BzL2hZUT09
- IiwiVmVyaWZ5IjoiaHR0cHM6Ly9jbGllbnQuZXhhbXBsZS9hcGkvaGFzaGJhY2s/aWQ9
- NTAyNTQyODg2In0=
+ eyJWZXJzaW9uIjoiQklMTFBHX0RSQUZUXzQuMiIsIkhvc3QiOiJ2ZXJpZmllci5leGFt
+ cGxlIiwiTm93Ijo2ODI3MTg1MjAsIlVudXMiOiJScGd0NEZjNW5NRHExNExPcHMvaFlR
+ PT0iLCJWZXJpZnkiOiJodHRwczovL3Byb3Zlci5leGFtcGxlL2FwaS9oYXNoYmFjaz9p
+ ZD01MDI1NDI4ODYifQ==
 ]]></sourcecode>
       </section>
     </section>
@@ -424,10 +422,10 @@ Authorization: HashBack
         <dt>Iterations:</dt><dd>477708</dd>
         <dt>Output:</dt><dd>256 bits</dd>
       </dl>
-      <t>
+      <t anchor="example-hash">
         The expected verification hash for the example request in
         <xref target="json-props"/> is
-        <tt>/+Zc/xVCVgnnfC69tEybe2TAluOk21ScdystX0/1Ayk=</tt>.
+        <tt>JjXwhKxNa8397PC6qL5takb5DZhEZwReZOJonzhGkUE=</tt>.
       </t>
       <t>
         Once computed, the Prover <bcp14>MUST</bcp14> publish the
