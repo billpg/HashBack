@@ -11,7 +11,9 @@
         HashBack is a two-step authentication exchange carried over HTTPS/TLS
         that allows one HTTP server to authenticate another, without either
         party holding a long-term shared secret, bearer token, or private
-        key. A prover demonstrates its identity by publishing a short cryptographic
+        key. It is intended for unattended services, such as those running
+        in the cloud, which would otherwise have to keep such a credential
+        where an attacker could copy it. A prover demonstrates its identity by publishing a short cryptographic
         hash on a website it controls; the verifier of a request fetches
         that hash over a second, independent HTTPS connection and compares
         it against a value it calculates itself. If the two values match,
@@ -1269,7 +1271,9 @@ li > p:last-of-type:only-child {
         HashBack is a two-step authentication exchange carried over HTTPS/TLS
         that allows one HTTP server to authenticate another, without either
         party holding a long-term shared secret, bearer token, or private
-        key. A prover demonstrates its identity by publishing a short cryptographic
+        key. It is intended for unattended services, such as those running
+        in the cloud, which would otherwise have to keep such a credential
+        where an attacker could copy it. A prover demonstrates its identity by publishing a short cryptographic
         hash on a website it controls; the verifier of a request fetches
         that hash over a second, independent HTTPS connection and compares
         it against a value it calculates itself. If the two values match,
@@ -1349,12 +1353,17 @@ li > p:last-of-type:only-child {
 <nav class="toc"><ul class="compact toc ulBare ulEmpty">
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.1">
             <p id="section-toc.1-1.1.1" class="keepWithNext"><a href="#section-1" class="auto internal xref">1</a>.  <a href="#name-introduction" class="internal xref">Introduction</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.1.2.1">
+                <p id="section-toc.1-1.1.2.1.1" class="keepWithNext"><a href="#section-1.1" class="auto internal xref">1.1</a>.  <a href="#name-comparison-with-other-appro" class="internal xref">Comparison with Other Approaches</a></p>
+</li>
+            </ul>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.2">
             <p id="section-toc.1-1.2.1" class="keepWithNext"><a href="#section-2" class="auto internal xref">2</a>.  <a href="#name-terminology-and-notation" class="internal xref">Terminology and Notation</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3">
-            <p id="section-toc.1-1.3.1" class="keepWithNext"><a href="#section-3" class="auto internal xref">3</a>.  <a href="#name-protocol-overview" class="internal xref">Protocol Overview</a></p>
+            <p id="section-toc.1-1.3.1"><a href="#section-3" class="auto internal xref">3</a>.  <a href="#name-protocol-overview" class="internal xref">Protocol Overview</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4">
             <p id="section-toc.1-1.4.1"><a href="#section-4" class="auto internal xref">4</a>.  <a href="#name-prerequisite-declaring-a-ve" class="internal xref">Prerequisite: Declaring a Verify URL Range</a></p>
@@ -1392,10 +1401,13 @@ li > p:last-of-type:only-child {
                 <p id="section-toc.1-1.10.2.3.1"><a href="#section-10.3" class="auto internal xref">10.3</a>.  <a href="#name-predictability-of-request-c" class="internal xref">Predictability of Request Contents</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10.2.4">
-                <p id="section-toc.1-1.10.2.4.1"><a href="#section-10.4" class="auto internal xref">10.4</a>.  <a href="#name-server-side-request-forgery" class="internal xref">Server-Side Request Forgery Considerations</a></p>
+                <p id="section-toc.1-1.10.2.4.1"><a href="#section-10.4" class="auto internal xref">10.4</a>.  <a href="#name-replay-attacks" class="internal xref">Replay Attacks</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10.2.5">
-                <p id="section-toc.1-1.10.2.5.1"><a href="#section-10.5" class="auto internal xref">10.5</a>.  <a href="#name-denial-of-service-considera" class="internal xref">Denial of Service Considerations</a></p>
+                <p id="section-toc.1-1.10.2.5.1"><a href="#section-10.5" class="auto internal xref">10.5</a>.  <a href="#name-server-side-request-forgery" class="internal xref">Server-Side Request Forgery Considerations</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10.2.6">
+                <p id="section-toc.1-1.10.2.6.1"><a href="#section-10.6" class="auto internal xref">10.6</a>.  <a href="#name-denial-of-service-considera" class="internal xref">Denial of Service Considerations</a></p>
 </li>
             </ul>
 </li>
@@ -1403,19 +1415,16 @@ li > p:last-of-type:only-child {
             <p id="section-toc.1-1.11.1"><a href="#section-11" class="auto internal xref">11</a>. <a href="#name-iana-considerations" class="internal xref">IANA Considerations</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12">
-            <p id="section-toc.1-1.12.1"><a href="#section-12" class="auto internal xref">12</a>. <a href="#name-acknowledgements" class="internal xref">Acknowledgements</a></p>
+            <p id="section-toc.1-1.12.1"><a href="#section-12" class="auto internal xref">12</a>. <a href="#name-normative-references" class="internal xref">Normative References</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13">
-            <p id="section-toc.1-1.13.1"><a href="#section-13" class="auto internal xref">13</a>. <a href="#name-normative-references" class="internal xref">Normative References</a></p>
+            <p id="section-toc.1-1.13.1"><a href="#section-13" class="auto internal xref">13</a>. <a href="#name-informative-references" class="internal xref">Informative References</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.14">
-            <p id="section-toc.1-1.14.1"><a href="#section-14" class="auto internal xref">14</a>. <a href="#name-informative-references" class="internal xref">Informative References</a></p>
+            <p id="section-toc.1-1.14.1"><a href="#appendix-A" class="auto internal xref">Appendix A</a>.  <a href="#name-reference-implementation" class="internal xref">Reference Implementation</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.15">
-            <p id="section-toc.1-1.15.1"><a href="#appendix-A" class="auto internal xref">Appendix A</a>.  <a href="#name-reference-implementation" class="internal xref">Reference Implementation</a></p>
-</li>
-          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.16">
-            <p id="section-toc.1-1.16.1"><a href="#appendix-B" class="auto internal xref"></a><a href="#name-authors-address" class="internal xref">Author's Address</a></p>
+            <p id="section-toc.1-1.15.1"><a href="#appendix-B" class="auto internal xref"></a><a href="#name-authors-address" class="internal xref">Author's Address</a></p>
 </li>
         </ul>
 </nav>
@@ -1427,16 +1436,26 @@ li > p:last-of-type:only-child {
 <a href="#section-1" class="section-number selfRef">1. </a><a href="#name-introduction" class="section-name selfRef">Introduction</a>
       </h2>
 <p id="section-1-1">
-        A server that calls out to another server over the Internet
-        typically needs some way to prove its identity: an API key, a
-        bearer token, a shared secret, or a private key backing a client
-        TLS certificate. Whichever form it takes, that credential has to be
-        generated, distributed to the calling service, stored securely at
-        both ends, and eventually rotated - all before the two services can
-        exchange a single authenticated request.<a href="#section-1-1" class="pilcrow">¶</a></p>
+        Consider a service running unattended in the cloud that makes
+        requests to another service over the Internet. To prove its
+        identity it normally needs a credential: an API key, a bearer
+        token, a shared secret, or the private key behind a client TLS
+        certificate. That credential has to be readable by the running
+        code, so it must be kept somewhere the code can reach without a
+        person present to unlock it: a configuration file, an environment
+        variable, a machine image, or a secrets manager. Anyone who obtains
+        a copy from a backup, a log, a build system, or a compromised host
+        can impersonate the service from anywhere, until the credential is
+        noticed and rotated. A secrets manager moves the problem rather
+        than removing it, because the service needs a credential of its
+        own to open it. The credential also has to be generated,
+        distributed to the calling service, stored securely at both ends,
+        and eventually rotated, all before the two services can exchange a
+        single authenticated request.<a href="#section-1-1" class="pilcrow">¶</a></p>
 <p id="section-1-2">
-        HashBack removes the need for that long-term credential entirely.
-        Instead, it relies on a property both parties already have if they
+        The motivation for HashBack is to avoid all of that: a calling
+        service should not have to hold any long-term private key, token,
+        or password in order to prove who it is. Instead, it relies on a property both parties already have if they
         are communicating over HTTPS at all: each side runs a TLS-secured
         web server that the other side can reach. HashBack uses this in a
         manner similar to a phone call placed to a trusted number and then
@@ -1445,17 +1464,59 @@ li > p:last-of-type:only-child {
         there to check", and publishes a value at that URL for the
         verifier to retrieve.<a href="#section-1-2" class="pilcrow">¶</a></p>
 <p id="section-1-3">
+        This does not make a compromised host harmless: an attacker in
+        control of the prover can still publish hashes while it remains in
+        control. What HashBack avoids is leaving a reusable credential on
+        the machine, one that can be copied away and used elsewhere, or
+        later, after the attacker has lost access. The prover, being a web
+        server itself, needs no credential beyond its own ability to serve
+        a small file at a URL it controls.<a href="#section-1-3" class="pilcrow">¶</a></p>
+<p id="section-1-4">
         This is deliberately similar in spirit to the challenge exchange
         used by the Automatic Certificate Management Environment (ACME)
         <span>[<a href="#RFC8555" class="cite xref">RFC8555</a>]</span>, which validates control of a domain name
         by asking the requester to publish a token there ahead of a
         certificate being issued. HashBack applies the same "prove control
         of a URL" idea to general-purpose API authentication, and reduces
-        the exchange to two HTTP transactions instead of three.<a href="#section-1-3" class="pilcrow">¶</a></p>
-<p id="section-1-4">
+        the exchange to two HTTP transactions instead of three.<a href="#section-1-4" class="pilcrow">¶</a></p>
+<p id="section-1-5">
         This document is an early, individual Internet-Draft. It has not
         been adopted by any IETF working group. It is published to invite
-        review and comment ahead of a future submission for standardization.<a href="#section-1-4" class="pilcrow">¶</a></p>
+        review and comment ahead of a future submission for standardization.<a href="#section-1-5" class="pilcrow">¶</a></p>
+<div id="comparison">
+<section id="section-1.1">
+        <h3 id="name-comparison-with-other-appro">
+<a href="#section-1.1" class="section-number selfRef">1.1. </a><a href="#name-comparison-with-other-appro" class="section-name selfRef">Comparison with Other Approaches</a>
+        </h3>
+<p id="section-1.1-1">
+          Mutual TLS (client certificates, as part of TLS
+          <span>[<a href="#RFC8446" class="cite xref">RFC8446</a>]</span>) and HTTP Message Signatures
+          <span>[<a href="#RFC9421" class="cite xref">RFC9421</a>]</span> are well-established ways for one
+          service to authenticate to another, and are the better choice in
+          many deployments. Both, however, rest on a private key (or, for
+          the MAC form of HTTP Message Signatures, a shared secret) held by
+          the calling service, which is the long-term credential described
+          above. Each also needs that key or certificate to be provisioned,
+          registered with or trusted by every service that will verify it,
+          and rotated. Mutual TLS has a further operational cost: the
+          client certificate is checked during the TLS handshake, so it
+          does not survive a load balancer, CDN, or other intermediary that
+          terminates TLS in front of the Verifier, unless that intermediary
+          forwards the identity some other way.<a href="#section-1.1-1" class="pilcrow">¶</a></p>
+<p id="section-1.1-2">
+          HashBack trades these costs for others. The Verifier makes an
+          additional HTTPS request for every authenticated request (see
+          <a href="#repeated-requests" class="auto internal xref">Section 9</a>), and the Prover must be able
+          to serve a small file at a URL it controls. HashBack also gives a
+          narrower guarantee: it authenticates the Prover for a request,
+          but it does not sign the content of the request as HTTP Message
+          Signatures can, so it provides no integrity protection for the
+          message beyond TLS. Where that property is needed, or where the
+          calling service can protect a private key so that it cannot be
+          copied (for example in a hardware security module), those
+          mechanisms may be more appropriate.<a href="#section-1.1-2" class="pilcrow">¶</a></p>
+</section>
+</div>
 </section>
 </div>
 <div id="terminology">
@@ -1486,10 +1547,13 @@ li > p:last-of-type:only-child {
         <dd class="break"></dd>
 <dt id="section-2-3.5">Unus:</dt>
         <dd style="margin-left: 1.5em" id="section-2-3.6">
-          A 128-bit cryptographic-quality random value, encoded in Base64,
-          included in every request to make its verification hash
-          unpredictable. Equivalent in purpose to a cryptographic nonce.
-          The name is the Latin word for "one" or "single".<a href="#section-2-3.6" class="pilcrow">¶</a>
+          A value generated by the Prover for each request, which must be
+          both unique and unpredictable: 16 bytes from a cryptographically
+          secure random number generator, Base64-encoded. It serves the
+          purpose of a cryptographic nonce, except that it must be
+          unpredictable and not merely unique. The name is the Latin word
+          for "one", used here instead of "nonce", which is an offensive
+          slang term in some varieties of English.<a href="#section-2-3.6" class="pilcrow">¶</a>
 </dd>
         <dd class="break"></dd>
 <dt id="section-2-3.7">Verify URL:</dt>
@@ -1600,6 +1664,11 @@ li > p:last-of-type:only-child {
             <td class="text-left" rowspan="1" colspan="1">Not protected by TLS</td>
           </tr>
           <tr>
+            <td class="text-left" rowspan="1" colspan="1">https://192.0.2.1/hashback?id=*</td>
+            <td class="text-left" rowspan="1" colspan="1">No</td>
+            <td class="text-left" rowspan="1" colspan="1">Host is an IP address, not a domain name the Prover controls</td>
+          </tr>
+          <tr>
             <td class="text-left" rowspan="1" colspan="1">https://example.com/*</td>
             <td class="text-left" rowspan="1" colspan="1">No</td>
             <td class="text-left" rowspan="1" colspan="1">Too broad; covers content the Prover does not control</td>
@@ -1691,8 +1760,9 @@ Authorization = "HashBack" 1*SP token68
           <dd class="break"></dd>
 <dt id="section-5.1-2.7">Unus:</dt>
           <dd style="margin-left: 1.5em" id="section-5.1-2.8">
-            128 bits of cryptographic-quality randomness, Base64-encoded
-            including any trailing "<code>=</code>" padding. Every other
+            16 bytes (128 bits) of cryptographic-quality randomness,
+            Base64-encoded including any trailing "<code>=</code>" padding,
+            which makes 24 characters ending in "<code>==</code>". Every other
             property of this JSON object is potentially predictable to an
             attacker; the security of this exchange depends on this value,
             and only this value, being unpredictable (see
@@ -1700,7 +1770,8 @@ Authorization = "HashBack" 1*SP token68
             <span class="bcp14">MUST NOT</span> reuse a <code>Unus</code> value across
             requests. A Verifier <span class="bcp14">SHOULD</span> reject any request
             reusing a <code>Unus</code> value it has already seen within its
-            configured <code>Now</code> tolerance window.<a href="#section-5.1-2.8" class="pilcrow">¶</a>
+            configured <code>Now</code> tolerance window. See
+            <a href="#replay" class="auto internal xref">Section 10.4</a>.<a href="#section-5.1-2.8" class="pilcrow">¶</a>
 </dd>
           <dd class="break"></dd>
 <dt id="section-5.1-2.9">Verify:</dt>
@@ -1869,8 +1940,11 @@ Authorization: HashBack
 <p id="section-7-1">
         On receiving a request bearing a HashBack
         <code>Authorization</code> header, the Verifier
-        <span class="bcp14">MUST</span> perform the following checks, in any order,
-        before treating the request as authenticated:<a href="#section-7-1" class="pilcrow">¶</a></p>
+        <span class="bcp14">MUST</span> perform the following checks before treating
+        the request as authenticated. They may be performed in any order,
+        except that the check of the <code>Verify</code> property
+        <span class="bcp14">MUST</span> be completed before the Verify URL is fetched
+        (see <a href="#ssrf" class="auto internal xref">Section 10.5</a>):<a href="#section-7-1" class="pilcrow">¶</a></p>
 <ol start="1" type="1" class="normal type-1" id="section-7-2">
         <li id="section-7-2.1">
           The request arrived over HTTPS, the <code>Authorization</code> header
@@ -1890,8 +1964,9 @@ Authorization: HashBack
           tolerance of its own clock.<a href="#section-7-2.4" class="pilcrow">¶</a>
 </li>
         <li id="section-7-2.5">
-          The <code>Unus</code> property is well-formed and, if replay
-          protection is configured, has not already been seen.<a href="#section-7-2.5" class="pilcrow">¶</a>
+          The <code>Unus</code> property is well-formed, meaning that it
+          Base64-decodes to exactly 16 bytes, and, if replay protection is
+          configured, has not already been seen.<a href="#section-7-2.5" class="pilcrow">¶</a>
 </li>
         <li id="section-7-2.6">
           The <code>Verify</code> property is an HTTPS URL the Verifier can
@@ -2028,29 +2103,85 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
           generator, and <span class="bcp14">MUST NOT</span> reuse a value.<a href="#section-10.3-1" class="pilcrow">¶</a></p>
 </section>
 </div>
-<div id="ssrf">
+<div id="replay">
 <section id="section-10.4">
-        <h3 id="name-server-side-request-forgery">
-<a href="#section-10.4" class="section-number selfRef">10.4. </a><a href="#name-server-side-request-forgery" class="section-name selfRef">Server-Side Request Forgery Considerations</a>
+        <h3 id="name-replay-attacks">
+<a href="#section-10.4" class="section-number selfRef">10.4. </a><a href="#name-replay-attacks" class="section-name selfRef">Replay Attacks</a>
         </h3>
 <p id="section-10.4-1">
+          A captured request is accepted only if its <code>Now</code> is within
+          the Verifier's tolerance, its <code>Host</code> names that Verifier,
+          its <code>Unus</code> has not been seen before, and the Verify URL
+          still returns the matching hash. A Verifier that wants replay
+          protection <span class="bcp14">MUST</span> remember each <code>Unus</code> for at
+          least as long as the request remains acceptable, which is until
+          <code>Now</code> plus the tolerance. A Prover <span class="bcp14">SHOULD</span>
+          stop serving a verification hash once the Verifier's window has
+          passed, and <span class="bcp14">MAY</span> serve it only once.<a href="#section-10.4-1" class="pilcrow">¶</a></p>
+<p id="section-10.4-2">
+          Without <code>Unus</code> tracking or hash expiry, a captured request
+          can be replayed until its <code>Now</code> is out of tolerance.<a href="#section-10.4-2" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="ssrf">
+<section id="section-10.5">
+        <h3 id="name-server-side-request-forgery">
+<a href="#section-10.5" class="section-number selfRef">10.5. </a><a href="#name-server-side-request-forgery" class="section-name selfRef">Server-Side Request Forgery Considerations</a>
+        </h3>
+<p id="section-10.5-1">
           Fetching a URL supplied in an incoming request carries the usual
-          SSRF risks associated with any user-supplied URL fetch.
+          SSRF risks associated with any user-supplied URL fetch. The most
+          important protection is the one required by
+          <a href="#prereq" class="auto internal xref">Section 4</a>: the Verifier fetches only from a Verify
+          URL that it has already associated with an identified Prover. A
+          Verifier <span class="bcp14">MUST</span> complete that check before making
+          any request to the Verify URL, and <span class="bcp14">MUST NOT</span> fetch
+          the hash from an arbitrary location merely because a request
+          names it. A Verifier that did would let any caller make it send
+          requests to any place of the caller's choosing.<a href="#section-10.5-1" class="pilcrow">¶</a></p>
+<p id="section-10.5-2">
           Implementations <span class="bcp14">SHOULD</span> apply the same precautions
           they would to any other outbound fetch of prover-supplied data:
           resolving and validating the destination address before
           connecting, rejecting internal or loopback address ranges unless
           explicitly intended (for example, during local development),
           declining to follow redirects (see <a href="#hashing" class="auto internal xref">Section 6</a>), and
-          applying a request timeout.<a href="#section-10.4-1" class="pilcrow">¶</a></p>
+          applying a request timeout.<a href="#section-10.5-2" class="pilcrow">¶</a></p>
+<p id="section-10.5-3">
+          A domain name is not evidence that the address behind it is
+          public. Anyone can publish a DNS record, for a name they control,
+          that points to an address inside the Verifier's own network: a
+          loopback, private-use, link-local, or unique-local address, or
+          an address such as a cloud provider's instance metadata service.
+          A Verify URL inside a declared range is not safe from this either,
+          because a record for it can be changed after the range was
+          declared. A Verifier <span class="bcp14">SHOULD</span> therefore resolve the
+          host name itself and connect only to a resolved address that is
+          not in a special-purpose range, such as those listed in
+          <span>[<a href="#IANA-IPv4-Special" class="cite xref">IANA-IPv4-Special</a>]</span> and
+          <span>[<a href="#IANA-IPv6-Special" class="cite xref">IANA-IPv6-Special</a>]</span>, failing the request if there
+          is no such address. This includes IPv6 addresses that embed an
+          IPv4 address, such as IPv4-mapped and NAT64 addresses. The
+          Verifier <span class="bcp14">SHOULD</span> connect to the address it
+          validated, and not resolve the name a second time, so that a
+          record changed between the check and the connection (DNS
+          rebinding) is not followed. The usual TLS certificate validation
+          against the original host name still applies, but it does not
+          remove the need for these checks, because the connection attempt
+          itself, the time it takes, and the error it produces can reveal
+          what is on the internal network.<a href="#section-10.5-3" class="pilcrow">¶</a></p>
+<p id="section-10.5-4">
+          For the same reason, a Verifier <span class="bcp14">SHOULD NOT</span> include
+          content received from a Verify URL, or detailed connection errors
+          for one, in the error response it sends to the caller.<a href="#section-10.5-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="dos">
-<section id="section-10.5">
+<section id="section-10.6">
         <h3 id="name-denial-of-service-considera">
-<a href="#section-10.5" class="section-number selfRef">10.5. </a><a href="#name-denial-of-service-considera" class="section-name selfRef">Denial of Service Considerations</a>
+<a href="#section-10.6" class="section-number selfRef">10.6. </a><a href="#name-denial-of-service-considera" class="section-name selfRef">Denial of Service Considerations</a>
         </h3>
-<p id="section-10.5-1">
+<p id="section-10.6-1">
           Because every incoming request with a HashBack header causes the
           Verifier to make a further outbound HTTPS request, a flood of
           fabricated <code>Authorization</code> headers could be used to
@@ -2059,14 +2190,14 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
           Implementations <span class="bcp14">SHOULD</span> apply a short connection
           and response timeout to the Verify URL fetch, and
           <span class="bcp14">MAY</span> track and rate-limit sources of requests that
-          repeatedly fail verification.<a href="#section-10.5-1" class="pilcrow">¶</a></p>
-<p id="section-10.5-2">
+          repeatedly fail verification.<a href="#section-10.6-1" class="pilcrow">¶</a></p>
+<p id="section-10.6-2">
           A related concern is a malicious Verify URL that accepts the
           connection but never completes the response, tying up a
           connection on the Verifier for as long as it is willing to wait.
           A short, strictly enforced timeout on the Verify URL fetch
           mitigates this; the timeout only needs to be long enough for the
-          expected response to arrive under normal network conditions.<a href="#section-10.5-2" class="pilcrow">¶</a></p>
+          expected response to arrive under normal network conditions.<a href="#section-10.6-2" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -2113,23 +2244,9 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
         IANA registries at this time.<a href="#section-11-3" class="pilcrow">¶</a></p>
 </section>
 </div>
-<div id="acknowledgements">
 <section id="section-12">
-      <h2 id="name-acknowledgements">
-<a href="#section-12" class="section-number selfRef">12. </a><a href="#name-acknowledgements" class="section-name selfRef">Acknowledgements</a>
-      </h2>
-<p id="section-12-1">
-        The author thanks Danny Wilson for feedback and for developing an
-        independent implementation of this exchange; multiple independent
-        implementations are valuable when establishing a new standard.
-        The author also thanks "buzer" of Hacker News for raising the
-        slow-verification-URL denial-of-service concern discussed in
-        <a href="#dos" class="auto internal xref">Section 10.5</a>.<a href="#section-12-1" class="pilcrow">¶</a></p>
-</section>
-</div>
-<section id="section-13">
       <h2 id="name-normative-references">
-<a href="#section-13" class="section-number selfRef">13. </a><a href="#name-normative-references" class="section-name selfRef">Normative References</a>
+<a href="#section-12" class="section-number selfRef">12. </a><a href="#name-normative-references" class="section-name selfRef">Normative References</a>
       </h2>
 <dl class="references">
 <dt id="RFC2119">[RFC2119]</dt>
@@ -2162,14 +2279,30 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
 <dd class="break"></dd>
 </dl>
 </section>
-<section id="section-14">
+<section id="section-13">
       <h2 id="name-informative-references">
-<a href="#section-14" class="section-number selfRef">14. </a><a href="#name-informative-references" class="section-name selfRef">Informative References</a>
+<a href="#section-13" class="section-number selfRef">13. </a><a href="#name-informative-references" class="section-name selfRef">Informative References</a>
       </h2>
 <dl class="references">
 <dt id="RFC8555">[RFC8555]</dt>
-    <dd>
+      <dd>
 <span class="refAuthor">Barnes, R.</span>, <span class="refAuthor">Hoffman-Andrews, J.</span>, <span class="refAuthor">McCarney, D.</span>, and <span class="refAuthor">J. Kasten</span>, <span class="refTitle">"Automatic Certificate Management Environment (ACME)"</span>, <span class="seriesInfo">RFC 8555</span>, <time datetime="2019-03" class="refDate">March 2019</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc8555">https://www.rfc-editor.org/info/rfc8555</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC8446">[RFC8446]</dt>
+      <dd>
+<span class="refAuthor">Rescorla, E.</span>, <span class="refTitle">"The Transport Layer Security (TLS) Protocol Version 1.3"</span>, <span class="seriesInfo">RFC 8446</span>, <time datetime="2018-08" class="refDate">August 2018</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc8446">https://www.rfc-editor.org/info/rfc8446</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9421">[RFC9421]</dt>
+      <dd>
+<span class="refAuthor">Backman, A., Ed.</span>, <span class="refAuthor">Richer, J., Ed.</span>, and <span class="refAuthor">M. Sporny</span>, <span class="refTitle">"HTTP Message Signatures"</span>, <span class="seriesInfo">RFC 9421</span>, <time datetime="2024-02" class="refDate">February 2024</time>, <span>&lt;<a href="https://www.rfc-editor.org/info/rfc9421">https://www.rfc-editor.org/info/rfc9421</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="IANA-IPv4-Special">[IANA-IPv4-Special]</dt>
+      <dd>
+<span class="refAuthor">IANA</span>, <span class="refTitle">"IANA IPv4 Special-Purpose Address Registry"</span>, <span>&lt;<a href="https://www.iana.org/assignments/iana-ipv4-special-registry/">https://www.iana.org/assignments/iana-ipv4-special-registry/</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="IANA-IPv6-Special">[IANA-IPv6-Special]</dt>
+    <dd>
+<span class="refAuthor">IANA</span>, <span class="refTitle">"IANA IPv6 Special-Purpose Address Registry"</span>, <span>&lt;<a href="https://www.iana.org/assignments/iana-ipv6-special-registry/">https://www.iana.org/assignments/iana-ipv6-special-registry/</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 </dl>
 </section>
