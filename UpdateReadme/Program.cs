@@ -1,5 +1,6 @@
 ﻿/* Modify the README.md file with correct tokens and 
  * signatures using the crypto-helper functions. */
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.Reflection;
@@ -68,7 +69,7 @@ PopulateExample(
     "CASE_STUDY",
     DateTime.Parse("1991-08-20T23:02:00+03:00"),
     "RutabagaRepublic.example",
-    "Petunia.example");
+    "petunia.example");
 
 /* If README has changed, rewrite back. */
 if (readmeOrigText != string.Join("\r\n", readmeLines))
@@ -177,16 +178,17 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     int responseMarkerLineIndex = readmeLines.FindIndex(s => s.Contains($"<!--{keyBase}_SET_COOKIE-->"));
     if (responseMarkerLineIndex > 0)
     {
-        string setCookieHeader =
-            $"Set-Cookie:" +
-            $" RutabagaAuth={GenerateBearerToken(keyBase)};\r\n" +
-            $"  Domain={xnHostDomain};\r\n" +
-            $"  Expires={now.AddSeconds(4601):R};\r\n" +
-            $"  Secure; HttpOnly; SameSite=Strict";
+        string[] setCookieHeader =
+        [
+            $"Set-Cookie: RutabagaAuth={GenerateBearerToken(keyBase)};",
+            $"  Domain={xnHostDomain};",
+            $"  Expires={now.AddSeconds(4601):R};",
+            $"  Secure; HttpOnly; SameSite=Strict"
+        ];
         int setCookieLineIndex = readmeLines.FindIndex(responseMarkerLineIndex, s => s.StartsWith("Set-Cookie:"));
         int endSetCookie = readmeLines.FindIndex(setCookieLineIndex+1, s => s.StartsWith(' ') == false);
-        readmeLines[setCookieLineIndex] = setCookieHeader;
-        readmeLines.RemoveRange(setCookieLineIndex + 1, endSetCookie - setCookieLineIndex - 1);
+        readmeLines.RemoveRange(setCookieLineIndex, endSetCookie - setCookieLineIndex);
+        readmeLines.InsertRange(setCookieLineIndex, setCookieHeader);
     }
 }
 
@@ -222,8 +224,17 @@ string GenerateBearerToken(string keyBase)
 
 void ReplaceJson(string tag, JObject insert)
 {
+    /* Format the JSON with four-space indentation. (Newtonsoft's default is two spaces,
+     * and its line endings depend on the operating system, so write it out explicitly.) */
+    var jsonStringWriter = new StringWriter { NewLine = "\n" };
+    using (var jsonWriter = new JsonTextWriter(jsonStringWriter)
+        { Formatting = Formatting.Indented, Indentation = 4, IndentChar = ' ' })
+    {
+        insert.WriteTo(jsonWriter);
+    }
+
     /* Turn the JSON object into a Json string with only ascii. */
-    StringBuilder jsonAsString = new StringBuilder(insert.ToString().Replace("\r\n  ", "\r\n    "));
+    StringBuilder jsonAsString = new StringBuilder(jsonStringWriter.ToString());
     for (int jsonIndex = jsonAsString.Length-1; jsonIndex > 0; jsonIndex--)
     {
         char ch = jsonAsString[jsonIndex];
@@ -241,8 +252,8 @@ void ReplaceJson(string tag, JObject insert)
     int closeBraceIndex = readmeLines.FindIndex(openBraceIndex, src => src == "}");
     readmeLines.RemoveRange(openBraceIndex, closeBraceIndex - openBraceIndex + 1);
 
-    /* Insert back into code. */
-    readmeLines.Insert(openBraceIndex, jsonAsString.ToString());
+    /* Insert back into code, as one README line per JSON line. */
+    readmeLines.InsertRange(openBraceIndex, jsonAsString.ToString().Split('\n'));
 }
 
 /* Find the folder with the given name, starting from this file's folder moving upwards. */
