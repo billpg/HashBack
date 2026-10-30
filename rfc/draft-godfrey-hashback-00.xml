@@ -808,18 +808,6 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
       </t>
     </section>
 
-    <section anchor="acknowledgements" numbered="true" toc="default">
-      <name>Acknowledgements</name>
-      <t>
-        The author thanks Danny Wilson for feedback and for developing an
-        independent implementation of this exchange; multiple independent
-        implementations are valuable when establishing a new standard.
-        The author also thanks "buzer" of Hacker News for raising the
-        slow-verification-URL denial-of-service concern discussed in
-        <xref target="dos"/>.
-      </t>
-    </section>
-
   </middle>
 
   <back>
