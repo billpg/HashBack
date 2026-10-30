@@ -603,8 +603,7 @@ Authorization: HashBack
       </t>
       <sourcecode type="http-message"><![CDATA[
 HTTP/1.1 401 Unauthorized
-WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
- version="RFC_NNNN,BILLPG_DRAFT_4.2,BILLPG_DRAFT_4.1"
+WWW-Authenticate: HashBack version="RFC_NNNN,BILLPG_DRAFT_4.2"
 ]]></sourcecode>
       <t>
         A Prover that already knows a Verifier supports HashBack
