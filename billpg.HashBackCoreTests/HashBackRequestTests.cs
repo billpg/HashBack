@@ -37,6 +37,28 @@ namespace billpg.HashBackCoreTests
         }
 
         [TestMethod]
+        public void Create_UnusWithPlusSign_WritesItLiterallyNotEscaped()
+        {
+            /* The default JSON encoder would escape "+" as \u002B, leaving the decoded
+             * header different from the JSON a reader of the README would expect. */
+            string unus = "sGhK1rIbEWjW6Sg25s+KPg==";
+            var request = HashBackRequest.Create(
+                "rutabaga-republic.example", 682718520L, unus,
+                new Uri("https://parsnip.example/api/hashback?id=901983180"));
+
+            /* Decode the header back into JSON text. */
+            string json = Encoding.UTF8.GetString(Convert.FromBase64String(request.AuthToken));
+
+            StringAssert.Contains(json, "\"Unus\":\"sGhK1rIbEWjW6Sg25s+KPg==\"");
+            Assert.IsFalse(json.Contains("\\u002B"), "The plus sign should not be escaped.");
+
+            /* The hash is computed over those same bytes, so it still round-trips. */
+            var parsed = HashBackRequest.Parse(request.AuthToken);
+            Assert.AreEqual(unus, parsed.Unus);
+            Assert.AreEqual(request.VerificationHash, parsed.VerificationHash);
+        }
+
+        [TestMethod]
         public void Create_Auto_ProducesValidBase64AndHash()
         {
             /* Sample values. */

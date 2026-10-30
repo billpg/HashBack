@@ -1,5 +1,6 @@
 ﻿/* Modify the README.md file with correct tokens and 
  * signatures using the crypto-helper functions. */
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.Reflection;
@@ -17,40 +18,40 @@ string readmePath = Path.Combine(Directory.GetParent(coreProjectFolder)!.FullNam
 var readmeLines = File.ReadAllLines(readmePath).ToList();
 var readmeOrigText = string.Join("\r\n", readmeLines);
 
-/* Constants from which the fixed salt bytes will be derived. */
-const string fixed_salt_password = "HashBack is dedicated to my Treacle.";
-const string fixed_salt_salt = "I love you to the moon and back.";
-const int fixed_salt_rounds = 238854 * 2; 
+/* Constants from which the Domain Separation Prefix bytes will be derived. */
+const string prefix_password = "HashBack is dedicated to my Treacle.";
+const string prefix_salt = "I love you to the moon and back.";
+const int prefix_rounds = 238854 * 2; 
 
-/* Find the fixed salt. */
-var fixedSaltBytes = Pbkdf2(
-    password: Encoding.ASCII.GetBytes(fixed_salt_password),
-    salt: Encoding.ASCII.GetBytes(fixed_salt_salt),
-    iterations: fixed_salt_rounds,
+/* Find the Domain Separation Prefix. */
+var prefixBytes = Pbkdf2(
+    password: Encoding.ASCII.GetBytes(prefix_password),
+    salt: Encoding.ASCII.GetBytes(prefix_salt),
+    iterations: prefix_rounds,
     hashAlgorithm: HashAlgorithmName.SHA512,
     outputLength: 32);
 
-/* Look for the fixed salt in the README. */
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_PASSWORD-->", StringSaltParameters("Password", fixed_salt_password));
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_DEDICATION-->", StringSaltParameters("Salt", fixed_salt_salt));
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_ITERATIONS-->", $"- Iterations: {fixed_salt_rounds}");
+/* Look for the Domain Separation Prefix in the README. */
+SetTextByMarker(readmeLines, "<!--DOMAIN_SEPARATION_PREFIX_PASSWORD-->", StringSaltParameters("Password", prefix_password));
+SetTextByMarker(readmeLines, "<!--DOMAIN_SEPARATION_PREFIX_DEDICATION-->", StringSaltParameters("Salt", prefix_salt));
+SetTextByMarker(readmeLines, "<!--DOMAIN_SEPARATION_PREFIX_ITERATIONS-->", $"- Iterations: {prefix_rounds}");
 
-/* Look for the fixed salt byte block, two lines after the marker. */
-InsertByteArrayAsText(readmeLines, "<!--FIXED_SALT-->", "```", "```", fixedSaltBytes);
+/* Look for the Domain Separation Prefix byte block, two lines after the marker. */
+InsertByteArrayAsText(readmeLines, "<!--DOMAIN_SEPARATION_PREFIX-->", "```", "```", prefixBytes);
 
-/* Look for the line with the fixed salt in hex/base64. */
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_HEX-->", $"- Hex: `{BytesToHex(fixedSaltBytes)}`");
-SetTextByMarker(readmeLines, "<!--FIXED_SALT_B64-->", $"- Base64: `{Convert.ToBase64String(fixedSaltBytes)}`");
+/* Look for the line with the prefix in hex/base64. */
+SetTextByMarker(readmeLines, "<!--DOMAIN_SEPARATION_PREFIX_HEX-->", $"- Hex: `{BytesToHex(prefixBytes)}`");
+SetTextByMarker(readmeLines, "<!--DOMAIN_SEPARATION_PREFIX_B64-->", $"- Base64: `{Convert.ToBase64String(prefixBytes)}`");
 
-/* Rewrite the HashBackCore copy of the fixed salt in source. */
+/* Rewrite the HashBackCore copy of the Domain Separation Prefix in source. */
 string helpersPath = Path.Combine(coreProjectFolder, "Helpers.cs");
 var helpersLines = File.ReadAllLines(helpersPath).ToList();
-InsertByteArrayAsText(helpersLines, "FixedSalt42", "[", "]", fixedSaltBytes);
+InsertByteArrayAsText(helpersLines, "DomainSeparationPrefix42", "[", "]", prefixBytes);
 File.WriteAllLines(helpersPath, helpersLines);
 
-/* Pull out the compiled copy of the fixed salt and complain if it is different. */
-if (Convert.ToBase64String(billpg.HashBackCore.Helpers.FixedSalt42) 
-    != Convert.ToBase64String(fixedSaltBytes))
+/* Pull out the compiled copy of the prefix and complain if it is different. */
+if (Convert.ToBase64String(billpg.HashBackCore.Helpers.DomainSeparationPrefix42) 
+    != Convert.ToBase64String(prefixBytes))
 {
     Console.WriteLine("Rebuild and run this app again.");
     return;
@@ -68,7 +69,7 @@ PopulateExample(
     "CASE_STUDY",
     DateTime.Parse("1991-08-20T23:02:00+03:00"),
     "RutabagaRepublic.example",
-    "Petunia.example");
+    "petunia.example");
 
 /* If README has changed, rewrite back. */
 if (readmeOrigText != string.Join("\r\n", readmeLines))
@@ -80,24 +81,24 @@ if (readmeOrigText != string.Join("\r\n", readmeLines))
 /* Announce end. */
 Console.WriteLine("Finished helper/readme update.");
 
-/* Run PBKDF2 to generate the fixed salt, refering to a cache if we have it. */
+/* Run PBKDF2 to generate the Domain Separation Prefix, refering to a cache if we have it. */
 byte[] Pbkdf2(byte[] password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
 {
     /* Check if we've done this exact hashing operation before. */
-    string cacheFixedSaltPath =
+    string cachePrefixPath =
         Path.Combine(Path.GetTempPath(),
-        "CacheFixedSaltPath" +
+        "CachePrefixPath" +
         $"_{BytesToHex(password)}" +
         $"_{BytesToHex(salt)}" +
         $"_{iterations}" +
         $"_{hashAlgorithm}" +
         $"_{outputLength}.bin");
-    if (File.Exists(cacheFixedSaltPath))
-        return File.ReadAllBytes(cacheFixedSaltPath);
+    if (File.Exists(cachePrefixPath))
+        return File.ReadAllBytes(cachePrefixPath);
 
     /* If not call through to the actual PBKDF2. */
     var hashTimer = Stopwatch.StartNew();
-    var fixedSaltAsBytes = Rfc2898DeriveBytes.Pbkdf2(
+    var prefixAsBytes = Rfc2898DeriveBytes.Pbkdf2(
         password: password,
         salt: salt,
         iterations: iterations,
@@ -106,10 +107,10 @@ byte[] Pbkdf2(byte[] password, byte[] salt, int iterations, HashAlgorithmName ha
     Console.WriteLine($"PBKDF2 took {hashTimer.Elapsed}");
 
     /* Save to cache. */
-    File.WriteAllBytes(cacheFixedSaltPath, fixedSaltAsBytes);
+    File.WriteAllBytes(cachePrefixPath, prefixAsBytes);
 
     /* Return now cached bytes to caller. */
-    return fixedSaltAsBytes;
+    return prefixAsBytes;
 }
 
 /* Expand the salt parameter strings into a longer entry, clarifying their length and byte sum. */
@@ -177,16 +178,17 @@ void PopulateExample(string keyBase, DateTime now, string hostDomainName, string
     int responseMarkerLineIndex = readmeLines.FindIndex(s => s.Contains($"<!--{keyBase}_SET_COOKIE-->"));
     if (responseMarkerLineIndex > 0)
     {
-        string setCookieHeader =
-            $"Set-Cookie:" +
-            $" RutabagaAuth={GenerateBearerToken(keyBase)};\r\n" +
-            $"  Domain={xnHostDomain};\r\n" +
-            $"  Expires={now.AddSeconds(4601):R};\r\n" +
-            $"  Secure; HttpOnly; SameSite=Strict";
+        string[] setCookieHeader =
+        [
+            $"Set-Cookie: RutabagaAuth={GenerateBearerToken(keyBase)};",
+            $"  Domain={xnHostDomain};",
+            $"  Expires={now.AddSeconds(4601):R};",
+            $"  Secure; HttpOnly; SameSite=Strict"
+        ];
         int setCookieLineIndex = readmeLines.FindIndex(responseMarkerLineIndex, s => s.StartsWith("Set-Cookie:"));
         int endSetCookie = readmeLines.FindIndex(setCookieLineIndex+1, s => s.StartsWith(' ') == false);
-        readmeLines[setCookieLineIndex] = setCookieHeader;
-        readmeLines.RemoveRange(setCookieLineIndex + 1, endSetCookie - setCookieLineIndex - 1);
+        readmeLines.RemoveRange(setCookieLineIndex, endSetCookie - setCookieLineIndex);
+        readmeLines.InsertRange(setCookieLineIndex, setCookieHeader);
     }
 }
 
@@ -222,8 +224,17 @@ string GenerateBearerToken(string keyBase)
 
 void ReplaceJson(string tag, JObject insert)
 {
+    /* Format the JSON with four-space indentation. (Newtonsoft's default is two spaces,
+     * and its line endings depend on the operating system, so write it out explicitly.) */
+    var jsonStringWriter = new StringWriter { NewLine = "\n" };
+    using (var jsonWriter = new JsonTextWriter(jsonStringWriter)
+        { Formatting = Formatting.Indented, Indentation = 4, IndentChar = ' ' })
+    {
+        insert.WriteTo(jsonWriter);
+    }
+
     /* Turn the JSON object into a Json string with only ascii. */
-    StringBuilder jsonAsString = new StringBuilder(insert.ToString().Replace("\r\n  ", "\r\n    "));
+    StringBuilder jsonAsString = new StringBuilder(jsonStringWriter.ToString());
     for (int jsonIndex = jsonAsString.Length-1; jsonIndex > 0; jsonIndex--)
     {
         char ch = jsonAsString[jsonIndex];
@@ -241,8 +252,8 @@ void ReplaceJson(string tag, JObject insert)
     int closeBraceIndex = readmeLines.FindIndex(openBraceIndex, src => src == "}");
     readmeLines.RemoveRange(openBraceIndex, closeBraceIndex - openBraceIndex + 1);
 
-    /* Insert back into code. */
-    readmeLines.Insert(openBraceIndex, jsonAsString.ToString());
+    /* Insert back into code, as one README line per JSON line. */
+    readmeLines.InsertRange(openBraceIndex, jsonAsString.ToString().Split('\n'));
 }
 
 /* Find the folder with the given name, starting from this file's folder moving upwards. */
@@ -284,8 +295,8 @@ string GenerateUnus(int bits, string v)
 
 void SetTextByMarker(List<string> lines, string marker, string line)
 {
-    int fixedSaltIndex = lines.FindIndex(src => src.Contains(marker));
-    lines[fixedSaltIndex] = line + marker;
+    int markerIndex = lines.FindIndex(src => src.Contains(marker));
+    lines[markerIndex] = line + marker;
 }
 
 static void InsertByteArrayAsText(List<string> lines, string beacon, string startMarker, string endMarker, byte[] bytes)

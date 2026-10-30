@@ -67,5 +67,5 @@ without installing anything.
   the markup is valid, not that the prose is right.
 - Consider circulating it for informal review before an official
   `-00` submission via the IETF Datatracker.
-- Keep the JSON examples and Fixed Salt bytes in sync with
+- Keep the JSON examples and Domain Separation Prefix bytes in sync with
   `billpg.HashBackCore/Helpers.cs` if the protocol version changes.

@@ -18,8 +18,8 @@ hashback_claim = {
 
 # Hash the claim.
 json_as_bytes = json.dumps(hashback_claim).encode('utf-8')
-fixed_salt = base64.b64decode("MGrvPY28enVH8lmkmlksLxQqIvX65oseOPAoqCO4XPw=")
-hash = base64.b64encode(hashlib.sha256(fixed_salt + json_as_bytes).digest())
+domain_separation_prefix = base64.b64decode("MGrvPY28enVH8lmkmlksLxQqIvX65oseOPAoqCO4XPw=")
+hash = base64.b64encode(hashlib.sha256(domain_separation_prefix + json_as_bytes).digest())
 
 # Upload the hash to the hashback demo server.
 # Replace this with your own server upload!
