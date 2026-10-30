@@ -1392,10 +1392,13 @@ li > p:last-of-type:only-child {
                 <p id="section-toc.1-1.10.2.3.1"><a href="#section-10.3" class="auto internal xref">10.3</a>.  <a href="#name-predictability-of-request-c" class="internal xref">Predictability of Request Contents</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10.2.4">
-                <p id="section-toc.1-1.10.2.4.1"><a href="#section-10.4" class="auto internal xref">10.4</a>.  <a href="#name-server-side-request-forgery" class="internal xref">Server-Side Request Forgery Considerations</a></p>
+                <p id="section-toc.1-1.10.2.4.1"><a href="#section-10.4" class="auto internal xref">10.4</a>.  <a href="#name-replay-attacks" class="internal xref">Replay Attacks</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10.2.5">
-                <p id="section-toc.1-1.10.2.5.1"><a href="#section-10.5" class="auto internal xref">10.5</a>.  <a href="#name-denial-of-service-considera" class="internal xref">Denial of Service Considerations</a></p>
+                <p id="section-toc.1-1.10.2.5.1"><a href="#section-10.5" class="auto internal xref">10.5</a>.  <a href="#name-server-side-request-forgery" class="internal xref">Server-Side Request Forgery Considerations</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10.2.6">
+                <p id="section-toc.1-1.10.2.6.1"><a href="#section-10.6" class="auto internal xref">10.6</a>.  <a href="#name-denial-of-service-considera" class="internal xref">Denial of Service Considerations</a></p>
 </li>
             </ul>
 </li>
@@ -1700,7 +1703,8 @@ Authorization = "HashBack" 1*SP token68
             <span class="bcp14">MUST NOT</span> reuse a <code>Unus</code> value across
             requests. A Verifier <span class="bcp14">SHOULD</span> reject any request
             reusing a <code>Unus</code> value it has already seen within its
-            configured <code>Now</code> tolerance window.<a href="#section-5.1-2.8" class="pilcrow">¶</a>
+            configured <code>Now</code> tolerance window. See
+            <a href="#replay" class="auto internal xref">Section 10.4</a>.<a href="#section-5.1-2.8" class="pilcrow">¶</a>
 </dd>
           <dd class="break"></dd>
 <dt id="section-5.1-2.9">Verify:</dt>
@@ -2028,12 +2032,32 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
           generator, and <span class="bcp14">MUST NOT</span> reuse a value.<a href="#section-10.3-1" class="pilcrow">¶</a></p>
 </section>
 </div>
-<div id="ssrf">
+<div id="replay">
 <section id="section-10.4">
-        <h3 id="name-server-side-request-forgery">
-<a href="#section-10.4" class="section-number selfRef">10.4. </a><a href="#name-server-side-request-forgery" class="section-name selfRef">Server-Side Request Forgery Considerations</a>
+        <h3 id="name-replay-attacks">
+<a href="#section-10.4" class="section-number selfRef">10.4. </a><a href="#name-replay-attacks" class="section-name selfRef">Replay Attacks</a>
         </h3>
 <p id="section-10.4-1">
+          A captured request is accepted only if its <code>Now</code> is within
+          the Verifier's tolerance, its <code>Host</code> names that Verifier,
+          its <code>Unus</code> has not been seen before, and the Verify URL
+          still returns the matching hash. A Verifier that wants replay
+          protection <span class="bcp14">MUST</span> remember each <code>Unus</code> for at
+          least as long as the request remains acceptable, which is until
+          <code>Now</code> plus the tolerance. A Prover <span class="bcp14">SHOULD</span>
+          stop serving a verification hash once the Verifier's window has
+          passed, and <span class="bcp14">MAY</span> serve it only once.<a href="#section-10.4-1" class="pilcrow">¶</a></p>
+<p id="section-10.4-2">
+          Without <code>Unus</code> tracking or hash expiry, a captured request
+          can be replayed until its <code>Now</code> is out of tolerance.<a href="#section-10.4-2" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="ssrf">
+<section id="section-10.5">
+        <h3 id="name-server-side-request-forgery">
+<a href="#section-10.5" class="section-number selfRef">10.5. </a><a href="#name-server-side-request-forgery" class="section-name selfRef">Server-Side Request Forgery Considerations</a>
+        </h3>
+<p id="section-10.5-1">
           Fetching a URL supplied in an incoming request carries the usual
           SSRF risks associated with any user-supplied URL fetch.
           Implementations <span class="bcp14">SHOULD</span> apply the same precautions
@@ -2042,15 +2066,15 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
           connecting, rejecting internal or loopback address ranges unless
           explicitly intended (for example, during local development),
           declining to follow redirects (see <a href="#hashing" class="auto internal xref">Section 6</a>), and
-          applying a request timeout.<a href="#section-10.4-1" class="pilcrow">¶</a></p>
+          applying a request timeout.<a href="#section-10.5-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="dos">
-<section id="section-10.5">
+<section id="section-10.6">
         <h3 id="name-denial-of-service-considera">
-<a href="#section-10.5" class="section-number selfRef">10.5. </a><a href="#name-denial-of-service-considera" class="section-name selfRef">Denial of Service Considerations</a>
+<a href="#section-10.6" class="section-number selfRef">10.6. </a><a href="#name-denial-of-service-considera" class="section-name selfRef">Denial of Service Considerations</a>
         </h3>
-<p id="section-10.5-1">
+<p id="section-10.6-1">
           Because every incoming request with a HashBack header causes the
           Verifier to make a further outbound HTTPS request, a flood of
           fabricated <code>Authorization</code> headers could be used to
@@ -2059,14 +2083,14 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
           Implementations <span class="bcp14">SHOULD</span> apply a short connection
           and response timeout to the Verify URL fetch, and
           <span class="bcp14">MAY</span> track and rate-limit sources of requests that
-          repeatedly fail verification.<a href="#section-10.5-1" class="pilcrow">¶</a></p>
-<p id="section-10.5-2">
+          repeatedly fail verification.<a href="#section-10.6-1" class="pilcrow">¶</a></p>
+<p id="section-10.6-2">
           A related concern is a malicious Verify URL that accepts the
           connection but never completes the response, tying up a
           connection on the Verifier for as long as it is willing to wait.
           A short, strictly enforced timeout on the Verify URL fetch
           mitigates this; the timeout only needs to be long enough for the
-          expected response to arrive under normal network conditions.<a href="#section-10.5-2" class="pilcrow">¶</a></p>
+          expected response to arrive under normal network conditions.<a href="#section-10.6-2" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -2124,7 +2148,7 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
         implementations are valuable when establishing a new standard.
         The author also thanks "buzer" of Hacker News for raising the
         slow-verification-URL denial-of-service concern discussed in
-        <a href="#dos" class="auto internal xref">Section 10.5</a>.<a href="#section-12-1" class="pilcrow">¶</a></p>
+        <a href="#dos" class="auto internal xref">Section 10.6</a>.<a href="#section-12-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 <section id="section-13">

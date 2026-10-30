@@ -331,7 +331,8 @@ Authorization = "HashBack" 1*SP token68
             <bcp14>MUST NOT</bcp14> reuse a <tt>Unus</tt> value across
             requests. A Verifier <bcp14>SHOULD</bcp14> reject any request
             reusing a <tt>Unus</tt> value it has already seen within its
-            configured <tt>Now</tt> tolerance window.
+            configured <tt>Now</tt> tolerance window. See
+            <xref target="replay"/>.
           </dd>
           <dt>Verify:</dt>
           <dd>
@@ -616,6 +617,25 @@ WWW-Authenticate: HashBack realm="My_Wonderful_Realm"
           Implementations therefore <bcp14>MUST</bcp14> generate
           <tt>Unus</tt> using a cryptographically secure random number
           generator, and <bcp14>MUST NOT</bcp14> reuse a value.
+        </t>
+      </section>
+
+      <section anchor="replay" numbered="true" toc="default">
+        <name>Replay Attacks</name>
+        <t>
+          A captured request is accepted only if its <tt>Now</tt> is within
+          the Verifier's tolerance, its <tt>Host</tt> names that Verifier,
+          its <tt>Unus</tt> has not been seen before, and the Verify URL
+          still returns the matching hash. A Verifier that wants replay
+          protection <bcp14>MUST</bcp14> remember each <tt>Unus</tt> for at
+          least as long as the request remains acceptable, which is until
+          <tt>Now</tt> plus the tolerance. A Prover <bcp14>SHOULD</bcp14>
+          stop serving a verification hash once the Verifier's window has
+          passed, and <bcp14>MAY</bcp14> serve it only once.
+        </t>
+        <t>
+          Without <tt>Unus</tt> tracking or hash expiry, a captured request
+          can be replayed until its <tt>Now</tt> is out of tolerance.
         </t>
       </section>
 
