@@ -35,7 +35,9 @@
         HashBack is a two-step authentication exchange carried over HTTPS/TLS
         that allows one HTTP server to authenticate another, without either
         party holding a long-term shared secret, bearer token, or private
-        key. A prover demonstrates its identity by publishing a short cryptographic
+        key. It is intended for unattended services, such as those running
+        in the cloud, which would otherwise have to keep such a credential
+        where an attacker could copy it. A prover demonstrates its identity by publishing a short cryptographic
         hash on a website it controls; the verifier of a request fetches
         that hash over a second, independent HTTPS connection and compares
         it against a value it calculates itself. If the two values match,
@@ -76,17 +78,27 @@
     <section anchor="introduction" numbered="true" toc="default">
       <name>Introduction</name>
       <t>
-        A server that calls out to another server over the Internet
-        typically needs some way to prove its identity: an API key, a
-        bearer token, a shared secret, or a private key backing a client
-        TLS certificate. Whichever form it takes, that credential has to be
-        generated, distributed to the calling service, stored securely at
-        both ends, and eventually rotated - all before the two services can
-        exchange a single authenticated request.
+        Consider a service running unattended in the cloud that makes
+        requests to another service over the Internet. To prove its
+        identity it normally needs a credential: an API key, a bearer
+        token, a shared secret, or the private key behind a client TLS
+        certificate. That credential has to be readable by the running
+        code, so it must be kept somewhere the code can reach without a
+        person present to unlock it: a configuration file, an environment
+        variable, a machine image, or a secrets manager. Anyone who obtains
+        a copy from a backup, a log, a build system, or a compromised host
+        can impersonate the service from anywhere, until the credential is
+        noticed and rotated. A secrets manager moves the problem rather
+        than removing it, because the service needs a credential of its
+        own to open it. The credential also has to be generated,
+        distributed to the calling service, stored securely at both ends,
+        and eventually rotated, all before the two services can exchange a
+        single authenticated request.
       </t>
       <t>
-        HashBack removes the need for that long-term credential entirely.
-        Instead, it relies on a property both parties already have if they
+        The motivation for HashBack is to avoid all of that: a calling
+        service should not have to hold any long-term private key, token,
+        or password in order to prove who it is. Instead, it relies on a property both parties already have if they
         are communicating over HTTPS at all: each side runs a TLS-secured
         web server that the other side can reach. HashBack uses this in a
         manner similar to a phone call placed to a trusted number and then
@@ -94,6 +106,15 @@
         tells the verifier "I am the operator of this URL - call me back
         there to check", and publishes a value at that URL for the
         verifier to retrieve.
+      </t>
+      <t>
+        This does not make a compromised host harmless: an attacker in
+        control of the prover can still publish hashes while it remains in
+        control. What HashBack avoids is leaving a reusable credential on
+        the machine, one that can be copied away and used elsewhere, or
+        later, after the attacker has lost access. The prover, being a web
+        server itself, needs no credential beyond its own ability to serve
+        a small file at a URL it controls.
       </t>
       <t>
         This is deliberately similar in spirit to the challenge exchange

@@ -11,7 +11,9 @@
         HashBack is a two-step authentication exchange carried over HTTPS/TLS
         that allows one HTTP server to authenticate another, without either
         party holding a long-term shared secret, bearer token, or private
-        key. A prover demonstrates its identity by publishing a short cryptographic
+        key. It is intended for unattended services, such as those running
+        in the cloud, which would otherwise have to keep such a credential
+        where an attacker could copy it. A prover demonstrates its identity by publishing a short cryptographic
         hash on a website it controls; the verifier of a request fetches
         that hash over a second, independent HTTPS connection and compares
         it against a value it calculates itself. If the two values match,
@@ -1269,7 +1271,9 @@ li > p:last-of-type:only-child {
         HashBack is a two-step authentication exchange carried over HTTPS/TLS
         that allows one HTTP server to authenticate another, without either
         party holding a long-term shared secret, bearer token, or private
-        key. A prover demonstrates its identity by publishing a short cryptographic
+        key. It is intended for unattended services, such as those running
+        in the cloud, which would otherwise have to keep such a credential
+        where an attacker could copy it. A prover demonstrates its identity by publishing a short cryptographic
         hash on a website it controls; the verifier of a request fetches
         that hash over a second, independent HTTPS connection and compares
         it against a value it calculates itself. If the two values match,
@@ -1430,16 +1434,26 @@ li > p:last-of-type:only-child {
 <a href="#section-1" class="section-number selfRef">1. </a><a href="#name-introduction" class="section-name selfRef">Introduction</a>
       </h2>
 <p id="section-1-1">
-        A server that calls out to another server over the Internet
-        typically needs some way to prove its identity: an API key, a
-        bearer token, a shared secret, or a private key backing a client
-        TLS certificate. Whichever form it takes, that credential has to be
-        generated, distributed to the calling service, stored securely at
-        both ends, and eventually rotated - all before the two services can
-        exchange a single authenticated request.<a href="#section-1-1" class="pilcrow">¶</a></p>
+        Consider a service running unattended in the cloud that makes
+        requests to another service over the Internet. To prove its
+        identity it normally needs a credential: an API key, a bearer
+        token, a shared secret, or the private key behind a client TLS
+        certificate. That credential has to be readable by the running
+        code, so it must be kept somewhere the code can reach without a
+        person present to unlock it: a configuration file, an environment
+        variable, a machine image, or a secrets manager. Anyone who obtains
+        a copy from a backup, a log, a build system, or a compromised host
+        can impersonate the service from anywhere, until the credential is
+        noticed and rotated. A secrets manager moves the problem rather
+        than removing it, because the service needs a credential of its
+        own to open it. The credential also has to be generated,
+        distributed to the calling service, stored securely at both ends,
+        and eventually rotated, all before the two services can exchange a
+        single authenticated request.<a href="#section-1-1" class="pilcrow">¶</a></p>
 <p id="section-1-2">
-        HashBack removes the need for that long-term credential entirely.
-        Instead, it relies on a property both parties already have if they
+        The motivation for HashBack is to avoid all of that: a calling
+        service should not have to hold any long-term private key, token,
+        or password in order to prove who it is. Instead, it relies on a property both parties already have if they
         are communicating over HTTPS at all: each side runs a TLS-secured
         web server that the other side can reach. HashBack uses this in a
         manner similar to a phone call placed to a trusted number and then
@@ -1448,17 +1462,25 @@ li > p:last-of-type:only-child {
         there to check", and publishes a value at that URL for the
         verifier to retrieve.<a href="#section-1-2" class="pilcrow">¶</a></p>
 <p id="section-1-3">
+        This does not make a compromised host harmless: an attacker in
+        control of the prover can still publish hashes while it remains in
+        control. What HashBack avoids is leaving a reusable credential on
+        the machine, one that can be copied away and used elsewhere, or
+        later, after the attacker has lost access. The prover, being a web
+        server itself, needs no credential beyond its own ability to serve
+        a small file at a URL it controls.<a href="#section-1-3" class="pilcrow">¶</a></p>
+<p id="section-1-4">
         This is deliberately similar in spirit to the challenge exchange
         used by the Automatic Certificate Management Environment (ACME)
         <span>[<a href="#RFC8555" class="cite xref">RFC8555</a>]</span>, which validates control of a domain name
         by asking the requester to publish a token there ahead of a
         certificate being issued. HashBack applies the same "prove control
         of a URL" idea to general-purpose API authentication, and reduces
-        the exchange to two HTTP transactions instead of three.<a href="#section-1-3" class="pilcrow">¶</a></p>
-<p id="section-1-4">
+        the exchange to two HTTP transactions instead of three.<a href="#section-1-4" class="pilcrow">¶</a></p>
+<p id="section-1-5">
         This document is an early, individual Internet-Draft. It has not
         been adopted by any IETF working group. It is published to invite
-        review and comment ahead of a future submission for standardization.<a href="#section-1-4" class="pilcrow">¶</a></p>
+        review and comment ahead of a future submission for standardization.<a href="#section-1-5" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="terminology">
